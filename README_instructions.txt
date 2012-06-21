@@ -4,7 +4,7 @@ export JAVA_HOME="/usr/local/jdk-6u22-64"
 // At least current dir and mysql connector jar should be in CLASSPATH
 // Mysql connector jar can be downloaded from http://dev.mysql.com/downloads/connector/j/.
 // Download version 5.0.8 or higher. Copy the mysql jar to the lib directory.
-export CLASSPATH=.:<path to mysql-connector-java-5.0.8-bin.jar>
+export CLASSPATH=.:lib/mysql-connector-java-5.1.16-bin.jar:dist/FacebookLinkBench-20120608.jar
 
 export PATH=$JAVA_HOME/bin:$PATH
 
@@ -56,7 +56,7 @@ set global innodb_flush_log_at_trx_commit = 2;
 set global sync_binlog = 0;
 
 // LOAD DATA . takes about 11000 seconds.
-java com.facebook.LinkBench.LinkBenchDriver com/facebook/LinkBench/LinkConfigMysql.properties 1
+java com.facebook.LinkBench.LinkBenchDriver config/LinkConfigMysql.properties 1
 
 // You will see last line of output like this
 LOAD PHASE COMPLETED. Expected to load 10000000 links. 48181609 loaded in 10971 seconds.Links/second = 4391
