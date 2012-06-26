@@ -179,8 +179,26 @@ class RealDistribution {
    * value and the cumulative distribution at that value i.e. <x, CDF(x)>.
    */
   private static void getStatisticalData(Properties props) throws Exception {
-    String filename = props.getProperty("data_file");
-    Scanner scanner = new Scanner(new File(filename));
+    String propName = "data_file";
+    String filename = props.getProperty(propName);
+    
+    // If relative path, should be relative to linkbench home directory
+    String fileAbsPath;
+    if (new File(filename).isAbsolute()) {
+      fileAbsPath = filename;
+    } else {
+      String linkBenchHome = ConfigUtil.findLinkBenchHome();
+      if (linkBenchHome == null) {
+        throw new Exception("Data file config property " + propName
+            + " was specified using a relative path, but linkbench home"
+            + " directory was not specified through environment var "
+            + ConfigUtil.linkbenchHomeEnvVar);
+      } else {
+        fileAbsPath = linkBenchHome + File.separator + filename;
+      }
+    }
+    
+    Scanner scanner = new Scanner(new File(fileAbsPath));
     while (scanner.hasNext()) {
       String type = scanner.next();
       if (type.equals("nlinks")) {

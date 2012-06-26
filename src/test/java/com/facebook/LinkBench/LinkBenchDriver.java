@@ -1,14 +1,22 @@
 package com.facebook.LinkBench;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.util.Properties;
-import java.util.List;
 import java.util.LinkedList;
-
+import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 
 /*
  LinkBenchDriver class.
@@ -20,10 +28,15 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 
 public class LinkBenchDriver {
+  
+  public static final int EXIT_BADARGS = 1;
+  
+  private static String configFile = null;
+  private static boolean doLoad = false;
+  private static boolean doRequest = false;
+  
   public static final int LOAD = 1;
   public static final int REQUEST = 2;
-
-  private static int mode = 0;
 
   private Properties props;
   private String store;
@@ -76,7 +89,7 @@ public class LinkBenchDriver {
 
   void load() throws IOException, InterruptedException, Throwable {
 
-    if (mode == REQUEST) {
+    if (!doLoad) {
       System.out.println("Skipping load data per the cmdline arg");
       return;
     }
@@ -121,7 +134,7 @@ public class LinkBenchDriver {
 
   void sendrequests() throws IOException, InterruptedException, Throwable {
 
-    if (mode == LOAD) {
+    if (!doRequest) {
       System.out.println("Skipping request phase per the cmdline arg");
       return;
     }
@@ -226,22 +239,94 @@ public class LinkBenchDriver {
 
   public static void main(String[] args)
     throws IOException, InterruptedException, Throwable {
+    processArgs(args);
 
-    if (args.length < 2) {
-      System.out.println("Args : LinkBenchDriver configfile mode.");
-      System.out.println("Use mode=1 for load, mode=2 for requests, mode=3 for both");
-      return;
-    }
-
-    mode = Integer.parseInt(args[1]);
-    if (mode < 1 || mode > 3) {
-      System.out.println("Invalid mode. Mode should be 1, 2 or 3");
-      return;
-    }
-
-    LinkBenchDriver d = new LinkBenchDriver(args[0]);
+    LinkBenchDriver d = new LinkBenchDriver(configFile);
     d.drive();
+  }
 
+  private static void printUsage(Options options) {
+    //PrintWriter writer = new PrintWriter(System.err);
+    HelpFormatter fmt = new HelpFormatter();
+    fmt.printHelp("linkbench", options, true);
+  }
+
+  private static Options initializeOptions() {
+    Options options = new Options();
+    Option config = new Option("c", true,
+                                "Linkbench config file");
+    config.setArgName("file");
+    options.addOption(config);
+    
+    options.addOption("l", false,
+               "Execute loading stage of benchmark");
+    options.addOption("r", false,
+               "Execute request stage of benchmark");
+    return options;
+  }
+  
+  /**
+   * Process command line arguments and set static variables
+   * exits program if invalid arguments provided
+   * @param options
+   * @param args
+   * @throws ParseException
+   */
+  private static void processArgs(String[] args)
+              throws ParseException {
+    Options options = initializeOptions();
+    
+    CommandLine cmd = null;
+    try {
+      CommandLineParser parser = new GnuParser();
+      cmd = parser.parse( options, args);    
+    } catch (ParseException ex) {
+      // Use Apache CLI-provided messages
+      System.err.println(ex.getMessage());
+      printUsage(options);
+      System.exit(EXIT_BADARGS);
+    }
+    
+    /* 
+     * Apache CLI validates arguments, so can now assume
+     * all required options are present, etc
+     */
+    if (cmd.getArgs().length > 0) {
+      System.err.print("Invalid trailing arguments:");
+      for (String arg: cmd.getArgs()) {
+        System.err.print(' ');
+        System.err.print(arg);
+      }
+      System.err.println();
+      printUsage(options);
+      System.exit(EXIT_BADARGS);
+    }   
+
+    // Set static option variables
+    doLoad = cmd.hasOption('l');
+    doRequest = cmd.hasOption('r');
+    
+    configFile = cmd.getOptionValue('c');
+    if (configFile == null) {
+      // Try to find in usual location
+      String linkBenchHome = ConfigUtil.findLinkBenchHome();
+      if (linkBenchHome != null) {
+        configFile = linkBenchHome + File.separator +
+              "config" + File.separator + "LinkConfigMysql.properties";
+      } else {
+        System.err.println("Config file not specified through command "
+            + "line argument and " + ConfigUtil.linkbenchHomeEnvVar
+            + " environment variable not set to valid directory");
+        printUsage(options);
+        System.exit(EXIT_BADARGS);
+      }
+    }
+    
+    if (!(doLoad || doRequest)) {
+      System.err.println("Did not select benchmark mode");
+      printUsage(options);
+      System.exit(EXIT_BADARGS);
+    }
   }
 }
 

@@ -29,31 +29,27 @@
 #
 #   CONF_DIR  Alternate conf dir. Default is ./config.
 #
-#
-
 # This script creates the benchmark data and then runs the workload
 # on it
 
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
-LINKHOMEDIR=$bin
 
-# get arguments
-COMMAND=$1
-shift
-
-# some Java parameters
-if [ "$JAVA_HOME" != "" ]; then
-  #echo "run java in $JAVA_HOME"
-  JAVA_HOME=$JAVA_HOME
-fi
+# Export LINKBENCH_HOME so that LinkBench Java code can access env var
+export LINKBENCH_HOME=`dirname $bin`
 
 if [ "$JAVA_HOME" = "" ]; then
-  echo "Error: JAVA_HOME is not set."
-  exit 1
+  JAVA=`which java`
+  if [ ! -x $JAVA ]; then
+    echo "Error: java not found, set JAVA_HOME or add java to PATH."
+    exit 1
+  fi
+else
+  JAVA=$JAVA_HOME/bin/java
 fi
 
-JAVA=$JAVA_HOME/bin/java
+echo "Using java at: $JAVA"
+
 JAVA_HEAP_MAX=-Xmx1000m
 
 # check envvars which might override default args
@@ -71,12 +67,12 @@ CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
 IFS=
 
 # add libs to CLASSPATH
-for f in $LINKHOMEDIR/lib/*.jar; do
+for f in $LINKBENCH_HOME/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
 # add dist to CLASSPATH
-for f in $LINKHOMEDIR/dist/*.jar; do
+for f in $LINKBENCH_HOME/dist/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
@@ -86,12 +82,7 @@ unset IFS
 # figure out which class to run
 CLASS='com.facebook.LinkBench.LinkBenchDriver'
 
-# command line opts  to run 
-if [ "$CMDLINE_OPTS" == "" ]; then
-  CMDLINE_OPTS="$LINKHOMEDIR/config/LinkConfigMysql.properties 3"
-  echo XXX CMDLINE_OPTS=$CMDLINE_OPTS
-fi
-
 # run it
-echo "$JAVA" $JAVA_HEAP_MAX $OPTS $JMX_OPTS -classpath "$CLASSPATH" $CLASS $CMDLINE_OPTS "$@"
-exec "$JAVA" $JAVA_HEAP_MAX $OPTS $JMX_OPTS -classpath "$CLASSPATH" $CLASS $CMDLINE_OPTS "$@"
+set -x
+exec "$JAVA" $JAVA_HEAP_MAX $OPTS $JMX_OPTS -classpath "$CLASSPATH" $CLASS \
+          "$@"
