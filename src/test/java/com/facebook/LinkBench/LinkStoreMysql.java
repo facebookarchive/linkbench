@@ -4,9 +4,12 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Date;
 import java.util.Properties;
+
+import com.mysql.jdbc.CommunicationsException;
 
 public class LinkStoreMysql extends LinkStore {
 
@@ -21,18 +24,18 @@ public class LinkStoreMysql extends LinkStore {
   int debuglevel;
   Connection conn;
   Statement stmt;
-
+  
   public LinkStoreMysql() {
     super();
   }
 
-  public LinkStoreMysql(Properties props) throws IOException {
+  public LinkStoreMysql(Properties props) throws IOException, Exception {
     super();
     initialize(props, 0, 0);
   }
 
   public void initialize(Properties props, int currentPhase,
-    int threadId) throws IOException {
+    int threadId) throws IOException, Exception {
     counttable = props.getProperty("counttable");
     if (counttable == null || counttable.equals("")) {
       System.err.println("Error! counttable is empty/ not found!");
@@ -50,6 +53,10 @@ public class LinkStoreMysql extends LinkStore {
     // connect
     try {
       openConnection();
+    } catch (SQLException e) {
+      System.err.println("error connecting to database:");
+      System.err.println(e.getMessage());
+      System.exit(1);
     } catch (Exception e) {
       e.printStackTrace();
       System.exit(1);
@@ -62,24 +69,18 @@ public class LinkStoreMysql extends LinkStore {
   private void openConnection() throws Exception {
     conn = null;
     stmt = null;
-    try {
-      Class.forName("com.mysql.jdbc.Driver").newInstance();
-      conn = DriverManager.getConnection(
-                          "jdbc:mysql://"+ host + ":" + port + "/" + "test" +
-                          "?elideSetAutoCommits=true" +
-                          "&useLocalTransactionState=true" +
-                          "&allowMultiQueries=true" +
-                          "&useLocalSessionState=true",
-                          user, pwd);
-      // System.out.println("connected");
-      conn.setAutoCommit(false);
-      stmt = conn.createStatement();
-    }
-    catch (Throwable e)
-    {
-      e.printStackTrace();
-      return;
-    }
+    
+    Class.forName("com.mysql.jdbc.Driver").newInstance();
+    conn = DriverManager.getConnection(
+                        "jdbc:mysql://"+ host + ":" + port + "/" + "test" +
+                        "?elideSetAutoCommits=true" +
+                        "&useLocalTransactionState=true" +
+                        "&allowMultiQueries=true" +
+                        "&useLocalSessionState=true",
+                        user, pwd);
+    //System.err.println("connected");
+    conn.setAutoCommit(false);
+    stmt = conn.createStatement();
   }
 
   public void clearErrors(int threadID) {

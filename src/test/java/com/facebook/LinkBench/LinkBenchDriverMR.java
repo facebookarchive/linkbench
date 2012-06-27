@@ -90,11 +90,14 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     }
     newstore = (LinkStore)newInstance(clazz);
     if (clazz == null) {
-      System.out.println("Unknown data store " + store);
-      System.exit(1);
-      return null;
+      throw new IOException("Unknown data store " + store);
     }
-    newstore.initialize(props, currentphase, mapperid);
+    
+    try { 
+      newstore.initialize(props, currentphase, mapperid);
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
     return newstore;
   }
 
@@ -304,14 +307,14 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders.get());
       LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats,
                                           loaderid.get(), nloaders.get());
-      LinkedList<Runnable> tasks = new LinkedList<Runnable>();
+      LinkedList<LinkBenchLoad> tasks = new LinkedList<LinkBenchLoad>();
       tasks.add(loader);
       long linksloaded = 0;
       try {
         LinkBenchDriver.concurrentExec(tasks);
         linksloaded = loader.getLinksLoaded();
       } catch (java.lang.Throwable t) {
-        new IOException(t);
+        throw new IOException(t);
       }
       output.collect(new IntWritable(nloaders.get()),
                      new LongWritable(linksloaded));
@@ -336,10 +339,21 @@ public class LinkBenchDriverMR extends Configured implements Tool {
 
       LinkStore store = initStore(REQUEST, requesterid.get());
       LinkBenchLatency latencyStats = new LinkBenchLatency(nrequesters.get());
-      LinkBenchRequest requester =
+      final LinkBenchRequest requester =
         new LinkBenchRequest(store, props, latencyStats,
                              requesterid.get(), nrequesters.get());
-      Thread t = new Thread(requester);
+      
+      // Wrap in runnable to handle error
+      Thread t = new Thread(new Runnable() {
+        public void run() {
+          try {
+            requester.run();
+          } catch (Throwable t) {
+            System.err.println("Uncaught error in requester:");
+            t.printStackTrace();
+          }
+        }
+      });
       t.start();
       long requestdone = 0;
       try {

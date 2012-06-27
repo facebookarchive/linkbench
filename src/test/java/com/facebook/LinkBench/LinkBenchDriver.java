@@ -82,7 +82,14 @@ public class LinkBenchDriver {
       System.exit(1);
       return null;
     }
-    newstore.initialize(props, currentphase, threadid);
+    
+    try {
+      newstore.initialize(props, currentphase, threadid);
+    } catch (Exception e) {
+      System.err.println("Error while initializing data store:");
+      e.printStackTrace();
+      System.exit(1);
+    }
 
     return newstore;
   }
@@ -97,14 +104,14 @@ public class LinkBenchDriver {
     // load data
 
     int nloaders = Integer.parseInt(props.getProperty("loaders"));
-    List<Runnable> loaders = new LinkedList<Runnable>();
+    List<LinkBenchLoad> loaders = new LinkedList<LinkBenchLoad>();
     LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders);
 
     // start loaders
     System.out.println("Starting loaders " + nloaders);
     for (int i = 0; i < nloaders; i++) {
       LinkStore store = initStore(LOAD, i);
-      Runnable l = new LinkBenchLoad(store, props, latencyStats, i, nloaders);
+      LinkBenchLoad l = new LinkBenchLoad(store, props, latencyStats, i, nloaders);
       loaders.add(l);
     }
 
@@ -119,8 +126,7 @@ public class LinkBenchDriver {
     long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
 
     long actuallinks = 0;
-    for (final Runnable r:loaders) {
-      LinkBenchLoad l = (LinkBenchLoad)r;
+    for (final LinkBenchLoad l:loaders) {
       actuallinks += l.getLinksLoaded();
     }
 
@@ -146,12 +152,12 @@ public class LinkBenchDriver {
       return;
     }
     LinkBenchLatency latencyStats = new LinkBenchLatency(nrequesters);
-    List<Runnable> requesters = new LinkedList<Runnable>();
+    List<LinkBenchRequest> requesters = new LinkedList<LinkBenchRequest>();
 
     // create requesters
     for (int i = 0; i < nrequesters; i++) {
       LinkStore store = initStore(REQUEST, i);
-      Runnable l = new LinkBenchRequest(store, props, latencyStats,
+      LinkBenchRequest l = new LinkBenchRequest(store, props, latencyStats,
                                         i, nrequesters);
       requesters.add(l);
     }
@@ -162,7 +168,7 @@ public class LinkBenchDriver {
     long requestsdone = 0;
     // wait for requesters
     for (int j = 0; j < nrequesters; j++) {
-      requestsdone += ((LinkBenchRequest)requesters.get(j)).getRequestsDone();
+      requestsdone += requesters.get(j).getRequestsDone();
     }
 
     latencyStats.displayLatencyStats();
@@ -176,7 +182,7 @@ public class LinkBenchDriver {
    * tasks are completed. Returns the elapsed time (in millisec)
    * since the start of the first task to the completion of all tasks.
    */
-  static long concurrentExec(final List<Runnable> tasks)
+  static long concurrentExec(final List<? extends Runnable> tasks)
       throws Throwable {
     final CountDownLatch startSignal = new CountDownLatch(tasks.size());
     final CountDownLatch doneSignal = new CountDownLatch(tasks.size());
@@ -185,6 +191,11 @@ public class LinkBenchDriver {
       new Thread(new Runnable() {
         @Override
         public void run() {
+          /*
+           * Run a task.  If an uncaught exception occurs, bail
+           * out of the benchmark immediately, since any results
+           * of the benchmark will no longer be valid anyway
+           */
           try {
             startSignal.countDown();
             startSignal.await();
@@ -192,7 +203,10 @@ public class LinkBenchDriver {
             startTime.compareAndSet(0, now);
             task.run();
           } catch (Throwable e) {
+            System.err.println("Unrecoverable exception in" +
+            		" worker thread:");
             e.printStackTrace();
+            System.exit(1);
           }
           doneSignal.countDown();
         }

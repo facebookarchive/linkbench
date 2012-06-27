@@ -49,7 +49,7 @@ public abstract class LinkStore {
 
   /** initialize the store object */
   public abstract void initialize(Properties p,
-    int currentPhase, int threadId) throws IOException;
+    int currentPhase, int threadId) throws IOException, Exception;
 
   // this is invoked when an error happens in case connection needs to be
   // cleaned up, reset, reopened, whatever 
