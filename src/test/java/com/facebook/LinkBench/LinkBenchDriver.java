@@ -17,6 +17,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.log4j.Logger;
 
 /*
  LinkBenchDriver class.
@@ -32,6 +33,7 @@ public class LinkBenchDriver {
   public static final int EXIT_BADARGS = 1;
   
   private static String configFile = null;
+  private static String logFile = null;
   private static boolean doLoad = false;
   private static boolean doRequest = false;
   
@@ -42,13 +44,17 @@ public class LinkBenchDriver {
   private String store;
 
   private static final Class<?>[] EMPTY_ARRAY = new Class[]{};
+  
+  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
 
-  LinkBenchDriver(String configfile)
-    throws java.io.FileNotFoundException, IOException {
+  LinkBenchDriver(String configfile, String logFile)
+    throws java.io.FileNotFoundException, IOException, LinkBenchConfigError {
     // which link store to use
     props = new Properties();
     props.load(new FileInputStream(configfile));
     store = null;
+    
+    ConfigUtil.setupLogging(props, logFile);
   }
 
   // generate an instance of LinkStore
@@ -59,7 +65,7 @@ public class LinkBenchDriver {
 
     if (store == null) {
       store = props.getProperty("store");
-      System.out.println(store);
+      logger.info("Using LinkStore implementation: " + store);
     }
 
     // The property "store" defines the class name that will be used to
@@ -78,7 +84,7 @@ public class LinkBenchDriver {
     }
     newstore = (LinkStore)newInstance(clazz);
     if (clazz == null) {
-      System.out.println("Unknown data store " + store);
+      System.err.println("Unknown data store " + store);
       System.exit(1);
       return null;
     }
@@ -97,7 +103,7 @@ public class LinkBenchDriver {
   void load() throws IOException, InterruptedException, Throwable {
 
     if (!doLoad) {
-      System.out.println("Skipping load data per the cmdline arg");
+      logger.info("Skipping load data per the cmdline arg");
       return;
     }
 
@@ -108,7 +114,7 @@ public class LinkBenchDriver {
     LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders);
 
     // start loaders
-    System.out.println("Starting loaders " + nloaders);
+    logger.info("Starting loaders " + nloaders);
     for (int i = 0; i < nloaders; i++) {
       LinkStore store = initStore(LOAD, i);
       LinkBenchLoad l = new LinkBenchLoad(store, props, latencyStats, i, nloaders);
@@ -131,7 +137,7 @@ public class LinkBenchDriver {
     }
 
     latencyStats.displayLatencyStats();
-    System.out.println("LOAD PHASE COMPLETED. Expected to load " +
+    logger.info("LOAD PHASE COMPLETED. Expected to load " +
                        expectedlinks + " links. " +
                        actuallinks + " loaded in " + (loadtime/1000) + " seconds." +
                        "Links/second = " + ((1000*actuallinks)/loadtime));
@@ -141,14 +147,14 @@ public class LinkBenchDriver {
   void sendrequests() throws IOException, InterruptedException, Throwable {
 
     if (!doRequest) {
-      System.out.println("Skipping request phase per the cmdline arg");
+      logger.info("Skipping request phase per the cmdline arg");
       return;
     }
 
     // config info for requests
     int nrequesters = Integer.parseInt(props.getProperty("requesters"));
     if (nrequesters == 0) {
-      System.out.println("NO REQUEST PHASE CONFIGURED. ");
+      logger.info("NO REQUEST PHASE CONFIGURED. ");
       return;
     }
     LinkBenchLatency latencyStats = new LinkBenchLatency(nrequesters);
@@ -172,7 +178,7 @@ public class LinkBenchDriver {
     }
 
     latencyStats.displayLatencyStats();
-    System.out.println("REQUEST PHASE COMPLETED. " + requestsdone +
+    logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
                        " requests done in " + (requesttime/1000) + " seconds." +
                        "Requests/second = " + (1000*requestsdone)/requesttime);
   }
@@ -203,9 +209,9 @@ public class LinkBenchDriver {
             startTime.compareAndSet(0, now);
             task.run();
           } catch (Throwable e) {
-            System.err.println("Unrecoverable exception in" +
-            		" worker thread:");
-            e.printStackTrace();
+            Logger threadLog = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
+            threadLog.error("Unrecoverable exception in" +
+            		" worker thread:", e);
             System.exit(1);
           }
           doneSignal.countDown();
@@ -254,8 +260,8 @@ public class LinkBenchDriver {
   public static void main(String[] args)
     throws IOException, InterruptedException, Throwable {
     processArgs(args);
-
-    LinkBenchDriver d = new LinkBenchDriver(configFile);
+    
+    LinkBenchDriver d = new LinkBenchDriver(configFile, logFile);
     d.drive();
   }
 
@@ -267,10 +273,13 @@ public class LinkBenchDriver {
 
   private static Options initializeOptions() {
     Options options = new Options();
-    Option config = new Option("c", true,
-                                "Linkbench config file");
+    Option config = new Option("c", true, "Linkbench config file");
     config.setArgName("file");
     options.addOption(config);
+    
+    Option log = new Option("L", true, "Log to this file");
+    log.setArgName("file");
+    options.addOption(log);
     
     options.addOption("l", false,
                "Execute loading stage of benchmark");
@@ -320,6 +329,7 @@ public class LinkBenchDriver {
     doLoad = cmd.hasOption('l');
     doRequest = cmd.hasOption('r');
     
+    logFile = cmd.getOptionValue('L'); // May be null
     configFile = cmd.getOptionValue('c');
     if (configFile == null) {
       // Try to find in usual location

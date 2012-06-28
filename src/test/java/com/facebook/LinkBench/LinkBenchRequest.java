@@ -3,8 +3,11 @@ package com.facebook.LinkBench;
 import java.util.Properties;
 import java.util.Random;
 
-public class LinkBenchRequest implements Runnable {
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
+public class LinkBenchRequest implements Runnable {
+  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   Properties props;
   LinkStore store;
 
@@ -17,7 +20,8 @@ public class LinkBenchRequest implements Runnable {
   long maxid1;
   long startid1;
   int datasize;
-  int debuglevel;
+  Level debuglevel;
+  long progressfreq_ms;
   String dbid;
   boolean singleAssoc = false;
 
@@ -53,6 +57,13 @@ public class LinkBenchRequest implements Runnable {
   // configuration for generating id2
   int id2gen_config;
 
+  private int wr_distrfunc;
+
+  private int wr_distrconfig;
+
+  private int rd_distrfunc;
+
+  private int rd_distrconfig;
   public LinkBenchRequest(LinkStore input_store,
                           Properties input_props,
                           LinkBenchLatency latencyStats,
@@ -78,11 +89,11 @@ public class LinkBenchRequest implements Runnable {
     // is this a single assoc test?
     if (startid1 + 1 == maxid1) {
       singleAssoc = true;
-      System.out.println("Testing single row assoc read.");
+      logger.info("Testing single row assoc read.");
     }
 
     datasize = Integer.parseInt(props.getProperty("datasize"));
-    debuglevel = Integer.parseInt(props.getProperty("debuglevel"));
+    debuglevel = ConfigUtil.getDebugLevel(props);
     dbid = props.getProperty("dbid");
 
     pc_addlink = Double.parseDouble(props.getProperty("addlink"));
@@ -92,9 +103,14 @@ public class LinkBenchRequest implements Runnable {
     pc_getlink = pc_countlink + Double.parseDouble(props.getProperty("getlink"));
     pc_getlinklist = pc_getlink + Double.parseDouble(props.getProperty("getlinklist"));
 
+    wr_distrfunc = Integer.parseInt(props.getProperty("write_function"));
+    wr_distrconfig = Integer.parseInt(props.getProperty("write_config"));
+    rd_distrfunc = Integer.parseInt(props.getProperty("read_function"));
+    rd_distrconfig = Integer.parseInt(props.getProperty("read_config"));
+
 
     if (Math.abs(pc_getlinklist - 100.0) > 1e-5) {//compare real numbers
-      System.err.println("Percentages of request types do not add to 100!");
+      logger.error("Percentages of request types do not add to 100!");
       System.exit(1);
     }
 
@@ -102,6 +118,12 @@ public class LinkBenchRequest implements Runnable {
     numnotfound = 0;
 
     long displayfreq = Long.parseLong(props.getProperty("displayfreq"));
+    String progressfreq = props.getProperty("progressfreq");
+    if (progressfreq == null) {
+      progressfreq_ms = 6000L;
+    } else {
+      progressfreq_ms = Long.parseLong(progressfreq) * 1000L;
+    }
     int maxsamples = Integer.parseInt(props.getProperty("maxsamples"));
     stats = new LinkBenchStats(requesterID, displayfreq, maxsamples);
 
@@ -129,7 +151,7 @@ public class LinkBenchRequest implements Runnable {
         //will be initialized here
         RealDistribution.loadOneShot(props);
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.error(e);
         System.exit(1);
       }
     }
@@ -150,13 +172,9 @@ public class LinkBenchRequest implements Runnable {
     double id1 = longid1;
     double drange = (double)maxid1 - startid1;
 
-    //getting configs
-    String property = write ? "write_function" : "read_function";
-    int distrfunc = Integer.parseInt(props.getProperty(property));
-
-    property = write ? "write_config" : "read_config";
-    int distrconfig = Integer.parseInt(props.getProperty(property));
-
+    int distrfunc = write ? wr_distrfunc : rd_distrfunc;
+    int distrconfig = write ? wr_distrconfig : rd_distrconfig;
+    
     long newid1;
     switch(distrfunc) {
 
@@ -198,10 +216,10 @@ public class LinkBenchRequest implements Runnable {
     }
 
     if ((newid1 >= startid1) && (newid1 < maxid1)) {
-      if (debuglevel > 0) {
-        System.out.println("id1 generated = " + newid1 +
-                           " for (distrfunc, distrconfig): " +
-                           distrfunc + "," +  distrconfig);
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace("id1 generated = " + newid1 +
+                             " for (distrfunc, distrconfig): " +
+                             distrfunc + "," +  distrconfig);
       }
 
       return newid1;
@@ -211,8 +229,8 @@ public class LinkBenchRequest implements Runnable {
       longid1 = maxid1 - 1;
     }
 
-    if (debuglevel > 0) {
-      System.out.println("Using " + longid1 + " as id1 generated = " + newid1 +
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.debug("Using " + longid1 + " as id1 generated = " + newid1 +
                          " out of bounds for (distrfunc, distrconfig): " +
                          distrfunc + "," +  distrconfig);
     }
@@ -296,8 +314,8 @@ public class LinkBenchRequest implements Runnable {
         int count = ((links == null) ? 0 : links.length);
 
         stats.addStats(LinkStore.RANGE_SIZE, count, false);
-        if (debuglevel > 0) {
-          System.err.println("getlinklist count = " + count);
+        if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+          logger.trace("getlinklist count = " + count);
         }
       }
 
@@ -315,9 +333,8 @@ public class LinkBenchRequest implements Runnable {
 
       long timetaken2 = (endtime2 - starttime)/1000;
 
-      System.err.println(LinkStore.displaynames[type] + "error " +
-                         e.getMessage());
-      e.printStackTrace();
+      logger.error(LinkStore.displaynames[type] + "error " +
+                         e.getMessage(), e);
 
       stats.addStats(type, timetaken2, true);
       store.clearErrors(requesterID);
@@ -329,9 +346,10 @@ public class LinkBenchRequest implements Runnable {
 
   @Override
   public void run() {
-    System.out.println("Hello from requesterID = " + requesterID);
+    logger.info("Requester thread #" + requesterID + " started");
     long starttime = System.currentTimeMillis();
     long endtime = starttime + maxtime * 1000;
+    long lastupdate = starttime;
     long curtime = 0;
     long i;
 
@@ -351,29 +369,35 @@ public class LinkBenchRequest implements Runnable {
           if (found) {
             requestsdone++;
           } else {
-            System.out.println("ThreadID = " + requesterID +
+            logger.warn("ThreadID = " + requesterID +
                                " not found link for id1=45");
           }
         }
       } catch (Throwable e) {
-        System.err.println(LinkStore.displaynames[type] + "error " +
-                         e.getMessage());
-        e.printStackTrace();
+        logger.error(LinkStore.displaynames[type] + "error " +
+                         e.getMessage(), e);
       }
       return;
     }
     for (i = 0; i < nrequests; i++) {
       onerequest(i);
       requestsdone++;
+      
       curtime = System.currentTimeMillis();
+      
+      if (curtime > lastupdate + progressfreq_ms) {
+        logger.info(String.format("Requester #%d %d/%d requests done",
+            requesterID, requestsdone, nrequests));
+        lastupdate = curtime;
+      }
+      
       if (curtime > endtime) {
         break;
       }
     }
 
     stats.displayStatsAll();
-
-    System.out.println("ThreadID = " + requesterID +
+    logger.info("ThreadID = " + requesterID +
                        " total requests = " + i +
                        " requests/second = " + ((1000 * i)/(curtime - starttime)) +
                        " found = " + numfound +
@@ -412,14 +436,11 @@ public class LinkBenchRequest implements Runnable {
     link.id1_type = LinkStore.ID1_TYPE;
     link.id2_type = LinkStore.ID2_TYPE;
 
-    int distrfunc = Integer.parseInt(props.getProperty("write_function"));
-    int distrconfig = Integer.parseInt(props.getProperty("write_config"));
-
     // note that use use write_function here rather than nlinks_func.
     // This is useful if we want request phase to add links in a different
     // manner than load phase.
     long nlinks = LinkBenchLoad.getNlinks(link.id1, startid1, maxid1,
-        distrfunc, distrconfig, 1);
+        wr_distrfunc, wr_distrconfig, 1);
 
     // We want to sometimes add a link that already exists and sometimes
     // add a new link. So generate id2 between 0 and 2 * links.

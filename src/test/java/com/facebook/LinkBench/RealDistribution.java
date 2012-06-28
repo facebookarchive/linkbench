@@ -1,14 +1,22 @@
 package com.facebook.LinkBench;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+import java.util.Scanner;
+import java.util.TreeMap;
+
+import org.apache.log4j.Logger;
 
 /*
  * This class simulates the real distribution based on statistical data.
  */
 
 class RealDistribution {
-
+  private static final Logger logger = 
+                      Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
   /* params to shuffle
   final static long[] NLINKS_SHUFFLER_PARAMS = {13, 7};
   final static long[] WRITE_SHUFFLER_PARAMS = {23, 13};
@@ -47,7 +55,7 @@ class RealDistribution {
    */
   static synchronized void loadOneShot(Properties props) throws Exception {
     if (nlinks_cdf == null) {
-      System.out.println("Loading real distribution data...");
+      logger.info("Loading real distribution data...");
       reload(props);
     }
   }

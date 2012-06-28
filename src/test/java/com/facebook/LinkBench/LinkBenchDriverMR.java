@@ -1,28 +1,25 @@
 package com.facebook.LinkBench;
 
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.util.Properties;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Properties;
 
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
-import org.apache.hadoop.mapred.InputFormat;
-import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.FileOutputFormat;
+import org.apache.hadoop.mapred.InputFormat;
+import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MapReduceBase;
@@ -35,6 +32,7 @@ import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.log4j.Logger;
 
 /**
  * LinkBenchDriverMR class.
@@ -52,6 +50,9 @@ public class LinkBenchDriverMR extends Configured implements Tool {
   private static boolean REPORT_PROGRESS = false;
   private static boolean USE_INPUT_FILES = false; //use generate input by default
 
+  private static final Logger logger =
+              Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
+  
   static enum Counters { LINK_LOADED, REQUEST_DONE }
 
   private static Properties props;
@@ -71,7 +72,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
 
     if (store == null) {
       store = props.getProperty("store");
-      System.out.println(store);
+      logger.info("Using store class: " + store);
     }
 
     // The property "store" defines the class name that will be used to
@@ -261,7 +262,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
         } finally {
           writer.close();
         }
-        System.out.println("Wrote input for Map #"+i);
+        logger.info("Wrote input for Map #"+i);
       }
     }
     return fs;
@@ -302,7 +303,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
                     IntWritable nloaders,
                     OutputCollector<IntWritable, LongWritable> output,
                     Reporter reporter) throws IOException {
-
+      ConfigUtil.setupLogging(props, null);
       LinkStore store = initStore(LOAD, loaderid.get());
       LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders.get());
       LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats,
@@ -336,7 +337,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
                     IntWritable nrequesters,
                     OutputCollector<IntWritable, LongWritable> output,
                     Reporter reporter) throws IOException {
-
+      ConfigUtil.setupLogging(props, null);
       LinkStore store = initStore(REQUEST, requesterid.get());
       LinkBenchLatency latencyStats = new LinkBenchLatency(nrequesters.get());
       final LinkBenchRequest requester =
@@ -349,8 +350,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
           try {
             requester.run();
           } catch (Throwable t) {
-            System.err.println("Uncaught error in requester:");
-            t.printStackTrace();
+            logger.error("Uncaught error in requester:", t);
           }
         }
       });
@@ -421,7 +421,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
   private void load() throws IOException, InterruptedException {
     boolean loaddata = Boolean.parseBoolean(props.getProperty("loaddata"));
     if (!loaddata) {
-      System.out.println("Skipping load data per the config");
+      logger.info("Skipping load data per the config");
       return;
     }
 
@@ -430,7 +430,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     FileSystem fs = setupInputFiles(jobconf, nloaders);
 
     try {
-      System.out.println("Starting loaders " + nloaders);
+      logger.info("Starting loaders " + nloaders);
       final long starttime = System.currentTimeMillis();
       JobClient.runJob(jobconf);
       long loadtime = (System.currentTimeMillis() - starttime);
@@ -442,7 +442,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
       long actuallinks = readOutput(fs, jobconf);
 
-      System.out.println("LOAD PHASE COMPLETED. Expected to load " +
+      logger.info("LOAD PHASE COMPLETED. Expected to load " +
                          expectedlinks + " links. " +
                          actuallinks + " loaded in " + (loadtime/1000) + " seconds." +
                          "Links/second = " + ((1000*actuallinks)/loadtime));
@@ -461,7 +461,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     FileSystem fs = setupInputFiles(jobconf, nrequesters);
 
     try {
-      System.out.println("Starting requesters " + nrequesters);
+      logger.info("Starting requesters " + nrequesters);
       final long starttime = System.currentTimeMillis();
       JobClient.runJob(jobconf);
       long endtime = System.currentTimeMillis();
@@ -470,7 +470,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       long requesttime = (endtime - starttime);
       long requestsdone = readOutput(fs, jobconf);
 
-      System.out.println("REQUEST PHASE COMPLETED. " + requestsdone +
+      logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
                          " requests done in " + (requesttime/1000) + " seconds." +
                          "Requests/second = " + (1000*requestsdone)/requesttime);
     } finally {

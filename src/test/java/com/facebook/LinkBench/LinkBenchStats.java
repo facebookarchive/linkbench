@@ -3,6 +3,8 @@ package com.facebook.LinkBench;
 
 import java.util.Arrays;
 
+import org.apache.log4j.Logger;
+
 // Compute statistics
 public class LinkBenchStats {
 
@@ -35,6 +37,8 @@ public class LinkBenchStats {
 
   // Displayed along with stats
   private int threadID;
+  
+  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
   public LinkBenchStats(int input_threadID,
                         long input_displayfreq,
@@ -93,7 +97,7 @@ public class LinkBenchStats {
     int elems = end - start;
 
     if (elems <= 0) {
-        System.out.println("ThreadID = " + threadID +
+        logger.info("ThreadID = " + threadID +
                            " " + LinkStore.displaynames[type] +
                            " numops = " + numops[type] +
                            " errors = " + errors[type] +
@@ -104,7 +108,7 @@ public class LinkBenchStats {
     // sort  from start (inclusive) to end (exclusive)
     Arrays.sort(samples[type], start, end);
 
-    System.out.println("ThreadID = " + threadID +
+    logger.info("ThreadID = " + threadID +
                        " " + LinkStore.displaynames[type] +
                        " totalops = " + numops[type] +
                        " totalerrors = " + errors[type] +

@@ -3,6 +3,9 @@ package com.facebook.LinkBench;
 import java.util.Properties;
 import java.util.Random;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 /*
  * Muli-threaded loader for loading data into hbase.
  * The range from startid1 to maxid1 is chunked up into equal sized
@@ -14,7 +17,7 @@ import java.util.Random;
 
 public class LinkBenchLoad implements Runnable {
 
-  private static final long BILLION = 1000 * 1000 * 1000;
+  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
 
   private long randomid2max; // whether id2 should be generated randomly
   private Random random_id2; // random number generator for id2 if needed
@@ -31,7 +34,7 @@ public class LinkBenchLoad implements Runnable {
   long displayfreq;
   int maxsamples;
 
-  int debuglevel;
+  Level debuglevel;
   String dbid;
 
   int nlinks_func; // distribution function for #links
@@ -49,7 +52,7 @@ public class LinkBenchLoad implements Runnable {
                        Properties props,
                        LinkBenchLatency latencyStats,
                        int input_loaderID,
-                       int input_nloaders) {
+                       int input_nloaders) throws LinkBenchConfigError {
     linksloaded = 0;
     loaderID = input_loaderID;
     this.latencyStats = latencyStats;
@@ -66,7 +69,7 @@ public class LinkBenchLoad implements Runnable {
       startid1 = 1;
     }
 
-    debuglevel = Integer.parseInt(props.getProperty("debuglevel"));
+    debuglevel = ConfigUtil.getDebugLevel(props);
     nloaders = input_nloaders;
     store = input_store;
     datasize = Integer.parseInt(props.getProperty("datasize"));
@@ -79,7 +82,7 @@ public class LinkBenchLoad implements Runnable {
         //load staticical data into RealDistribution
         RealDistribution.loadOneShot(props);
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.error(e);
         System.exit(1);
       }
     }
@@ -194,11 +197,9 @@ public class LinkBenchLoad implements Runnable {
     link.data = new byte[datasize];
     link.time = System.currentTimeMillis();
 
-    if (debuglevel > 0) {
-      System.out.println("Hello from loaderID = " + loaderID +
-                         " startId1 " + startid +
-                         " endid1 " + endid);
-    }
+    logger.info("Starting loader thread  #" + loaderID +
+                " for range [" + startid + ":" + endid + "]");
+    
     long prevPercentPrinted = 0;
     for (long id1 = startid; id1 < endid; id1++) {
       long nlinks = 0;
@@ -218,8 +219,8 @@ public class LinkBenchLoad implements Runnable {
                   nlinks_func, nlinks_config, nlinks_default);
       }
 
-      if (debuglevel > 0) {
-        System.out.println("id1 = " + id1 + " newid1 = " + newid1 +
+      if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
+        logger.debug("id1 = " + id1 + " newid1 = " + newid1 +
                            " nlinks = " + nlinks);
       }
 
@@ -245,8 +246,8 @@ public class LinkBenchLoad implements Runnable {
           }
         }
 
-        if (debuglevel > 0) {
-          System.out.println("id2 chosen is " + link.id2);
+        if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
+          logger.debug("id2 chosen is " + link.id2);
         }
         if (!singleAssoc) {
           timestart = System.nanoTime();
@@ -270,8 +271,7 @@ public class LinkBenchLoad implements Runnable {
         } catch (Throwable e){//Catch exception if any
             long endtime2 = System.nanoTime();
             long timetaken2 = (endtime2 - timestart)/1000;
-            e.printStackTrace();
-            System.err.println("Error: " + e.getMessage());
+            logger.error("Error: " + e.getMessage(), e);
             stats.addStats(LinkStore.LOAD_LINK, timetaken2, true);
             store.clearErrors(loaderID);
             continue;
@@ -281,14 +281,14 @@ public class LinkBenchLoad implements Runnable {
       if (!singleAssoc) {
         long percent = 100 * (id1 - startid)/(endid - startid);
         if ((percent % 10 == 0) && (percent > prevPercentPrinted)) {
-          System.out.println("LOADED_ID " + loaderID +
+          logger.info("LOADED_ID " + loaderID +
                              ":Percent done = " + percent);
           prevPercentPrinted = percent;
         }
       }
     }
     if (!singleAssoc) {
-      System.out.println(" Same shuffle = " + sameShuffle +
+      logger.info(" Same shuffle = " + sameShuffle +
                          " Different shuffle = " + diffShuffle);
       stats.displayStatsAll();
     }

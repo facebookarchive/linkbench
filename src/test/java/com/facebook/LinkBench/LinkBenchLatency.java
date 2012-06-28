@@ -1,5 +1,7 @@
 package com.facebook.LinkBench;
 
+import org.apache.log4j.Logger;
+
 /**
  * Compute percentile latencies.
  * we record latencies in ms units, upto 100 milliseconds. Any calls
@@ -102,14 +104,14 @@ public class LinkBenchLatency {
       lhigh[type] += l10sec[type];
     }
 
+    Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
     // print percentiles
     for (int type = 0; type < LinkStore.MAX_OPTYPES; type++) {
       if (lhigh[type] == 0) { // no samples of this type
         continue;
       }
-      long value = getPercentile(type, 99);
 
-      System.out.println(LinkStore.displaynames[type] +
+      logger.info(LinkStore.displaynames[type] +
                        " p25 = " + getPercentile(type, 25)  + "ms " +
                        " p50 = " + getPercentile(type, 50)  + "ms " +
                        " p75 = " + getPercentile(type, 75)  + "ms " +

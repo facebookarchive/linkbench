@@ -15,6 +15,7 @@ import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.log4j.Level;
 
 /*
   This class is a stress test for verifying HBase API get/put operations. It
@@ -41,7 +42,7 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
   private final boolean DEBUG = false;
 
   HTable table;
-  int debuglevel;
+  Level debuglevel;
   ArrayList<String> columnfamilies;
 
   int currentphase;
@@ -152,7 +153,7 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
       String tablename = props.getProperty("tablename");
       table = new HTable(conf, tablename);
 
-      debuglevel = Integer.parseInt(props.getProperty("debuglevel"));
+      debuglevel = ConfigUtil.getDebugLevel(props);
       sleeprate = Double.parseDouble(props.getProperty("sleeprate"));
       sleeptime = Integer.parseInt(props.getProperty("sleeptime"));
       maxsleepingthreads = Integer.parseInt(props.getProperty(

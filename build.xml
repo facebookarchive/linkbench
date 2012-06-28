@@ -8,6 +8,10 @@
   <property name="dist"  location="dist"/>
   <property name="lib"  location="lib"/>
 
+  <!-- By default, debugging symbols are not created. This
+       can be overridden with command line property -->
+  <property name="debug" value="false"/>
+
   <target name="init">
     <!-- Create the time stamp -->
     <tstamp/>
@@ -18,7 +22,8 @@
   <target name="compile" depends="init"
         description="compile the source " >
     <!-- Compile the java code from ${src} into ${build} -->
-    <javac includeantruntime="false" srcdir="${src}" destdir="${build}">
+    <javac includeantruntime="false" srcdir="${src}" destdir="${build}"
+           debug="${debug}">
       <classpath>
         <pathelement path="${classpath}"/>
         <fileset dir="lib">

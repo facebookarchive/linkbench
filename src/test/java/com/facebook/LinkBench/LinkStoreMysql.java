@@ -9,7 +9,8 @@ import java.sql.Statement;
 import java.util.Date;
 import java.util.Properties;
 
-import com.mysql.jdbc.CommunicationsException;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 public class LinkStoreMysql extends LinkStore {
 
@@ -21,9 +22,11 @@ public class LinkStoreMysql extends LinkStore {
   String user;
   String pwd;
   String port;
-  int debuglevel;
+  Level debuglevel;
   Connection conn;
   Statement stmt;
+  
+  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   
   public LinkStoreMysql() {
     super();
@@ -38,8 +41,8 @@ public class LinkStoreMysql extends LinkStore {
     int threadId) throws IOException, Exception {
     counttable = props.getProperty("counttable");
     if (counttable == null || counttable.equals("")) {
-      System.err.println("Error! counttable is empty/ not found!");
-      System.err.println("Please check configuration file.");
+      logger.error("Error! counttable is empty/ not found!"
+                   + "Please check configuration file.");
       System.exit(1);
     }
 
@@ -48,17 +51,17 @@ public class LinkStoreMysql extends LinkStore {
     pwd = props.getProperty("password");
     port = props.getProperty("port");
     if (port == null || port.equals("")) port = "3306"; //use default port
-    debuglevel = Integer.parseInt(props.getProperty("debuglevel"));
+    debuglevel = ConfigUtil.getDebugLevel(props);
 
     // connect
     try {
       openConnection();
     } catch (SQLException e) {
-      System.err.println("error connecting to database:");
-      System.err.println(e.getMessage());
+      logger.error("error connecting to database:"
+                  + e.getMessage());
       System.exit(1);
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.error(e);
       System.exit(1);
     }
 
@@ -84,7 +87,7 @@ public class LinkStoreMysql extends LinkStore {
   }
 
   public void clearErrors(int threadID) {
-    System.err.println("Clearing region cache in threadID " + threadID);
+    logger.info("Clearing region cache in threadID " + threadID);
 
     try {
       if (conn != null) {
@@ -135,8 +138,8 @@ public class LinkStoreMysql extends LinkStore {
   public void addLink(String dbid, Link l, boolean noinverse)
     throws Exception {
 
-    if (debuglevel > 0) {
-      System.out.println("addLink " + l.id1 +
+    if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
+      logger.debug("addLink " + l.id1 +
                          "." + l.id2 +
                          "." + l.link_type);
     }
@@ -161,14 +164,14 @@ public class LinkStoreMysql extends LinkStore {
                     ") ON DUPLICATE KEY UPDATE " +
                     "visibility = " + LinkStore.VISIBILITY_DEFAULT;
 
-    if (debuglevel > 1) {
-      System.out.println(insert);
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace(insert);
     }
 
     int nrows = stmt.executeUpdate(insert);
 
-    if (debuglevel > 1) {
-      System.out.println("nrows = " + nrows);
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("nrows = " + nrows);
     }
 
     // based on nrows, determine whether the previous query was an insert
@@ -196,9 +199,9 @@ public class LinkStoreMysql extends LinkStore {
         break;
 
       default:
-        System.err.print("SQL Error");
-        throw new Exception("Value of affected-rows number is not valid" +
-                            nrows);
+        String msg = "Value of affected-rows number is not valid" + nrows;
+        logger.error("SQL Error: " + msg);
+        throw new Exception(msg);
     }
 
     if (update_count) {
@@ -214,8 +217,8 @@ public class LinkStoreMysql extends LinkStore {
                       ", " + l.version + ") " +
                       "ON DUPLICATE KEY UPDATE count = count + 1;";
 
-      if (debuglevel > 1) {
-        System.out.println(updatecount);
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace(updatecount);
       }
 
       stmt.executeUpdate(updatecount);
@@ -234,8 +237,8 @@ public class LinkStoreMysql extends LinkStore {
                   " AND id2 = " + l.id2 +
                   " AND link_type = " + l.link_type + ";";
 
-      if (debuglevel > 1) {
-        System.out.println(updatedata);
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace(updatedata);
       }
 
       stmt.executeUpdate(updatedata);
@@ -254,8 +257,8 @@ public class LinkStoreMysql extends LinkStore {
                          boolean noinverse, boolean expunge)
     throws Exception {
 
-    if (debuglevel > 0) {
-      System.out.println("deleteLink " + id1 +
+    if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
+      logger.debug("deleteLink " + id1 +
                          "." + id2 +
                          "." + link_type);
     }
@@ -273,8 +276,8 @@ public class LinkStoreMysql extends LinkStore {
                     " AND id2 = " + id2 +
                     " AND link_type = " + link_type + ";";
 
-    if (debuglevel > 1) {
-      System.out.println(select);
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace(select);
     }
 
     ResultSet result = stmt.executeQuery(select);
@@ -284,7 +287,7 @@ public class LinkStoreMysql extends LinkStore {
       visibility = result.getInt("visibility");
     }
 
-    if (debuglevel > 1) {
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       System.out.println("visibility = " + visibility);
     }
 
@@ -311,8 +314,8 @@ public class LinkStoreMysql extends LinkStore {
                  " AND link_type = " + link_type + ";";
       }
 
-      if (debuglevel > 1) {
-        System.out.println(delete);
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace(delete);
       }
 
       stmt.executeUpdate(delete);
@@ -337,8 +340,8 @@ public class LinkStoreMysql extends LinkStore {
                       ", time = " + currentTime +
                       ", version = version + 1;";
 
-      if (debuglevel > 1) {
-        System.out.println(update);
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace(update);
       }
 
       stmt.executeUpdate(update);
@@ -373,8 +376,8 @@ public class LinkStoreMysql extends LinkStore {
                    " and link_type = " + link_type + "; commit;";
 
 
-    if (debuglevel > 1) {
-      System.out.println("Query is " + query);
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("Query is " + query);
     }
 
     ResultSet rs = stmt.executeQuery(query);
@@ -385,8 +388,8 @@ public class LinkStoreMysql extends LinkStore {
       found = true;
     }
 
-    if (debuglevel > 1) {
-      System.out.println("Lookup result: " + id1 + "," + link_type + "," + id2 +
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("Lookup result: " + id1 + "," + link_type + "," + id2 +
                          " is " + found);
     }
 
@@ -418,8 +421,8 @@ public class LinkStoreMysql extends LinkStore {
                    " order by time desc " +
                    " limit " + offset + "," + limit + "; commit;";
 
-    if (debuglevel > 1) {
-      System.out.println("Query is " + query);
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("Query is " + query);
     }
 
     ResultSet rs = stmt.executeQuery(query);
@@ -430,8 +433,8 @@ public class LinkStoreMysql extends LinkStore {
       count++;
     }
 
-    if (debuglevel > 1) {
-      System.out.println("Range lookup result: " + id1 + "," + link_type +
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("Range lookup result: " + id1 + "," + link_type +
                          " is " + count);
     }
 
@@ -453,15 +456,15 @@ public class LinkStoreMysql extends LinkStore {
     while (rs.next()) {
       // found
       if (found) {
-        System.out.println("Count query 2nd row!: " + id1 + "," + link_type);
+        logger.trace("Count query 2nd row!: " + id1 + "," + link_type);
       }
 
       found = true;
       count = rs.getLong(1);
     }
 
-    if (debuglevel > 1) {
-      System.out.println("Count result: " + id1 + "," + link_type +
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("Count result: " + id1 + "," + link_type +
                          " is " + found + " and " + count);
     }
 
