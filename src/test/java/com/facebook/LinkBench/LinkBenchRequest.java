@@ -6,6 +6,8 @@ import java.util.Random;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.LinkStore.LinkStoreOp;
+
 public class LinkBenchRequest implements Runnable {
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   Properties props;
@@ -245,41 +247,41 @@ public class LinkBenchRequest implements Runnable {
     long starttime = 0;
     long endtime = 0;
 
-    int type = LinkStore.UNKNOWN; // initialize to invalid value
+    LinkStoreOp type = LinkStoreOp.UNKNOWN; // initialize to invalid value
 
     try {
 
       if (r <= pc_addlink) {
         // generate add request
-        type = LinkStore.ADD_LINK;
+        type = LinkStoreOp.ADD_LINK;
         link.id1 = getid1_from_distribution(random_id1, true, link.id1);
         starttime = System.nanoTime();
         addLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_deletelink) {
-        type = LinkStore.DELETE_LINK;
+        type = LinkStoreOp.DELETE_LINK;
         link.id1 = getid1_from_distribution(random_id1, true, link.id1);
         starttime = System.nanoTime();
         deleteLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_updatelink) {
-        type = LinkStore.UPDATE_LINK;
+        type = LinkStoreOp.UPDATE_LINK;
         link.id1 = getid1_from_distribution(random_id1, true, link.id1);
         starttime = System.nanoTime();
         updateLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_countlink) {
 
-        type = LinkStore.COUNT_LINK;
+        type = LinkStoreOp.COUNT_LINK;
 
         link.id1 = getid1_from_distribution(random_id1, false, link.id1);
         starttime = System.nanoTime();
-        long count = countLinks(link);
+        countLinks(link);
         endtime = System.nanoTime();
 
       } else if (r <= pc_getlink) {
 
-        type = LinkStore.GET_LINK;
+        type = LinkStoreOp.GET_LINK;
 
 
         link.id1 = getid1_from_distribution(random_id1, false, link.id1);
@@ -305,7 +307,7 @@ public class LinkBenchRequest implements Runnable {
 
       } else if (r <= pc_getlinklist) {
 
-        type = LinkStore.GET_LINKS_LIST;
+        type = LinkStoreOp.GET_LINKS_LIST;
 
         link.id1 = getid1_from_distribution(random_id1, false, link.id1);
         starttime = System.nanoTime();
@@ -313,7 +315,7 @@ public class LinkBenchRequest implements Runnable {
         endtime = System.nanoTime();
         int count = ((links == null) ? 0 : links.length);
 
-        stats.addStats(LinkStore.RANGE_SIZE, count, false);
+        stats.addStats(LinkStoreOp.RANGE_SIZE, count, false);
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("getlinklist count = " + count);
         }
@@ -333,7 +335,7 @@ public class LinkBenchRequest implements Runnable {
 
       long timetaken2 = (endtime2 - starttime)/1000;
 
-      logger.error(LinkStore.displaynames[type] + "error " +
+      logger.error(LinkStore.displayName(type) + "error " +
                          e.getMessage(), e);
 
       stats.addStats(type, timetaken2, true);
@@ -354,16 +356,16 @@ public class LinkBenchRequest implements Runnable {
     long i;
 
     if (singleAssoc) {
-      int type = LinkStore.UNKNOWN;
+      LinkStoreOp type = LinkStoreOp.UNKNOWN;
       try {
         // add a single assoc to the database
         link.id1 = 45;
         link.id1 = 46;
-        type = LinkStore.ADD_LINK;
+        type = LinkStoreOp.ADD_LINK;
         addLink(link);
 
         // read this assoc from the database over and over again
-        type = LinkStore.GET_LINK;
+        type = LinkStoreOp.GET_LINK;
         for (i = 0; i < nrequests; i++) {
           boolean found = getLink(link);
           if (found) {
@@ -374,7 +376,7 @@ public class LinkBenchRequest implements Runnable {
           }
         }
       } catch (Throwable e) {
-        logger.error(LinkStore.displaynames[type] + "error " +
+        logger.error(LinkStore.displayName(type) + "error " +
                          e.getMessage(), e);
       }
       return;

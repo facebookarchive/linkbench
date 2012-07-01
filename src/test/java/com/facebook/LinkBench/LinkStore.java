@@ -1,6 +1,7 @@
 package com.facebook.LinkBench;
 
 import java.io.*;
+import java.util.List;
 import java.util.Properties;
 
 public abstract class LinkStore {
@@ -15,33 +16,29 @@ public abstract class LinkStore {
   public static final byte VISIBILITY_DEFAULT = 1;
   
   // Various operation types for which we want to gather stats
-  public static final int ADD_LINK = 0;
-  public static final int DELETE_LINK = 1;
-  public static final int UPDATE_LINK = 2;
-  public static final int COUNT_LINK = 3;
-  public static final int GET_LINK = 4;
-  public static final int GET_LINKS_LIST = 5;
-  public static final int LOAD_LINK = 6;
-  public static final int UNKNOWN = 7;
+  public static enum LinkStoreOp {
+    ADD_LINK,
+    DELETE_LINK,
+    UPDATE_LINK,
+    COUNT_LINK,
+    GET_LINK,
+    GET_LINKS_LIST,
+    LOAD_LINK,
+    LOAD_LINKS_BULK,
+    UPDATE_COUNTS,
+    // Although the following are not truly operations, we need stats
+    // for them 
+    RANGE_SIZE,    // how big range scans are
+    LOAD_LINKS_BULK_NLINKS, // how many links inserted in bulk
+    UNKNOWN,
+  }
 
-  // Although the following is not an operation type, we need stats on
-  // how big range scans are
-  public static final int RANGE_SIZE = 8;
+  public static final int MAX_OPTYPES = LinkStoreOp.values().length;
 
-  public static final int MAX_OPTYPES = 9;
-
-  public static final String displaynames[] =
-  {
-      "ADD_LINK",
-      "DELETE_LINK",
-      "UPDATE_LINK",
-      "COUNT_LINK",
-      "GET_LINK",
-      "GET_LINKS_LIST",
-      "LOAD_LINK",
-      "UNKNOWN",
-      "RANGE_SIZE",
-  };
+  
+  public static final String displayName(LinkStoreOp op) {
+    return op.name();
+  }
 
   /** The default constructor */
   public LinkStore() {
@@ -50,6 +47,11 @@ public abstract class LinkStore {
   /** initialize the store object */
   public abstract void initialize(Properties p,
     int currentPhase, int threadId) throws IOException, Exception;
+
+  /**
+   * Do any cleanup.  After this is called, store won't be reused
+   */
+  public abstract void close();
 
   // this is invoked when an error happens in case connection needs to be
   // cleaned up, reset, reopened, whatever 
@@ -77,4 +79,25 @@ public abstract class LinkStore {
 
   // count the #links
   public abstract long countLinks(String dbid, long id1, long link_type) throws Exception;
+  
+  /** 
+   * @return 0 if it doesn't support addBulkLinks and recalculateCounts methods
+   *         If it does support them, return the maximum number of links that 
+   *         can be added at a time */
+  public int bulkLoadBatchSize() {
+    return 0;
+  }
+  
+  /** Add a batch of links without updating counts */
+  public void addBulkLinks(String dbid, List<Link> a, boolean noinverse)
+             throws Exception {
+    throw new UnsupportedOperationException("addBulkLinks not supported for " +
+    		"LinkStore subclass " + this.getClass().getName());
+  }
+  
+  /** Recalculate all of the link counts */
+  public void recalculateCounts(String dbid)  throws Exception {
+    throw new UnsupportedOperationException("recalculateCounts not supported for " +
+        "LinkStore subclass " + this.getClass().getName());
+  }
 }

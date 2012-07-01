@@ -5,6 +5,8 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.LinkStore.LinkStoreOp;
+
 // Compute statistics
 public class LinkBenchStats {
 
@@ -59,81 +61,94 @@ public class LinkBenchStats {
     }
   }
 
-  public void addStats(int type, long timetaken, boolean error) {
+  public void addStats(LinkStoreOp type, long timetaken, boolean error) {
 
     if (error) {
-      errors[type]++;
+      errors[type.ordinal()]++;
     }
 
-    if ((minimums[type] == 0) || (minimums[type] > timetaken)) {
-      minimums[type] = timetaken;
+    if ((minimums[type.ordinal()] == 0) || (minimums[type.ordinal()] > timetaken)) {
+      minimums[type.ordinal()] = timetaken;
     }
 
-    if (timetaken > maximums[type]) {
-      maximums[type] = timetaken;
+    if (timetaken > maximums[type.ordinal()]) {
+      maximums[type.ordinal()] = timetaken;
     }
 
-    numops[type]++;
-    int index = samplestaken[type];
+    numops[type.ordinal()]++;
+    int index = samplestaken[type.ordinal()];
 
     if (index < maxsamples) {
-      samples[type][index] = timetaken;
-      samplestaken[type]++;
+      samples[type.ordinal()][index] = timetaken;
+      samplestaken[type.ordinal()]++;
       index++;
     }
 
     long timenow = System.currentTimeMillis();
-    if ((timenow - lastdisplaytime[type]) > displayfreq * 1000) {
+    if ((timenow - lastdisplaytime[type.ordinal()]) > displayfreq * 1000) {
       displayStats(type, 0, index);
-      samplestaken[type] = 0;
-      lastdisplaytime[type] = timenow;
+      samplestaken[type.ordinal()] = 0;
+      lastdisplaytime[type.ordinal()] = timenow;
     }
 
   }
 
 
   // display stats for samples from start (inclusive) to end (exclusive)
-  private void displayStats(int type, int start, int end) {
+  private void displayStats(LinkStoreOp type, int start, int end) {
     int elems = end - start;
 
     if (elems <= 0) {
         logger.info("ThreadID = " + threadID +
-                           " " + LinkStore.displaynames[type] +
-                           " numops = " + numops[type] +
-                           " errors = " + errors[type] +
-                           " samples = " + elems);
+                         " " + LinkStore.displayName(type) +
+                         " numops = " + numops[type.ordinal()] +
+                         " errors = " + errors[type.ordinal()] +
+                         " samples = " + elems);
         return;
     }
 
     // sort  from start (inclusive) to end (exclusive)
-    Arrays.sort(samples[type], start, end);
+    Arrays.sort(samples[type.ordinal()], start, end);
 
     logger.info("ThreadID = " + threadID +
-                       " " + LinkStore.displaynames[type] +
-                       " totalops = " + numops[type] +
-                       " totalerrors = " + errors[type] +
-                       " ops = " + elems +
-                       " min = " + samples[type][start] +
-                       " 25% = " + samples[type][start + elems/4] +
-                       " 50% = " + samples[type][start + elems/2] +
-                       " 75% = " + samples[type][end - 1 - elems/4] +
-                       " 90% = " + samples[type][end - 1 - elems/10] +
-                       " 95% = " + samples[type][end - 1 - elems/20] +
-                       " 99% = " + samples[type][end - 1 - elems/100] +
-                       " max = " + samples[type][end - 1]);
+                     " " + LinkStore.displayName(type) +
+                     " totalops = " + numops[type.ordinal()] +
+                     " totalerrors = " + errors[type.ordinal()] +
+                     " ops = " + elems +
+                     " min = " + samples[type.ordinal()][start] +
+                     " 25% = " + samples[type.ordinal()][start + elems/4] +
+                     " 50% = " + samples[type.ordinal()][start + elems/2] +
+                     " 75% = " + samples[type.ordinal()][end - 1 - elems/4] +
+                     " 90% = " + samples[type.ordinal()][end - 1 - elems/10] +
+                     " 95% = " + samples[type.ordinal()][end - 1 - elems/20] +
+                     " 99% = " + samples[type.ordinal()][end - 1 - elems/100] +
+                     " max = " + samples[type.ordinal()][end - 1]);
 
   }
 
   public void displayStatsAll() {
-    displayStats(LinkStore.ADD_LINK, 0, samplestaken[LinkStore.ADD_LINK]);
-    displayStats(LinkStore.DELETE_LINK, 0, samplestaken[LinkStore.DELETE_LINK]);
-    displayStats(LinkStore.UPDATE_LINK, 0, samplestaken[LinkStore.UPDATE_LINK]);
-    displayStats(LinkStore.COUNT_LINK, 0, samplestaken[LinkStore.COUNT_LINK]);
-    displayStats(LinkStore.GET_LINK, 0, samplestaken[LinkStore.GET_LINK]);
-    displayStats(LinkStore.GET_LINKS_LIST, 0, samplestaken[LinkStore.GET_LINKS_LIST]);
-    displayStats(LinkStore.LOAD_LINK, 0, samplestaken[LinkStore.LOAD_LINK]);
-    displayStats(LinkStore.UNKNOWN, 0, samplestaken[LinkStore.UNKNOWN]);
-    displayStats(LinkStore.RANGE_SIZE, 0, samplestaken[LinkStore.RANGE_SIZE]);
+    displayStats(LinkStoreOp.ADD_LINK, 0, 
+          samplestaken[LinkStoreOp.ADD_LINK.ordinal()]);
+    displayStats(LinkStoreOp.DELETE_LINK, 0, 
+        samplestaken[LinkStoreOp.DELETE_LINK.ordinal()]);
+    displayStats(LinkStoreOp.UPDATE_LINK, 0, 
+        samplestaken[LinkStoreOp.UPDATE_LINK.ordinal()]);
+    displayStats(LinkStoreOp.COUNT_LINK, 0, 
+        samplestaken[LinkStoreOp.COUNT_LINK.ordinal()]);
+    displayStats(LinkStoreOp.GET_LINK, 0,
+        samplestaken[LinkStoreOp.GET_LINK.ordinal()]);
+    displayStats(LinkStoreOp.GET_LINKS_LIST, 0,
+        samplestaken[LinkStoreOp.GET_LINKS_LIST.ordinal()]);
+    displayStats(LinkStoreOp.LOAD_LINK, 0,
+        samplestaken[LinkStoreOp.LOAD_LINK.ordinal()]);
+    displayStats(LinkStoreOp.UNKNOWN, 0, 
+        samplestaken[LinkStoreOp.UNKNOWN.ordinal()]);
+    displayStats(LinkStoreOp.RANGE_SIZE, 0, 
+        samplestaken[LinkStoreOp.RANGE_SIZE.ordinal()]);
+    displayStats(LinkStoreOp.LOAD_LINKS_BULK, 0,
+        samplestaken[LinkStoreOp.LOAD_LINKS_BULK.ordinal()]);
+    displayStats(LinkStoreOp.LOAD_LINKS_BULK_NLINKS, 0,
+        samplestaken[LinkStoreOp.LOAD_LINKS_BULK_NLINKS.ordinal()]);
   }
 
 }

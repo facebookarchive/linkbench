@@ -19,6 +19,8 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.LinkStore.LinkStoreOp;
+
 /*
  LinkBenchDriver class.
  First loads data using multi-threaded LinkBenchLoad class.
@@ -110,19 +112,31 @@ public class LinkBenchDriver {
     // load data
 
     int nloaders = Integer.parseInt(props.getProperty("loaders"));
+    int nthreads = nloaders + 1;
     List<LinkBenchLoad> loaders = new LinkedList<LinkBenchLoad>();
-    LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders);
+    LinkBenchLatency latencyStats = new LinkBenchLatency(nthreads);
 
+    boolean bulkLoad = true;
+    
     // start loaders
     logger.info("Starting loaders " + nloaders);
     for (int i = 0; i < nloaders; i++) {
       LinkStore store = initStore(LOAD, i);
+      bulkLoad = bulkLoad && store.bulkLoadBatchSize() > 0;
       LinkBenchLoad l = new LinkBenchLoad(store, props, latencyStats, i, nloaders);
       loaders.add(l);
     }
+    
+    logger.debug("Bulk Load setting: " + bulkLoad);
 
     // run loaders
     long loadtime = concurrentExec(loaders);
+    
+    if (bulkLoad) {
+      // Didn't update counts as part of load
+      logger.info("Bulk load of links finished, now updating counts"); 
+      updateCounts(latencyStats, nloaders);
+    }
 
     // compute total #links loaded
     long maxid1 = Long.parseLong(props.getProperty("maxid1"));
@@ -142,6 +156,23 @@ public class LinkBenchDriver {
                        actuallinks + " loaded in " + (loadtime/1000) + " seconds." +
                        "Links/second = " + ((1000*actuallinks)/loadtime));
 
+  }
+
+  private void updateCounts(LinkBenchLatency latencyStats, int threadnum)
+                                          throws IOException {
+    LinkStore store = initStore(LOAD, threadnum);
+    try {
+      long starttime = System.nanoTime();
+      store.recalculateCounts(props.getProperty("dbid"));
+      long endtime = System.nanoTime();
+      long time = endtime - starttime;
+      latencyStats.recordLatency(threadnum, LinkStoreOp.UPDATE_COUNTS, 
+                        time);
+      logger.info("Updating counts took " + (time / 1e6) + "ms");
+    } catch (Exception e) {
+      logger.error("Error while recalculating counts.  Link" +
+          " counts may be bad", e);
+    }
   }
 
   void sendrequests() throws IOException, InterruptedException, Throwable {

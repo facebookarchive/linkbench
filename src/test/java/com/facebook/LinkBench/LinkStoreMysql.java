@@ -6,16 +6,21 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 public class LinkStoreMysql extends LinkStore {
-
+  public static final int MYSQL_DEFAULT_BULKINSERT_SIZE = 1024;
+  
   private static final boolean INTERNAL_TESTING = false;
 
+  
+  
   String assoctable;
   String counttable;
   String host;
@@ -25,6 +30,7 @@ public class LinkStoreMysql extends LinkStore {
   Level debuglevel;
   Connection conn;
   Statement stmt;
+  int bulkinsertSize = MYSQL_DEFAULT_BULKINSERT_SIZE;
   
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   
@@ -53,6 +59,11 @@ public class LinkStoreMysql extends LinkStore {
     if (port == null || port.equals("")) port = "3306"; //use default port
     debuglevel = ConfigUtil.getDebugLevel(props);
 
+    if (props.containsKey("mysql_bulk_insert_size")) {
+      bulkinsertSize = Integer.parseInt(
+                        props.getProperty("mysql_bulk_insert_batch"));
+    }
+    
     // connect
     try {
       openConnection();
@@ -84,6 +95,15 @@ public class LinkStoreMysql extends LinkStore {
     //System.err.println("connected");
     conn.setAutoCommit(false);
     stmt = conn.createStatement();
+  }
+  
+  @Override
+  public void close() {
+    try {
+      conn.close();
+    } catch (SQLException e) {
+      logger.error("Error while closing MySQL connection: ", e);
+    }
   }
 
   public void clearErrors(int threadID) {
@@ -146,29 +166,11 @@ public class LinkStoreMysql extends LinkStore {
 
     // conn.setAutoCommit(false);
 
-    // query to insert a link;
+
     // if the link is already there then update its visibility
     // only update visibility; skip updating time, version, etc.
-    String insert = "INSERT INTO " + dbid + "." + assoctable +
-                    "(id1, id1_type, id2, id2_type, link_type, " +
-                    "visibility, data, time, version) " +
-                    "VALUES (" + l.id1 +
-                    ", " + l.id1_type +
-                    ", " + l.id2 +
-                    ", " + l.id2_type +
-                    ", " + l.link_type +
-                    ", " + LinkStore.VISIBILITY_DEFAULT +
-                    ", '" + new String(l.data) +
-                    "', " + l.time +
-                    ", "  + l.version +
-                    ") ON DUPLICATE KEY UPDATE " +
-                    "visibility = " + LinkStore.VISIBILITY_DEFAULT;
-
-    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-      logger.trace(insert);
-    }
-
-    int nrows = stmt.executeUpdate(insert);
+    
+    int nrows = addLinksNoCount(dbid, Collections.singletonList(l));
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("nrows = " + nrows);
@@ -252,6 +254,50 @@ public class LinkStoreMysql extends LinkStore {
     // conn.setAutoCommit(true);
   }
 
+  /**
+   * Internal method: add links without updating the count
+   * @param dbid
+   * @param links
+   * @return
+   * @throws SQLException
+   */
+  private int addLinksNoCount(String dbid, List<Link> links)
+                                            throws SQLException {
+    if (links.size() == 0)
+      return 0;
+    
+    // query to insert a link;
+    StringBuilder sb = new StringBuilder();
+    sb.append("INSERT INTO " + dbid + "." + assoctable +
+                    "(id1, id1_type, id2, id2_type, link_type, " +
+                    "visibility, data, time, version) VALUES ");
+    boolean first = true;
+    for (Link l: links ) {
+      if (first) {
+        first = false;
+      } else {
+        sb.append(',');
+      }
+      sb.append("(" + l.id1 +
+                    ", " + l.id1_type +
+                    ", " + l.id2 +
+                    ", " + l.id2_type +
+                    ", " + l.link_type +
+                    ", " + LinkStore.VISIBILITY_DEFAULT +
+                    ", '" + new String(l.data) +
+                    "', " + l.time +
+                    ", "  + l.version + ")");
+    }
+    sb.append(" ON DUPLICATE KEY UPDATE visibility = " 
+              + LinkStore.VISIBILITY_DEFAULT);
+    String insert = sb.toString();
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace(insert);
+    }
+  
+    int nrows = stmt.executeUpdate(insert);
+    return nrows;
+  }
 
   public void deleteLink(String dbid, long id1, long link_type, long id2,
                          boolean noinverse, boolean expunge)
@@ -469,6 +515,41 @@ public class LinkStoreMysql extends LinkStore {
     }
 
     return count;
+  }
+
+  @Override
+  public int bulkLoadBatchSize() {
+    return MYSQL_DEFAULT_BULKINSERT_SIZE;
+  }
+
+  @Override
+  public void addBulkLinks(String dbid, List<Link> links, boolean noinverse)
+      throws Exception {
+    if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
+      logger.debug("addBulkLinks: " + links.size() + " links");
+    }
+    
+    addLinksNoCount(dbid, links);
+    conn.commit();
+  }
+
+  @Override
+  public void recalculateCounts(String dbid) throws Exception {
+    String recalcSql = 
+          "INSERT INTO " + dbid + "." + counttable 
+            + "(id, id_type, link_type, count, time, version)"
+        + " SELECT id1, id1_type, link_type, count(*), max(time), max(version)"
+        + " FROM " + dbid + "." + assoctable 
+        + " WHERE visibility = " + LinkStore.VISIBILITY_DEFAULT
+        + " GROUP BY id1, id1_type, link_type"
+        + " ON DUPLICATE KEY UPDATE count = VALUES(count), "
+            + " time = VALUES(time), version = VALUES(version)";
+
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace(recalcSql);
+    }
+    stmt.executeUpdate(recalcSql);
+    conn.commit();
   }
 
 

@@ -284,15 +284,19 @@ class RealDistribution {
     return left + random_generator.nextInt(right - left + 1);
   }
 
-  static long shuffleAndGetNlinks(long id1_and_newid1[],
+  /**
+   * Return [id1, nlinks] 
+   * @param unshuffled_id1 id1 to be permuted in range [startid1, maxid1]
+   * @param startid1
+   * @param maxid1
+   * @return
+   */
+  static long[] getId1AndNLinks(long unshuffled_id1,
                                   long startid1, long maxid1) {
-    long id1 = id1_and_newid1[0];
-
-    long newid1 = Shuffler.getPermutationValue(id1, startid1, maxid1,
+    long id1 = Shuffler.getPermutationValue(unshuffled_id1, startid1, maxid1,
                                                NLINKS_SHUFFLER_PARAMS);
 
-    id1_and_newid1[1] = newid1;
-    return getNlinks(newid1, startid1, maxid1);
+    return new long[] {id1, getNlinks(id1, startid1, maxid1)};
   }
 
   static long getNlinks(long id1, long startid1, long maxid1) {

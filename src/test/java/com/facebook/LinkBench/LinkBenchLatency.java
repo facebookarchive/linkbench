@@ -2,6 +2,8 @@ package com.facebook.LinkBench;
 
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.LinkStore.LinkStoreOp;
+
 /**
  * Compute percentile latencies.
  * we record latencies in ms units, upto 100 milliseconds. Any calls
@@ -52,18 +54,19 @@ public class LinkBenchLatency {
    * Used by the linkbench driver to record latency of each 
    * individual call
    */
-  public void recordLatency(int threadid, int type, long nanotimetaken) {
+  public void recordLatency(int threadid, LinkStoreOp type,
+        long nanotimetaken) {
 
     long timetaken = nanotimetaken/1000; // in milli seconds
 
     if (timetaken < 100) {
-      latencyms[threadid][type][(int)timetaken]++;
+      latencyms[threadid][type.ordinal()][(int)timetaken]++;
     } else if (timetaken < 100000) {
-      latency1s[threadid][type]++;
+      latency1s[threadid][type.ordinal()]++;
     } else if (timetaken < 1000000) {
-      latency10s[threadid][type]++;
+      latency10s[threadid][type.ordinal()]++;
     } else {
-      latencyhigh[threadid][type]++;
+      latencyhigh[threadid][type.ordinal()]++;
     }
   }
 
@@ -106,12 +109,12 @@ public class LinkBenchLatency {
 
     Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
     // print percentiles
-    for (int type = 0; type < LinkStore.MAX_OPTYPES; type++) {
-      if (lhigh[type] == 0) { // no samples of this type
+    for (LinkStoreOp type: LinkStoreOp.values()) {
+      if (lhigh[type.ordinal()] == 0) { // no samples of this type
         continue;
       }
 
-      logger.info(LinkStore.displaynames[type] +
+      logger.info(LinkStore.displayName(type) +
                        " p25 = " + getPercentile(type, 25)  + "ms " +
                        " p50 = " + getPercentile(type, 50)  + "ms " +
                        " p75 = " + getPercentile(type, 75)  + "ms " +
@@ -121,21 +124,22 @@ public class LinkBenchLatency {
     }
   }
    
-  private long getPercentile(int type, long percentile) {
-    long p = (lhigh[type] * percentile)/100;
+  private long getPercentile(LinkStoreOp type, long percentile) {
+    int type_ix = type.ordinal();
+    long p = (lhigh[type_ix] * percentile)/100;
 
     // does this value fall in the millisecond range?
     int ms = 0;
     for (ms = 0; ms < MAX_MILLIS; ms++) {
-      if (lassort[type][ms] > p) {
+      if (lassort[type_ix][ms] > p) {
         return ms;
       }
     }
 
     // The latency is greater than 100 milliseconds.
-    if (p < l1sec[type]) {
+    if (p < l1sec[type_ix]) {
       ms = 1000;
-    } else if (p < l10sec[type]) {
+    } else if (p < l10sec[type_ix]) {
       ms = 10000;
     } else  {
       ms = 100000;

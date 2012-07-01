@@ -1,10 +1,13 @@
 package com.facebook.LinkBench;
 
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.Random;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
+import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 
 /*
  * Muli-threaded loader for loading data into hbase.
@@ -165,7 +168,6 @@ public class LinkBenchLoad implements Runnable {
 
     long startid;
     long endid;
-    long timestart = 0;
     long sameShuffle = 0;
     long diffShuffle = 0;
     boolean singleAssoc = false;
@@ -188,6 +190,100 @@ public class LinkBenchLoad implements Runnable {
       singleAssoc = false;
     }
 
+    int bulkLoadBatchSize = store.bulkLoadBatchSize();
+    boolean bulkLoad = bulkLoadBatchSize > 0;
+    ArrayList<Link> loadBuffer = null;
+    if (bulkLoad) {
+      loadBuffer = new ArrayList<Link>(bulkLoadBatchSize);
+    }
+    
+    Link link = null;
+    if (!bulkLoad) {
+      // When bulk-loading, need to have multiple link objects at a time
+      // otherwise reuse object
+      link = initLink();
+    }
+
+    logger.info("Starting loader thread  #" + loaderID +
+                " for range [" + startid + ":" + endid + "]");
+    
+    long prevPercentPrinted = 0;
+    for (long i = startid; i < endid; i++) {
+      long nlinks = 0;
+      long id1;
+      if (nlinks_func == -2) {
+        long res[] = RealDistribution.getId1AndNLinks(i, startid1, maxid1);
+        id1 = res[0];
+        nlinks = res[1];
+        if (id1 == i) {
+          sameShuffle++;
+        } else {
+          diffShuffle++;
+        }
+      } else {
+        id1 = i;
+        nlinks = getNlinks(id1, startid1, maxid1,
+                  nlinks_func, nlinks_config, nlinks_default);
+      }
+
+      if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
+        logger.debug("i = " + i + " id1 = " + id1 +
+                           " nlinks = " + nlinks);
+      }
+
+      createOutLinks(link, loadBuffer, id1, nlinks, singleAssoc,
+          bulkLoad, bulkLoadBatchSize);
+
+      if (!singleAssoc) {
+        long nloaded = (i - startid);
+        if (bulkLoad) {
+          nloaded -= loadBuffer.size();
+        }
+        long percent = 100 * nloaded/(endid - startid);
+        if ((percent % 10 == 0) && (percent > prevPercentPrinted)) {
+          logger.info("LOADED_ID " + loaderID +
+                             ":Percent done = " + percent);
+          prevPercentPrinted = percent;
+        }
+      }
+    }
+    
+    if (bulkLoad) {
+      // Load any remaining links
+      loadLinks(loadBuffer);
+    }
+    
+    if (!singleAssoc) {
+      logger.info(" Same shuffle = " + sameShuffle +
+                         " Different shuffle = " + diffShuffle);
+      stats.displayStatsAll();
+    }
+    
+    store.close();
+  }
+
+  private void createOutLinks(Link link, ArrayList<Link> loadBuffer,
+      long id1, long nlinks, boolean singleAssoc, boolean bulkLoad,
+      int bulkLoadBatchSize) {
+    for (long j = 0; j < nlinks; j++) {
+      if (bulkLoad) {
+        // Can't reuse link object
+        link = initLink();
+      }
+      constructLink(link, id1, j, singleAssoc);
+      
+      if (bulkLoad) {
+        loadBuffer.add(link);
+        if (loadBuffer.size() >= bulkLoadBatchSize) {
+          loadLinks(loadBuffer);
+        }
+      } else {
+        loadLink(link, j, nlinks, singleAssoc);
+      }
+    }
+  }
+
+  private Link initLink() {
     Link link = new Link();
     link.link_type = LinkStore.LINK_TYPE;
     link.id1_type = LinkStore.ID1_TYPE;
@@ -196,101 +292,111 @@ public class LinkBenchLoad implements Runnable {
     link.version = 0;
     link.data = new byte[datasize];
     link.time = System.currentTimeMillis();
+    return link;
+  }
 
-    logger.info("Starting loader thread  #" + loaderID +
-                " for range [" + startid + ":" + endid + "]");
-    
-    long prevPercentPrinted = 0;
-    for (long id1 = startid; id1 < endid; id1++) {
-      long nlinks = 0;
-      long newid1 = id1;
-      if (nlinks_func == -2) {
-        long[] id1_and_newid1 = {id1, id1};
-        nlinks = RealDistribution.shuffleAndGetNlinks(id1_and_newid1,
-                                                      startid1, maxid1);
-        newid1 = id1_and_newid1[1];
-        if (newid1 == id1) {
-          sameShuffle++;
-        } else {
-          diffShuffle++;
-        }
-      } else {
-        nlinks = getNlinks(id1, startid1, maxid1,
-                  nlinks_func, nlinks_config, nlinks_default);
-      }
+  /**
+   * Helper method to fill in link data
+   * @param link this link is filled in.  Should have been initialized with
+   *            initLink() earlier
+   * @param outlink_ix the number of this link out of all outlinks from
+   *                    id1
+   * @param singleAssoc whether we are in singleAssoc mode
+   */
+  private void constructLink(Link link, long id1, long outlink_ix,
+      boolean singleAssoc) {
+    link.id1 = id1;
 
-      if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
-        logger.debug("id1 = " + id1 + " newid1 = " + newid1 +
-                           " nlinks = " + nlinks);
-      }
-
-      for (long j = 0; j < nlinks; j++) {
-
-        link.id1 = newid1;
-
-        // Using random number generator for id2 means we won't know
-        // which id2s exist. So link id1 to
-        // maxid1 + id1 + 1 thru maxid1 + id1 + nlinks(id1) UNLESS
-        // config randomid2max is nonzero.
-        if (singleAssoc) {
-          link.id2 = 45; // some constant
-        } else {
-          link.id2 = (randomid2max == 0 ?
-                     (maxid1 + newid1 + j) :
-                     random_id2.nextInt((int)randomid2max));
-          link.time = System.currentTimeMillis();
-          // generate data as a sequence of random characters from 'a' to 'd'
-          link.data = new byte[datasize];
-          for (int k = 0; k < datasize; k++) {
-            link.data[k] = (byte)('a' + Math.abs(random_data.nextInt()) % 4);
-          }
-        }
-
-        if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
-          logger.debug("id2 chosen is " + link.id2);
-        }
-        if (!singleAssoc) {
-          timestart = System.nanoTime();
-        }
-
-        link.time = System.currentTimeMillis();
-        try {
-          // no inverses for now
-          store.addLink(dbid, link, true);
-          linksloaded++;
-
-          if (!singleAssoc && j == nlinks - 1) {
-            long timetaken = (System.nanoTime() - timestart);
-
-            // convert to microseconds
-            stats.addStats(LinkStore.LOAD_LINK, timetaken/1000, false);
-
-            latencyStats.recordLatency(loaderID, LinkStore.LOAD_LINK, timetaken);
-          }
-
-        } catch (Throwable e){//Catch exception if any
-            long endtime2 = System.nanoTime();
-            long timetaken2 = (endtime2 - timestart)/1000;
-            logger.error("Error: " + e.getMessage(), e);
-            stats.addStats(LinkStore.LOAD_LINK, timetaken2, true);
-            store.clearErrors(loaderID);
-            continue;
-        }
-      }
-
-      if (!singleAssoc) {
-        long percent = 100 * (id1 - startid)/(endid - startid);
-        if ((percent % 10 == 0) && (percent > prevPercentPrinted)) {
-          logger.info("LOADED_ID " + loaderID +
-                             ":Percent done = " + percent);
-          prevPercentPrinted = percent;
-        }
+    // Using random number generator for id2 means we won't know
+    // which id2s exist. So link id1 to
+    // maxid1 + id1 + 1 thru maxid1 + id1 + nlinks(id1) UNLESS
+    // config randomid2max is nonzero.
+    if (singleAssoc) {
+      link.id2 = 45; // some constant
+    } else {
+      link.id2 = (randomid2max == 0 ?
+                 (maxid1 + id1 + outlink_ix) :
+                 random_id2.nextInt((int)randomid2max));
+      link.time = System.currentTimeMillis();
+      // generate data as a sequence of random characters from 'a' to 'd'
+      link.data = new byte[datasize];
+      for (int k = 0; k < datasize; k++) {
+        link.data[k] = (byte)('a' + Math.abs(random_data.nextInt()) % 4);
       }
     }
+
+    if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
+      logger.debug("id2 chosen is " + link.id2);
+    }
+    
+    link.time = System.currentTimeMillis();
+  }
+
+  /**
+   * Load an individual link into the db.
+   * 
+   * If an error occurs during loading, this method will log it,
+   *  add stats, and reset the connection.
+   * @param link
+   * @param outlink_ix
+   * @param nlinks
+   * @param singleAssoc
+   */
+  private void loadLink(Link link, long outlink_ix, long nlinks,
+      boolean singleAssoc) {
+    long timestart = 0;
     if (!singleAssoc) {
-      logger.info(" Same shuffle = " + sameShuffle +
-                         " Different shuffle = " + diffShuffle);
-      stats.displayStatsAll();
+      timestart = System.nanoTime();
+    }
+    
+    try {
+      // no inverses for now
+      store.addLink(dbid, link, true);
+      linksloaded++;
+  
+      if (!singleAssoc && outlink_ix == nlinks - 1) {
+        long timetaken = (System.nanoTime() - timestart);
+  
+        // convert to microseconds
+        stats.addStats(LinkStoreOp.LOAD_LINK, timetaken/1000, false);
+  
+        latencyStats.recordLatency(loaderID, 
+                      LinkStoreOp.LOAD_LINK, timetaken);
+      }
+  
+    } catch (Throwable e){//Catch exception if any
+        long endtime2 = System.nanoTime();
+        long timetaken2 = (endtime2 - timestart)/1000;
+        logger.error("Error: " + e.getMessage(), e);
+        stats.addStats(LinkStoreOp.LOAD_LINK, timetaken2, true);
+        store.clearErrors(loaderID);
+    }
+  }
+
+  private void loadLinks(ArrayList<Link> loadBuffer) {
+    long timestart = System.nanoTime();
+    
+    try {
+      // no inverses for now
+      int nlinks = loadBuffer.size();
+      store.addBulkLinks(dbid, loadBuffer, true);
+      linksloaded += nlinks;
+      loadBuffer.clear();
+  
+      long timetaken = (System.nanoTime() - timestart);
+  
+      // convert to microseconds
+      stats.addStats(LinkStoreOp.LOAD_LINKS_BULK, timetaken/1000, false);
+      stats.addStats(LinkStoreOp.LOAD_LINKS_BULK_NLINKS, linksloaded, false);
+  
+      latencyStats.recordLatency(loaderID, LinkStoreOp.LOAD_LINKS_BULK,
+                                                             timetaken);
+    } catch (Throwable e){//Catch exception if any
+        long endtime2 = System.nanoTime();
+        long timetaken2 = (endtime2 - timestart)/1000;
+        logger.error("Error: " + e.getMessage(), e);
+        stats.addStats(LinkStoreOp.LOAD_LINKS_BULK, timetaken2, true);
+        store.clearErrors(loaderID);
     }
   }
 }

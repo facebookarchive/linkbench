@@ -172,6 +172,11 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
       columnfamilies.add("cf3");
     }
 
+  @Override
+  public void close() {
+    //TODO
+  }
+
   /*
    * Interface implementation
    */
