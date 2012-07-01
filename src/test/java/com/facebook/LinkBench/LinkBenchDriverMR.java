@@ -34,6 +34,8 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
+
 /**
  * LinkBenchDriverMR class.
  * First loads data using map-reduced LinkBenchLoad class.
@@ -306,8 +308,17 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       ConfigUtil.setupLogging(props, null);
       LinkStore store = initStore(LOAD, loaderid.get());
       LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders.get());
+
+      long maxid1 = Long.parseLong(props.getProperty("maxid1"));
+      long startid1 = Long.parseLong(props.getProperty("startid1"));
+      
+      LoadProgress prog_tracker = new LoadProgress(
+          Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER), maxid1 - startid1);
+      
       LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats,
-                                          loaderid.get(), nloaders.get());
+                               loaderid.get(), maxid1 == startid1 + 1,
+                               nloaders.get(), prog_tracker);
+      
       LinkedList<LinkBenchLoad> tasks = new LinkedList<LinkBenchLoad>();
       tasks.add(loader);
       long linksloaded = 0;

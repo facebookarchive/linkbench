@@ -3,6 +3,9 @@ package com.facebook.LinkBench;
 import java.util.ArrayList;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -10,6 +13,7 @@ import org.apache.log4j.Logger;
 import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 
 /*
+ * TODO: update to reflect changes
  * Muli-threaded loader for loading data into hbase.
  * The range from startid1 to maxid1 is chunked up into equal sized
  * disjoint ranges so that each loader can work on its range.
@@ -23,12 +27,10 @@ public class LinkBenchLoad implements Runnable {
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
 
   private long randomid2max; // whether id2 should be generated randomly
-  private Random random_id2; // random number generator for id2 if needed
 
   private long maxid1;   // max id1 to generate
   private long startid1; // id1 at which to start
   private int  loaderID; // ID for this loader
-  private int  nloaders; // #loaders
   private LinkStore store;// store interface (several possible implementations
                           // like mysql, hbase etc)
   private int datasize; // 'data' column size for one (id1, type, id2)
@@ -44,26 +46,69 @@ public class LinkBenchLoad implements Runnable {
   int nlinks_config; // any additional config to go with above the above func
   int nlinks_default; // default value of #links - expected to be 0 or 1
 
+  
+  // Counters for load statistics
+  long sameShuffle;
+  long diffShuffle;
   long linksloaded;
+  
+  // Random generators
   Random random_data;
+  Random random_links = new Random(); // for #links
+  private Random random_id2; // random number generator for id2 if needed
+  
+  /** 
+   * special case for single hot row benchmark. If singleAssoc is set, 
+   * then make this method not print any statistics message, all statistics
+   * are collected at a higher layer. */
+  boolean singleAssoc;
 
-  // Random number generators for #links
-  Random random_links = new Random();
+  private BlockingQueue<LoadChunk> chunk_q;
+
+  private LoadProgress prog_tracker;
 
 
-  public LinkBenchLoad(LinkStore input_store,
+  /**
+   * Convenience constructor
+   * @param store2
+   * @param props
+   * @param latencyStats
+   * @param loaderID
+   * @param nloaders
+   */
+  public LinkBenchLoad(LinkStore store, Properties props,
+      LinkBenchLatency latencyStats, int loaderID, boolean singleAssoc,
+      int nloaders, LoadProgress prog_tracker) {
+    this(store, props, latencyStats, loaderID, singleAssoc,
+              new ArrayBlockingQueue<LoadChunk>(2), prog_tracker);
+    
+    // Just add a single chunk to the queue
+    chunk_q.add(new LoadChunk(loaderID, startid1, maxid1));
+    chunk_q.add(LoadChunk.SHUTDOWN);
+  }
+
+  
+  public LinkBenchLoad(LinkStore store,
                        Properties props,
                        LinkBenchLatency latencyStats,
-                       int input_loaderID,
-                       int input_nloaders) throws LinkBenchConfigError {
-    linksloaded = 0;
-    loaderID = input_loaderID;
+                       int loaderID,
+                       boolean singleAssoc,
+                       BlockingQueue<LoadChunk> chunk_q,
+                       LoadProgress prog_tracker) throws LinkBenchConfigError {
+    /*
+     * Initialize fields from arguments
+     */
+    this.store = store;
     this.latencyStats = latencyStats;
+    this.loaderID = loaderID;
+    this.singleAssoc = singleAssoc;
+    this.chunk_q = chunk_q;
+    this.prog_tracker = prog_tracker;
 
-    // random number generator for id2 if needed
-    randomid2max = Long.parseLong(props.getProperty("randomid2max"));
-    random_id2 = (randomid2max > 0) ? (new Random()) : null;
-
+    
+    /*
+     * Load settings from properties
+     */
     maxid1 = Long.parseLong(props.getProperty("maxid1"));
     startid1 = Long.parseLong(props.getProperty("startid1"));
 
@@ -73,8 +118,6 @@ public class LinkBenchLoad implements Runnable {
     }
 
     debuglevel = ConfigUtil.getDebugLevel(props);
-    nloaders = input_nloaders;
-    store = input_store;
     datasize = Integer.parseInt(props.getProperty("datasize"));
 
     nlinks_func = Integer.parseInt(props.getProperty("nlinks_func"));
@@ -82,7 +125,7 @@ public class LinkBenchLoad implements Runnable {
     nlinks_default = Integer.parseInt(props.getProperty("nlinks_default"));
     if (nlinks_func == -2) {//real distribution has it own initialization
       try {
-        //load staticical data into RealDistribution
+        //load statistical data into RealDistribution
         RealDistribution.loadOneShot(props);
       } catch (Exception e) {
         logger.error(e);
@@ -92,15 +135,29 @@ public class LinkBenchLoad implements Runnable {
 
     displayfreq = Long.parseLong(props.getProperty("displayfreq"));
     maxsamples = Integer.parseInt(props.getProperty("maxsamples"));
-    stats = new LinkBenchStats(loaderID,
-                               displayfreq,
-                               maxsamples);
-
+    
     dbid = props.getProperty("dbid");
+    
 
+    /*
+     * Initialize statistics
+     */
+    linksloaded = 0;
+    sameShuffle = 0;
+    diffShuffle = 0;
+    stats = new LinkBenchStats(loaderID, displayfreq, maxsamples);
+    
+    
+    /*
+     * Setup random number generators
+     */
+    // random number generator for id2 if needed
+    randomid2max = Long.parseLong(props.getProperty("randomid2max"));
+    random_id2 = (randomid2max > 0) ? (new Random()) : null;
+    
     // generate data as a sequence of random characters from 'a' to 'd'
     random_data = new Random();
-
+    
     // Random number generators for #links
     random_links = new Random();
   }
@@ -166,49 +223,63 @@ public class LinkBenchLoad implements Runnable {
   @Override
   public void run() {
 
-    long startid;
-    long endid;
-    long sameShuffle = 0;
-    long diffShuffle = 0;
-    boolean singleAssoc = false;
-
-    // special case for single hot row benchmark. If singleAssoc is set, then make
-    // this method not print any statistics message, all statistics are collected
-    // at a higher layer.
-    if (startid1 + 1 == maxid1) {
-      startid = startid1;
-      endid = startid1 + 1;
-      singleAssoc = true;
-    } else {
-      // partition the range from startid1 to maxid1 into nloaders chunks
-      // the last partition could be shorter than others
-      long chunksize = (maxid1 - startid1)%nloaders == 0 ?
-                     (maxid1 - startid1)/nloaders :
-                     (maxid1 - startid1)/nloaders + 1;
-      startid = startid1 + (chunksize * loaderID);
-      endid = Math.min(startid + chunksize, maxid1); //exclusive
-      singleAssoc = false;
-    }
-
     int bulkLoadBatchSize = store.bulkLoadBatchSize();
     boolean bulkLoad = bulkLoadBatchSize > 0;
     ArrayList<Link> loadBuffer = null;
     if (bulkLoad) {
       loadBuffer = new ArrayList<Link>(bulkLoadBatchSize);
     }
+
+    logger.info("Starting loader thread  #" + loaderID);
     
+    while (true) {
+      LoadChunk chunk;
+      try {
+        chunk = chunk_q.take();
+      } catch (InterruptedException ie) {
+        logger.warn("InterruptedException not expected, try again", ie);
+        continue;
+      }
+      
+      // Shutdown signal is received though special chunk type
+      if (chunk.shutdown) {
+        break;
+      }
+
+      // Load the link range specified in the chunk
+      processChunk(chunk, bulkLoad, bulkLoadBatchSize, loadBuffer);
+    }
+    
+    if (bulkLoad) {
+      // Load any remaining links
+      loadLinks(loadBuffer);
+    }
+    
+    if (!singleAssoc) {
+      logger.info(" Same shuffle = " + sameShuffle +
+                         " Different shuffle = " + diffShuffle);
+      stats.displayStatsAll();
+    }
+    
+    store.close();
+  }
+
+  private void processChunk(LoadChunk chunk, boolean bulkLoad,
+      int bulkLoadBatchSize, ArrayList<Link> loadBuffer) {
+    if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
+      logger.debug("Loader thread  #" + loaderID + " processing "
+                  + chunk.toString());
+    }
+
     Link link = null;
     if (!bulkLoad) {
       // When bulk-loading, need to have multiple link objects at a time
       // otherwise reuse object
       link = initLink();
     }
-
-    logger.info("Starting loader thread  #" + loaderID +
-                " for range [" + startid + ":" + endid + "]");
     
     long prevPercentPrinted = 0;
-    for (long i = startid; i < endid; i++) {
+    for (long i = chunk.start; i < chunk.end; i += chunk.step) {
       long nlinks = 0;
       long id1;
       if (nlinks_func == -2) {
@@ -225,41 +296,30 @@ public class LinkBenchLoad implements Runnable {
         nlinks = getNlinks(id1, startid1, maxid1,
                   nlinks_func, nlinks_config, nlinks_default);
       }
-
-      if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
-        logger.debug("i = " + i + " id1 = " + id1 +
+ 
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace("i = " + i + " id1 = " + id1 +
                            " nlinks = " + nlinks);
       }
-
+ 
       createOutLinks(link, loadBuffer, id1, nlinks, singleAssoc,
           bulkLoad, bulkLoadBatchSize);
-
+ 
       if (!singleAssoc) {
-        long nloaded = (i - startid);
+        long nloaded = (i - chunk.start) / chunk.step;
         if (bulkLoad) {
           nloaded -= loadBuffer.size();
         }
-        long percent = 100 * nloaded/(endid - startid);
+        long percent = 100 * nloaded/(chunk.size);
         if ((percent % 10 == 0) && (percent > prevPercentPrinted)) {
-          logger.info("LOADED_ID " + loaderID +
-                             ":Percent done = " + percent);
+          logger.debug(chunk.toString() +  ": Percent done = " + percent);
           prevPercentPrinted = percent;
         }
       }
     }
     
-    if (bulkLoad) {
-      // Load any remaining links
-      loadLinks(loadBuffer);
-    }
-    
-    if (!singleAssoc) {
-      logger.info(" Same shuffle = " + sameShuffle +
-                         " Different shuffle = " + diffShuffle);
-      stats.displayStatsAll();
-    }
-    
-    store.close();
+    // Update progress and maybe print message
+    prog_tracker.update(chunk.size);
   }
 
   private void createOutLinks(Link link, ArrayList<Link> loadBuffer,
@@ -325,8 +385,8 @@ public class LinkBenchLoad implements Runnable {
       }
     }
 
-    if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
-      logger.debug("id2 chosen is " + link.id2);
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("id2 chosen is " + link.id2);
     }
     
     link.time = System.currentTimeMillis();
@@ -397,6 +457,77 @@ public class LinkBenchLoad implements Runnable {
         logger.error("Error: " + e.getMessage(), e);
         stats.addStats(LinkStoreOp.LOAD_LINKS_BULK, timetaken2, true);
         store.clearErrors(loaderID);
+    }
+  }
+  
+  /**
+   * Represents a portion of the id space, starting with
+   * start, going up until end (non-inclusive) with step size
+   * step
+   *
+   */
+  public static class LoadChunk {
+    public static LoadChunk SHUTDOWN = new LoadChunk(true,
+                                              0, 0, 0, 1);
+
+    public LoadChunk(long id, long start, long end) {
+      this(false, id, start, end, 1);
+    }
+    public LoadChunk(boolean shutdown,
+                      long id, long start, long end, long step) {
+      super();
+      this.shutdown = shutdown;
+      this.id = id;
+      this.start = start;
+      this.end = end;
+      this.step = step;
+      this.size = (end - start) / step;
+    }
+    public final boolean shutdown;
+    public final long id;
+    public final long start;
+    public final long end;
+    public final long step;
+    public final long size;
+    
+    public String toString() {
+      if (shutdown) {
+        return "chunk SHUTDOWN";
+      }
+      String range;
+      if (step == 1) {
+        range = "[" + start + ":" + end + "]";
+      } else {
+        range = "[" + start + ":" + step + ":" + end + "]";
+      }
+      return "chunk " + id + range;
+    }
+  }
+  public static class LoadProgress {
+    public LoadProgress(Logger progressLogger, long ntotal) {
+      super();
+      this.progressLogger = progressLogger;
+      this.ntotal = ntotal;
+      this.nloaded = new AtomicLong();
+    }
+    private final Logger progressLogger;
+    private final AtomicLong nloaded; // progress
+    private final long ntotal; // goal
+    
+    public void update(long inc) {
+      // TODO: check semantics
+      long curr = nloaded.addAndGet(inc);
+      long prev = curr - inc;
+      
+      // TODO: temporary
+      long report_int = (1024);
+      if ((curr / report_int) > (prev / report_int)
+          || curr == ntotal) {
+        double percentage = (curr / (double)ntotal) * 100.0;
+        progressLogger.info(
+            String.format("%d/%d id1s loaded: %.1f%% complete: ",
+                          curr, ntotal, percentage));
+      }
     }
   }
 }

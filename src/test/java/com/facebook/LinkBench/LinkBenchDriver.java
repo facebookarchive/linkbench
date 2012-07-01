@@ -4,10 +4,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.cli.CommandLine;
@@ -19,6 +22,8 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
+import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 
 /*
@@ -117,17 +122,27 @@ public class LinkBenchDriver {
     LinkBenchLatency latencyStats = new LinkBenchLatency(nthreads);
 
     boolean bulkLoad = true;
+    BlockingQueue<LoadChunk> chunk_q = new LinkedBlockingQueue<LoadChunk>();
     
-    // start loaders
+    // max id1 to generate
+    long maxid1 = Long.parseLong(props.getProperty("maxid1"));
+    // id1 at which to start
+    long startid1 = Long.parseLong(props.getProperty("startid1"));
+    
+    // Create loaders
     logger.info("Starting loaders " + nloaders);
+    logger.debug("Bulk Load setting: " + bulkLoad);
+    
+    LoadProgress loadTracker = new LoadProgress(logger, maxid1 - startid1); 
     for (int i = 0; i < nloaders; i++) {
       LinkStore store = initStore(LOAD, i);
       bulkLoad = bulkLoad && store.bulkLoadBatchSize() > 0;
-      LinkBenchLoad l = new LinkBenchLoad(store, props, latencyStats, i, nloaders);
+      LinkBenchLoad l = new LinkBenchLoad(store, props, latencyStats, i,
+                          maxid1 == startid1 + 1, chunk_q, loadTracker);
       loaders.add(l);
     }
     
-    logger.debug("Bulk Load setting: " + bulkLoad);
+    enqueueLoadWork(chunk_q, startid1, maxid1, nloaders);
 
     // run loaders
     long loadtime = concurrentExec(loaders);
@@ -139,8 +154,6 @@ public class LinkBenchDriver {
     }
 
     // compute total #links loaded
-    long maxid1 = Long.parseLong(props.getProperty("maxid1"));
-    long startid1 = Long.parseLong(props.getProperty("startid1"));
     int nlinks_default = Integer.parseInt(props.getProperty("nlinks_default"));
 
     long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
@@ -156,6 +169,31 @@ public class LinkBenchDriver {
                        actuallinks + " loaded in " + (loadtime/1000) + " seconds." +
                        "Links/second = " + ((1000*actuallinks)/loadtime));
 
+  }
+
+  private void enqueueLoadWork(BlockingQueue<LoadChunk> chunk_q, long startid1,
+      long maxid1, int nloaders) {
+    // Enqueue work chunks.  Do it in reverse order as a heuristic to improve
+    // load balancing, since queue is FIFO and later chunks tend to be larger
+    
+    int chunkSize = Integer.parseInt(
+                      props.getProperty("loader_chunk_size", "2048"));
+    long chunk_num = 0;
+    ArrayList<LoadChunk> stack = new ArrayList<LoadChunk>();
+    for (long id1 = startid1; id1 < maxid1; id1 += chunkSize) {
+      stack.add(new LoadChunk(chunk_num, id1, 
+                    Math.min(id1 + chunkSize, maxid1)));
+      chunk_num++;
+    }
+    
+    for (int i = stack.size() - 1; i >= 0; i--) {
+      chunk_q.add(stack.get(i));
+    }
+    
+    for (int i = 0; i < nloaders; i++) {
+      // Add a shutdown signal for each loader
+      chunk_q.add(LoadChunk.SHUTDOWN);
+    }
   }
 
   private void updateCounts(LinkBenchLatency latencyStats, int threadnum)

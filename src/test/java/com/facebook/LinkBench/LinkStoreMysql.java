@@ -30,7 +30,7 @@ public class LinkStoreMysql extends LinkStore {
   Level debuglevel;
   Connection conn;
   Statement stmt;
-  int bulkinsertSize = MYSQL_DEFAULT_BULKINSERT_SIZE;
+  int bulkInsertSize = MYSQL_DEFAULT_BULKINSERT_SIZE;
   
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   
@@ -60,7 +60,7 @@ public class LinkStoreMysql extends LinkStore {
     debuglevel = ConfigUtil.getDebugLevel(props);
 
     if (props.containsKey("mysql_bulk_insert_size")) {
-      bulkinsertSize = Integer.parseInt(
+      bulkInsertSize = Integer.parseInt(
                         props.getProperty("mysql_bulk_insert_batch"));
     }
     
@@ -472,7 +472,6 @@ public class LinkStoreMysql extends LinkStore {
     }
 
     ResultSet rs = stmt.executeQuery(query);
-    boolean found = false;
 
     int count = 0;
     while (rs.next()) {
@@ -519,14 +518,14 @@ public class LinkStoreMysql extends LinkStore {
 
   @Override
   public int bulkLoadBatchSize() {
-    return MYSQL_DEFAULT_BULKINSERT_SIZE;
+    return bulkInsertSize;
   }
 
   @Override
   public void addBulkLinks(String dbid, List<Link> links, boolean noinverse)
       throws Exception {
-    if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
-      logger.debug("addBulkLinks: " + links.size() + " links");
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("addBulkLinks: " + links.size() + " links");
     }
     
     addLinksNoCount(dbid, links);
