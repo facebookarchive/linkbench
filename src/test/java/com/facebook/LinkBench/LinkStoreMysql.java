@@ -30,10 +30,15 @@ public class LinkStoreMysql extends LinkStore {
   Level debuglevel;
   Connection conn;
   Statement stmt;
+  
+  private int phase;
+
   int bulkInsertSize = MYSQL_DEFAULT_BULKINSERT_SIZE;
-  
+  // Optional optimization: disable binary logging
+  boolean disableBinLogForLoad = false;
+
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
-  
+
   public LinkStoreMysql() {
     super();
   }
@@ -58,10 +63,15 @@ public class LinkStoreMysql extends LinkStore {
     port = props.getProperty("port");
     if (port == null || port.equals("")) port = "3306"; //use default port
     debuglevel = ConfigUtil.getDebugLevel(props);
+    phase = currentPhase;
 
     if (props.containsKey("mysql_bulk_insert_size")) {
       bulkInsertSize = Integer.parseInt(
                         props.getProperty("mysql_bulk_insert_batch"));
+    }
+    if (props.containsKey("mysql_disable_binlog_load")) {
+      disableBinLogForLoad = Boolean.parseBoolean(
+                        props.getProperty("mysql_disable_binlog_load"));
     }
     
     // connect
@@ -95,6 +105,11 @@ public class LinkStoreMysql extends LinkStore {
     //System.err.println("connected");
     conn.setAutoCommit(false);
     stmt = conn.createStatement();
+    
+    if (phase == LinkBenchDriver.LOAD && disableBinLogForLoad) {
+      // Turn binary logging off for duration of connection
+      stmt.executeUpdate("SET SESSION sql_log_bin=0");
+    }
   }
   
   @Override
@@ -533,23 +548,41 @@ public class LinkStoreMysql extends LinkStore {
   }
 
   @Override
-  public void recalculateCounts(String dbid) throws Exception {
-    String recalcSql = 
-          "INSERT INTO " + dbid + "." + counttable 
-            + "(id, id_type, link_type, count, time, version)"
-        + " SELECT id1, id1_type, link_type, count(*), max(time), max(version)"
-        + " FROM " + dbid + "." + assoctable 
-        + " WHERE visibility = " + LinkStore.VISIBILITY_DEFAULT
-        + " GROUP BY id1, id1_type, link_type"
-        + " ON DUPLICATE KEY UPDATE count = VALUES(count), "
-            + " time = VALUES(time), version = VALUES(version)";
-
+  public void addBulkCounts(String dbid, List<LinkCount> counts)
+                                                throws Exception {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-      logger.trace(recalcSql);
+      logger.trace("addBulkCounts: " + counts.size() + " link counts");
     }
-    stmt.executeUpdate(recalcSql);
+    if (counts.size() == 0)
+      return;
+    
+    StringBuilder sqlSB = new StringBuilder(); 
+    sqlSB.append("INSERT INTO " + dbid + "." + counttable +
+        "(id, id_type, link_type, count, time, version) " +
+        "VALUES ");
+    boolean first = true;
+    for (LinkCount count: counts) {
+      if (first) {
+        first = false;
+      } else {
+        sqlSB.append(",");
+      }
+      sqlSB.append("(" + count.id1 +
+        ", " + count.id1_type +
+        ", " + count.link_type +
+        ", " + count.count +
+        ", " + count.time +
+        ", " + count.version + ")");
+    }
+    sqlSB.append("ON DUPLICATE KEY UPDATE"
+        + " count = VALUES(count), time = VALUES(time),"
+        + " version = VALUES(version)");
+        
+    String sql = sqlSB.toString();
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace(sql);
+    }
+    stmt.executeUpdate(sql);
     conn.commit();
   }
-
-
 }

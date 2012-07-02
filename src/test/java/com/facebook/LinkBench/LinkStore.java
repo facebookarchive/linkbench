@@ -25,11 +25,13 @@ public abstract class LinkStore {
     GET_LINKS_LIST,
     LOAD_LINK,
     LOAD_LINKS_BULK,
+    LOAD_COUNTS_BULK,
     UPDATE_COUNTS,
     // Although the following are not truly operations, we need stats
     // for them 
     RANGE_SIZE,    // how big range scans are
     LOAD_LINKS_BULK_NLINKS, // how many links inserted in bulk
+    LOAD_COUNTS_BULK_NLINKS, // how many counts inserted in bulk
     UNKNOWN,
   }
 
@@ -95,9 +97,10 @@ public abstract class LinkStore {
     		"LinkStore subclass " + this.getClass().getName());
   }
   
-  /** Recalculate all of the link counts */
-  public void recalculateCounts(String dbid)  throws Exception {
-    throw new UnsupportedOperationException("recalculateCounts not supported for " +
-        "LinkStore subclass " + this.getClass().getName());
+  /** Add a batch of counts */
+  public void addBulkCounts(String dbid, List<LinkCount> a)
+      throws Exception {
+    throw new UnsupportedOperationException("addBulkCounts not supported for " +
+      "LinkStore subclass " + this.getClass().getName());
   }
 }

@@ -149,6 +149,10 @@ public class LinkBenchStats {
         samplestaken[LinkStoreOp.LOAD_LINKS_BULK.ordinal()]);
     displayStats(LinkStoreOp.LOAD_LINKS_BULK_NLINKS, 0,
         samplestaken[LinkStoreOp.LOAD_LINKS_BULK_NLINKS.ordinal()]);
+    displayStats(LinkStoreOp.LOAD_COUNTS_BULK, 0,
+        samplestaken[LinkStoreOp.LOAD_COUNTS_BULK.ordinal()]);
+    displayStats(LinkStoreOp.LOAD_COUNTS_BULK_NLINKS, 0,
+        samplestaken[LinkStoreOp.LOAD_COUNTS_BULK_NLINKS.ordinal()]);
   }
 
 }

@@ -1,6 +1,8 @@
 package com.facebook.LinkBench;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -226,8 +228,10 @@ public class LinkBenchLoad implements Runnable {
     int bulkLoadBatchSize = store.bulkLoadBatchSize();
     boolean bulkLoad = bulkLoadBatchSize > 0;
     ArrayList<Link> loadBuffer = null;
+    ArrayList<LinkCount> countLoadBuffer = null;
     if (bulkLoad) {
       loadBuffer = new ArrayList<Link>(bulkLoadBatchSize);
+      countLoadBuffer = new ArrayList<LinkCount>(bulkLoadBatchSize);
     }
 
     logger.info("Starting loader thread  #" + loaderID);
@@ -247,12 +251,14 @@ public class LinkBenchLoad implements Runnable {
       }
 
       // Load the link range specified in the chunk
-      processChunk(chunk, bulkLoad, bulkLoadBatchSize, loadBuffer);
+      processChunk(chunk, bulkLoad, bulkLoadBatchSize,
+                    loadBuffer, countLoadBuffer);
     }
     
     if (bulkLoad) {
-      // Load any remaining links
+      // Load any remaining links or counts
       loadLinks(loadBuffer);
+      loadCounts(countLoadBuffer);
     }
     
     if (!singleAssoc) {
@@ -265,7 +271,8 @@ public class LinkBenchLoad implements Runnable {
   }
 
   private void processChunk(LoadChunk chunk, boolean bulkLoad,
-      int bulkLoadBatchSize, ArrayList<Link> loadBuffer) {
+      int bulkLoadBatchSize, ArrayList<Link> loadBuffer,
+      ArrayList<LinkCount> countLoadBuffer) {
     if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
       logger.debug("Loader thread  #" + loaderID + " processing "
                   + chunk.toString());
@@ -302,7 +309,8 @@ public class LinkBenchLoad implements Runnable {
                            " nlinks = " + nlinks);
       }
  
-      createOutLinks(link, loadBuffer, id1, nlinks, singleAssoc,
+      createOutLinks(link, loadBuffer, countLoadBuffer,
+          id1, nlinks, singleAssoc,
           bulkLoad, bulkLoadBatchSize);
  
       if (!singleAssoc) {
@@ -322,9 +330,25 @@ public class LinkBenchLoad implements Runnable {
     prog_tracker.update(chunk.size);
   }
 
+  /**
+   * Create the out links for a given id1
+   * @param link
+   * @param loadBuffer
+   * @param id1
+   * @param nlinks
+   * @param singleAssoc
+   * @param bulkLoad
+   * @param bulkLoadBatchSize
+   */
   private void createOutLinks(Link link, ArrayList<Link> loadBuffer,
+      ArrayList<LinkCount> countLoadBuffer,
       long id1, long nlinks, boolean singleAssoc, boolean bulkLoad,
       int bulkLoadBatchSize) {
+    Map<Long, LinkCount> linkTypeCounts = null;
+    if (bulkLoad) {
+      linkTypeCounts = new HashMap<Long, LinkCount>();
+    }
+    
     for (long j = 0; j < nlinks; j++) {
       if (bulkLoad) {
         // Can't reuse link object
@@ -337,8 +361,30 @@ public class LinkBenchLoad implements Runnable {
         if (loadBuffer.size() >= bulkLoadBatchSize) {
           loadLinks(loadBuffer);
         }
+        
+        // Update link counts for this type
+        LinkCount count = linkTypeCounts.get(link.link_type); 
+        if (count == null) {
+          count = new LinkCount(id1,link.id1_type, link.link_type,
+                                link.time, link.version, 1);
+          linkTypeCounts.put(link.link_type, count);
+        } else {
+          count.count++;
+          count.time = link.time;
+          count.version = link.version;
+        }
       } else {
         loadLink(link, j, nlinks, singleAssoc);
+      }
+    }
+    
+    // Maintain the counts separately
+    if (bulkLoad) {
+      for (LinkCount count: linkTypeCounts.values()) {
+        countLoadBuffer.add(count);
+        if (countLoadBuffer.size() >= bulkLoadBatchSize) {
+          loadCounts(countLoadBuffer);
+        }
       }
     }
   }
@@ -447,7 +493,7 @@ public class LinkBenchLoad implements Runnable {
   
       // convert to microseconds
       stats.addStats(LinkStoreOp.LOAD_LINKS_BULK, timetaken/1000, false);
-      stats.addStats(LinkStoreOp.LOAD_LINKS_BULK_NLINKS, linksloaded, false);
+      stats.addStats(LinkStoreOp.LOAD_LINKS_BULK_NLINKS, nlinks, false);
   
       latencyStats.recordLatency(loaderID, LinkStoreOp.LOAD_LINKS_BULK,
                                                              timetaken);
@@ -456,6 +502,32 @@ public class LinkBenchLoad implements Runnable {
         long timetaken2 = (endtime2 - timestart)/1000;
         logger.error("Error: " + e.getMessage(), e);
         stats.addStats(LinkStoreOp.LOAD_LINKS_BULK, timetaken2, true);
+        store.clearErrors(loaderID);
+    }
+  }
+  
+  private void loadCounts(ArrayList<LinkCount> loadBuffer) {
+    long timestart = System.nanoTime();
+    
+    try {
+      // no inverses for now
+      int ncounts = loadBuffer.size();
+      store.addBulkCounts(dbid, loadBuffer);
+      loadBuffer.clear();
+  
+      long timetaken = (System.nanoTime() - timestart);
+  
+      // convert to microseconds
+      stats.addStats(LinkStoreOp.LOAD_COUNTS_BULK, timetaken/1000, false);
+      stats.addStats(LinkStoreOp.LOAD_COUNTS_BULK_NLINKS, ncounts, false);
+  
+      latencyStats.recordLatency(loaderID, LinkStoreOp.LOAD_COUNTS_BULK,
+                                                             timetaken);
+    } catch (Throwable e){//Catch exception if any
+        long endtime2 = System.nanoTime();
+        long timetaken2 = (endtime2 - timestart)/1000;
+        logger.error("Error: " + e.getMessage(), e);
+        stats.addStats(LinkStoreOp.LOAD_COUNTS_BULK, timetaken2, true);
         store.clearErrors(loaderID);
     }
   }

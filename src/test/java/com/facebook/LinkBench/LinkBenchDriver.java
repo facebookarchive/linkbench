@@ -24,7 +24,6 @@ import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
-import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 
 /*
  LinkBenchDriver class.
@@ -146,12 +145,6 @@ public class LinkBenchDriver {
 
     // run loaders
     long loadtime = concurrentExec(loaders);
-    
-    if (bulkLoad) {
-      // Didn't update counts as part of load
-      logger.info("Bulk load of links finished, now updating counts"); 
-      updateCounts(latencyStats, nloaders);
-    }
 
     // compute total #links loaded
     int nlinks_default = Integer.parseInt(props.getProperty("nlinks_default"));
@@ -193,23 +186,6 @@ public class LinkBenchDriver {
     for (int i = 0; i < nloaders; i++) {
       // Add a shutdown signal for each loader
       chunk_q.add(LoadChunk.SHUTDOWN);
-    }
-  }
-
-  private void updateCounts(LinkBenchLatency latencyStats, int threadnum)
-                                          throws IOException {
-    LinkStore store = initStore(LOAD, threadnum);
-    try {
-      long starttime = System.nanoTime();
-      store.recalculateCounts(props.getProperty("dbid"));
-      long endtime = System.nanoTime();
-      long time = endtime - starttime;
-      latencyStats.recordLatency(threadnum, LinkStoreOp.UPDATE_COUNTS, 
-                        time);
-      logger.info("Updating counts took " + (time / 1e6) + "ms");
-    } catch (Exception e) {
-      logger.error("Error while recalculating counts.  Link" +
-          " counts may be bad", e);
     }
   }
 
