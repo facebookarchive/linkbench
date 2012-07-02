@@ -1,7 +1,9 @@
 package com.facebook.LinkBench;
 
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -9,9 +11,11 @@ import org.apache.log4j.Logger;
 import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 
 public class LinkBenchRequest implements Runnable {
+  
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   Properties props;
   LinkStore store;
+  RequestProgress progressTracker;
 
   long nrequests;
   long maxtime;
@@ -69,12 +73,14 @@ public class LinkBenchRequest implements Runnable {
   public LinkBenchRequest(LinkStore input_store,
                           Properties input_props,
                           LinkBenchLatency latencyStats,
+                          RequestProgress progressTracker,
                           int input_requesterID,
                           int input_nrequesters) {
 
     store = input_store;
     props = input_props;
     this.latencyStats = latencyStats;
+    this.progressTracker = progressTracker;
 
     nrequesters = input_nrequesters;
     requesterID = input_requesterID;
@@ -348,7 +354,8 @@ public class LinkBenchRequest implements Runnable {
 
   @Override
   public void run() {
-    logger.info("Requester thread #" + requesterID + " started");
+    logger.info("Requester thread #" + requesterID + " started: will do "
+        + nrequests + " ops");
     long starttime = System.currentTimeMillis();
     long endtime = starttime + maxtime * 1000;
     long lastupdate = starttime;
@@ -381,6 +388,8 @@ public class LinkBenchRequest implements Runnable {
       }
       return;
     }
+    
+    int requestsSinceLastUpdate = 0;
     for (i = 0; i < nrequests; i++) {
       onerequest(i);
       requestsdone++;
@@ -393,12 +402,23 @@ public class LinkBenchRequest implements Runnable {
         lastupdate = curtime;
       }
       
+      requestsSinceLastUpdate++;
       if (curtime > endtime) {
         break;
       }
+      if (requestsSinceLastUpdate >= RequestProgress.THREAD_REPORT_INTERVAL) {
+        progressTracker.update(requestsSinceLastUpdate);
+        requestsSinceLastUpdate = 0;
+      }
     }
+    
+    progressTracker.update(requestsSinceLastUpdate);
 
-    stats.displayStatsAll();
+    stats.displayStats(Arrays.asList(
+        LinkStoreOp.GET_LINK, LinkStoreOp.GET_LINKS_LIST,
+        LinkStoreOp.COUNT_LINK,
+        LinkStoreOp.UPDATE_LINK, LinkStoreOp.ADD_LINK, 
+        LinkStoreOp.RANGE_SIZE));
     logger.info("ThreadID = " + requesterID +
                        " total requests = " + i +
                        " requests/second = " + ((1000 * i)/(curtime - starttime)) +
@@ -532,5 +552,61 @@ public class LinkBenchRequest implements Runnable {
                      false);// let us hide rather than delete
   }
 
+  public static class RequestProgress {
+    // How many ops before a thread should register its progress
+    static final int THREAD_REPORT_INTERVAL = 250;
+    // How many ops before a progress update should be printed to console
+    private static final int PROGRESS_PRINT_INTERVAL = 10000;
+    
+    private final Logger progressLogger;
+    
+    private long totalRequests;
+    private final AtomicLong requestsDone;
+    
+    private long startTime;
+    private long timeLimit_s;
+
+    public RequestProgress(Logger progressLogger,
+                      long totalRequests, long timeLimit) {
+      this.progressLogger = progressLogger;
+      this.totalRequests = totalRequests;
+      this.requestsDone = new AtomicLong();
+      this.timeLimit_s = timeLimit;
+      this.startTime = 0;
+    }
+    
+    public void startTimer() {
+      startTime = System.currentTimeMillis();
+    }
+    
+    public void update(long requestIncr) {
+      long curr = requestsDone.addAndGet(requestIncr);
+      long prev = curr - requestIncr;
+      
+      long interval = PROGRESS_PRINT_INTERVAL;
+      if ((curr / interval) > (prev / interval) || curr == totalRequests) {
+        float progressPercent = ((float) curr) / totalRequests * 100;
+        long now = System.currentTimeMillis();
+        long elapsed = now - startTime;
+        float elapsed_s = ((float) elapsed) / 1000;
+        float limitPercent = (elapsed_s / ((float) timeLimit_s)) * 100;
+        float rate = curr / ((float)elapsed_s);
+        progressLogger.info(String.format(
+            "%d/%d requests finished: %.1f%% complete at %.1f ops/sec" +
+            " %.1f/%d secs elapsed: %.1f%% of time limit used",
+            curr, totalRequests, progressPercent, rate,
+            elapsed_s, timeLimit_s, limitPercent));
+            
+      }
+    }
+  }
+
+  public static RequestProgress createProgress(Logger logger,
+       Properties props) {
+    long total_requests = Long.parseLong(props.getProperty("requests"))
+                      * Long.parseLong(props.getProperty("requesters"));
+    return new RequestProgress(logger, total_requests,
+        Long.parseLong(props.getProperty("maxtime")));
+  }
 }
 

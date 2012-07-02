@@ -1,6 +1,7 @@
 package com.facebook.LinkBench;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -264,7 +265,13 @@ public class LinkBenchLoad implements Runnable {
     if (!singleAssoc) {
       logger.info(" Same shuffle = " + sameShuffle +
                          " Different shuffle = " + diffShuffle);
-      stats.displayStatsAll();
+      if (bulkLoad) {
+        stats.displayStats(Arrays.asList(LinkStoreOp.LOAD_LINKS_BULK,
+            LinkStoreOp.LOAD_COUNTS_BULK, LinkStoreOp.LOAD_LINKS_BULK_NLINKS,
+            LinkStoreOp.LOAD_COUNTS_BULK_NLINKS));
+      } else {
+        stats.displayStats(Arrays.asList(LinkStoreOp.LOAD_LINK));
+      }
     }
     
     store.close();
@@ -277,6 +284,9 @@ public class LinkBenchLoad implements Runnable {
       logger.debug("Loader thread  #" + loaderID + " processing "
                   + chunk.toString());
     }
+    
+    // Counter for total number of links loaded in chunk;
+    long links_in_chunk = 0;
 
     Link link = null;
     if (!bulkLoad) {
@@ -303,6 +313,8 @@ public class LinkBenchLoad implements Runnable {
         nlinks = getNlinks(id1, startid1, maxid1,
                   nlinks_func, nlinks_config, nlinks_default);
       }
+      
+      links_in_chunk += nlinks;
  
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
         logger.trace("i = " + i + " id1 = " + id1 +
@@ -327,7 +339,7 @@ public class LinkBenchLoad implements Runnable {
     }
     
     // Update progress and maybe print message
-    prog_tracker.update(chunk.size);
+    prog_tracker.update(chunk.size, links_in_chunk);
   }
 
   /**
@@ -576,29 +588,52 @@ public class LinkBenchLoad implements Runnable {
     }
   }
   public static class LoadProgress {
-    public LoadProgress(Logger progressLogger, long ntotal) {
+    // TODO: hardcoded
+    private static final long PROGRESS_REPORT_INTERVAL = 50000;
+    
+    public LoadProgress(Logger progressLogger, long id1s_total) {
       super();
       this.progressLogger = progressLogger;
-      this.ntotal = ntotal;
-      this.nloaded = new AtomicLong();
+      this.id1s_total = id1s_total;
+      this.starttime_ms = 0;
+      this.id1s_loaded = new AtomicLong();
+      this.links_loaded = new AtomicLong();
     }
     private final Logger progressLogger;
-    private final AtomicLong nloaded; // progress
-    private final long ntotal; // goal
+    private final AtomicLong id1s_loaded; // progress
+    private final AtomicLong links_loaded; // progress
+    private final long id1s_total; // goal
+    private long starttime_ms;
     
-    public void update(long inc) {
-      // TODO: check semantics
-      long curr = nloaded.addAndGet(inc);
-      long prev = curr - inc;
+    /** Mark current time as start time for load */
+    public void startTimer() {
+      starttime_ms = System.currentTimeMillis();
+    }
+    
+    /**
+     * Update progress
+     * @param id1_incr number of additional id1s loaded since last call
+     * @param links_incr number of links loaded since last call
+     */
+    public void update(long id1_incr, long links_incr) {
+      long curr_id1s = id1s_loaded.addAndGet(id1_incr);
       
-      // TODO: temporary
-      long report_int = (1024);
-      if ((curr / report_int) > (prev / report_int)
-          || curr == ntotal) {
-        double percentage = (curr / (double)ntotal) * 100.0;
-        progressLogger.info(
-            String.format("%d/%d id1s loaded: %.1f%% complete: ",
-                          curr, ntotal, percentage));
+      long curr_links = links_loaded.addAndGet(links_incr);
+      long prev_links = curr_links - links_incr;
+      
+      if ((curr_links / PROGRESS_REPORT_INTERVAL) >
+          (prev_links / PROGRESS_REPORT_INTERVAL) || curr_id1s == id1s_total) {
+        double percentage = (curr_id1s / (double)id1s_total) * 100.0;
+
+        // Links per second loaded
+        long now = System.currentTimeMillis();
+        double link_rate = ((curr_links) / ((double) now - starttime_ms))*1000;
+        double id1_rate = ((curr_id1s) / ((double) now - starttime_ms))*1000;
+        progressLogger.info(String.format(
+            "%d/%d id1s loaded (%.1f%% complete) at %.2f id1s/sec avg. " +
+            "%d links loaded at %.2f links/sec avg.", 
+            curr_id1s, id1s_total, percentage, id1_rate,
+            curr_links, link_rate));
       }
     }
   }

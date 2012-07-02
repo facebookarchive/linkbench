@@ -4,7 +4,7 @@ package com.facebook.LinkBench;
  * Different phases of the benchmark
  *
  */
-public enum LinkBenchPhase {
+public enum Phase {
   LOAD,
   REQUEST
 }

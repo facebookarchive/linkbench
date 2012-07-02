@@ -2,6 +2,7 @@ package com.facebook.LinkBench;
 
 
 import java.util.Arrays;
+import java.util.Collection;
 
 import org.apache.log4j.Logger;
 
@@ -127,32 +128,13 @@ public class LinkBenchStats {
   }
 
   public void displayStatsAll() {
-    displayStats(LinkStoreOp.ADD_LINK, 0, 
-          samplestaken[LinkStoreOp.ADD_LINK.ordinal()]);
-    displayStats(LinkStoreOp.DELETE_LINK, 0, 
-        samplestaken[LinkStoreOp.DELETE_LINK.ordinal()]);
-    displayStats(LinkStoreOp.UPDATE_LINK, 0, 
-        samplestaken[LinkStoreOp.UPDATE_LINK.ordinal()]);
-    displayStats(LinkStoreOp.COUNT_LINK, 0, 
-        samplestaken[LinkStoreOp.COUNT_LINK.ordinal()]);
-    displayStats(LinkStoreOp.GET_LINK, 0,
-        samplestaken[LinkStoreOp.GET_LINK.ordinal()]);
-    displayStats(LinkStoreOp.GET_LINKS_LIST, 0,
-        samplestaken[LinkStoreOp.GET_LINKS_LIST.ordinal()]);
-    displayStats(LinkStoreOp.LOAD_LINK, 0,
-        samplestaken[LinkStoreOp.LOAD_LINK.ordinal()]);
-    displayStats(LinkStoreOp.UNKNOWN, 0, 
-        samplestaken[LinkStoreOp.UNKNOWN.ordinal()]);
-    displayStats(LinkStoreOp.RANGE_SIZE, 0, 
-        samplestaken[LinkStoreOp.RANGE_SIZE.ordinal()]);
-    displayStats(LinkStoreOp.LOAD_LINKS_BULK, 0,
-        samplestaken[LinkStoreOp.LOAD_LINKS_BULK.ordinal()]);
-    displayStats(LinkStoreOp.LOAD_LINKS_BULK_NLINKS, 0,
-        samplestaken[LinkStoreOp.LOAD_LINKS_BULK_NLINKS.ordinal()]);
-    displayStats(LinkStoreOp.LOAD_COUNTS_BULK, 0,
-        samplestaken[LinkStoreOp.LOAD_COUNTS_BULK.ordinal()]);
-    displayStats(LinkStoreOp.LOAD_COUNTS_BULK_NLINKS, 0,
-        samplestaken[LinkStoreOp.LOAD_COUNTS_BULK_NLINKS.ordinal()]);
+    displayStats(Arrays.asList(LinkStoreOp.values()));
+  }
+  
+  public void displayStats(Collection<LinkStoreOp> ops) {
+    for (LinkStoreOp op: ops) {
+      displayStats(op, 0, samplestaken[op.ordinal()]);
+    }
   }
 
 }

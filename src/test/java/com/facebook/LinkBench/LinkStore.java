@@ -26,7 +26,6 @@ public abstract class LinkStore {
     LOAD_LINK,
     LOAD_LINKS_BULK,
     LOAD_COUNTS_BULK,
-    UPDATE_COUNTS,
     // Although the following are not truly operations, we need stats
     // for them 
     RANGE_SIZE,    // how big range scans are
@@ -48,7 +47,7 @@ public abstract class LinkStore {
 
   /** initialize the store object */
   public abstract void initialize(Properties p,
-    int currentPhase, int threadId) throws IOException, Exception;
+      Phase currentPhase, int threadId) throws IOException, Exception;
 
   /**
    * Do any cleanup.  After this is called, store won't be reused

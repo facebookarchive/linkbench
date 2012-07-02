@@ -81,6 +81,14 @@ speed up the loading process:
            set global innodb_flush_log_at_trx_commit = 2;
            set global sync_binlog = 0;
 
+Other MySql settings will affect loading speed.  The larger the InnoDB
+buffer pool the better.  Two settings that can make a substantial
+difference for inserts are innodb_log_file_size, which should
+be set to a reasonably large value (25%-100% of buffer pool) and
+innodb_log_buffer_size, which you should check to see that it is
+sufficiently large (e.g 64M or more is plenty).
+
+
 Now, in your shell, you can execute the loading phase of linkbench using
 linkbench with the -l switch.
     # LOAD DATA . takes about 11000 seconds.

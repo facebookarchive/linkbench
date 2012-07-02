@@ -35,6 +35,7 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
+import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
 
 /**
  * LinkBenchDriverMR class.
@@ -67,7 +68,8 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    * @param currentphase LOAD or REQUEST
    * @param mapperid id of the mapper 0, 1, ...
    */
-  private static LinkStore initStore(int currentphase, int mapperid)
+  private static LinkStore initStore(Phase currentphase,
+                                                    int mapperid)
     throws IOException {
 
     LinkStore newstore = null;
@@ -306,7 +308,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
                     OutputCollector<IntWritable, LongWritable> output,
                     Reporter reporter) throws IOException {
       ConfigUtil.setupLogging(props, null);
-      LinkStore store = initStore(LOAD, loaderid.get());
+      LinkStore store = initStore(Phase.LOAD, loaderid.get());
       LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders.get());
 
       long maxid1 = Long.parseLong(props.getProperty("maxid1"));
@@ -349,11 +351,15 @@ public class LinkBenchDriverMR extends Configured implements Tool {
                     OutputCollector<IntWritable, LongWritable> output,
                     Reporter reporter) throws IOException {
       ConfigUtil.setupLogging(props, null);
-      LinkStore store = initStore(REQUEST, requesterid.get());
+      LinkStore store = initStore(Phase.REQUEST, requesterid.get());
       LinkBenchLatency latencyStats = new LinkBenchLatency(nrequesters.get());
+      RequestProgress progress =
+                              LinkBenchRequest.createProgress(logger, props);
+      progress.startTimer();    
       final LinkBenchRequest requester =
-        new LinkBenchRequest(store, props, latencyStats,
+        new LinkBenchRequest(store, props, latencyStats, progress,
                              requesterid.get(), nrequesters.get());
+      
       
       // Wrap in runnable to handle error
       Thread t = new Thread(new Runnable() {

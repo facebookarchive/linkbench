@@ -24,6 +24,7 @@ import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
+import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
 
 /*
  LinkBenchDriver class.
@@ -38,14 +39,13 @@ public class LinkBenchDriver {
   
   public static final int EXIT_BADARGS = 1;
   
+  /* Command line arguments */
   private static String configFile = null;
+  private static Properties cmdLineProps = null;
   private static String logFile = null;
   private static boolean doLoad = false;
   private static boolean doRequest = false;
   
-  public static final int LOAD = 1;
-  public static final int REQUEST = 2;
-
   private Properties props;
   private String store;
 
@@ -53,18 +53,22 @@ public class LinkBenchDriver {
   
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
 
-  LinkBenchDriver(String configfile, String logFile)
+  LinkBenchDriver(String configfile, Properties
+                  overrideProps, String logFile)
     throws java.io.FileNotFoundException, IOException, LinkBenchConfigError {
     // which link store to use
     props = new Properties();
     props.load(new FileInputStream(configfile));
+    for (String key: overrideProps.stringPropertyNames()) {
+      props.setProperty(key, overrideProps.getProperty(key));
+    }
     store = null;
     
     ConfigUtil.setupLogging(props, logFile);
   }
 
   // generate an instance of LinkStore
-  private LinkStore initStore(int currentphase, int threadid)
+  private LinkStore initStore(Phase currentphase, int threadid)
     throws IOException {
 
     LinkStore newstore = null;
@@ -134,7 +138,7 @@ public class LinkBenchDriver {
     
     LoadProgress loadTracker = new LoadProgress(logger, maxid1 - startid1); 
     for (int i = 0; i < nloaders; i++) {
-      LinkStore store = initStore(LOAD, i);
+      LinkStore store = initStore(Phase.LOAD, i);
       bulkLoad = bulkLoad && store.bulkLoadBatchSize() > 0;
       LinkBenchLoad l = new LinkBenchLoad(store, props, latencyStats, i,
                           maxid1 == startid1 + 1, chunk_q, loadTracker);
@@ -144,6 +148,7 @@ public class LinkBenchDriver {
     enqueueLoadWork(chunk_q, startid1, maxid1, nloaders);
 
     // run loaders
+    loadTracker.startTimer();
     long loadtime = concurrentExec(loaders);
 
     // compute total #links loaded
@@ -205,14 +210,17 @@ public class LinkBenchDriver {
     LinkBenchLatency latencyStats = new LinkBenchLatency(nrequesters);
     List<LinkBenchRequest> requesters = new LinkedList<LinkBenchRequest>();
 
+    RequestProgress progress = LinkBenchRequest.createProgress(logger, props);
+    
     // create requesters
     for (int i = 0; i < nrequesters; i++) {
-      LinkStore store = initStore(REQUEST, i);
+      LinkStore store = initStore(Phase.REQUEST, i);
       LinkBenchRequest l = new LinkBenchRequest(store, props, latencyStats,
-                                        i, nrequesters);
+                                progress, i, nrequesters);
       requesters.add(l);
     }
 
+    progress.startTimer();
     // run requesters
     long requesttime = concurrentExec(requesters);
 
@@ -306,7 +314,8 @@ public class LinkBenchDriver {
     throws IOException, InterruptedException, Throwable {
     processArgs(args);
     
-    LinkBenchDriver d = new LinkBenchDriver(configFile, logFile);
+    LinkBenchDriver d = new LinkBenchDriver(configFile, 
+                                cmdLineProps, logFile);
     d.drive();
   }
 
@@ -330,6 +339,15 @@ public class LinkBenchDriver {
                "Execute loading stage of benchmark");
     options.addOption("r", false,
                "Execute request stage of benchmark");
+    
+    // Java-style properties to override config file
+    // -Dkey=value
+    Option property = new Option("D", "Override a config setting");
+    property.setArgs(2);
+    property.setArgName("property=value");
+    property.setValueSeparator('=');
+    options.addOption(property);
+    
     return options;
   }
   
@@ -347,7 +365,7 @@ public class LinkBenchDriver {
     CommandLine cmd = null;
     try {
       CommandLineParser parser = new GnuParser();
-      cmd = parser.parse( options, args);    
+      cmd = parser.parse( options, args);
     } catch (ParseException ex) {
       // Use Apache CLI-provided messages
       System.err.println(ex.getMessage());
@@ -390,6 +408,8 @@ public class LinkBenchDriver {
         System.exit(EXIT_BADARGS);
       }
     }
+    
+    cmdLineProps = cmd.getOptionProperties("D");
     
     if (!(doLoad || doRequest)) {
       System.err.println("Did not select benchmark mode");

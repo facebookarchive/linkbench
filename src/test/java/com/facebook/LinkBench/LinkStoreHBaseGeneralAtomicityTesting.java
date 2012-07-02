@@ -45,7 +45,7 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
   Level debuglevel;
   ArrayList<String> columnfamilies;
 
-  int currentphase;
+  Phase currentphase;
   int threadid;
   String threadname;
 
@@ -120,8 +120,8 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
   /*
    * Constructor
    */
-  public LinkStoreHBaseGeneralAtomicityTesting(int input_currentphase,
-      int input_threadid,
+  public LinkStoreHBaseGeneralAtomicityTesting(
+      Phase input_currentphase, int input_threadid,
       Properties props) throws IOException {
       initialize(props, input_currentphase, input_threadid);
   }
@@ -131,15 +131,15 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
   }
 
   @Override
-  public void initialize(Properties props, int currentphase,
+  public void initialize(Properties props, Phase currentphase,
     int threadid) throws IOException {
       this.currentphase = currentphase;
       this.threadid = threadid;
 
-      if (currentphase == LinkBenchDriver.LOAD) {
+      if (currentphase == Phase.LOAD) {
         threadname = "Loader " + threadid;
       }
-      else if (currentphase == LinkBenchDriver.REQUEST) {
+      else if (currentphase == Phase.REQUEST) {
         threadname = "Requester " + threadid;
       }
       else {
@@ -213,7 +213,7 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
       table.put(p);
 
       // sleep for some time
-      if (currentphase == LinkBenchDriver.REQUEST &&
+      if (currentphase == Phase.REQUEST &&
           Math.random() < sleeprate) {
 
         synchronized(lock) {
@@ -265,7 +265,7 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
     table.delete(d);
 
     // sleep for some time
-    if (currentphase == LinkBenchDriver.REQUEST && Math.random() < sleeprate) {
+    if (currentphase == Phase.REQUEST && Math.random() < sleeprate) {
       synchronized(lock) {
         if (counter < maxsleepingthreads) {
           ++counter;

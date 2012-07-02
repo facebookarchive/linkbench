@@ -31,7 +31,7 @@ public class LinkStoreMysql extends LinkStore {
   Connection conn;
   Statement stmt;
   
-  private int phase;
+  private Phase phase;
 
   int bulkInsertSize = MYSQL_DEFAULT_BULKINSERT_SIZE;
   // Optional optimization: disable binary logging
@@ -45,10 +45,10 @@ public class LinkStoreMysql extends LinkStore {
 
   public LinkStoreMysql(Properties props) throws IOException, Exception {
     super();
-    initialize(props, 0, 0);
+    initialize(props, Phase.LOAD, 0);
   }
 
-  public void initialize(Properties props, int currentPhase,
+  public void initialize(Properties props, Phase currentPhase,
     int threadId) throws IOException, Exception {
     counttable = props.getProperty("counttable");
     if (counttable == null || counttable.equals("")) {
@@ -106,7 +106,7 @@ public class LinkStoreMysql extends LinkStore {
     conn.setAutoCommit(false);
     stmt = conn.createStatement();
     
-    if (phase == LinkBenchDriver.LOAD && disableBinLogForLoad) {
+    if (phase == Phase.LOAD && disableBinLogForLoad) {
       // Turn binary logging off for duration of connection
       stmt.executeUpdate("SET SESSION sql_log_bin=0");
     }
