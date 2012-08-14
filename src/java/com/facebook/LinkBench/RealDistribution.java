@@ -2,7 +2,8 @@ package com.facebook.LinkBench;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Scanner;
@@ -27,14 +28,14 @@ class RealDistribution {
   final static long[] READ_SHUFFLER_PARAMS = {13, 7};
 
   //helper class to store (value, probability)
-  static class Point implements Comparable {
+  static class Point implements Comparable<Point> {
     int value;
     double probability;
     Point(int input_value, double input_probability) {
       this.value = input_value;
       this.probability = input_probability;
     }
-    public int compareTo(Object obj) {
+    public int compareTo(Point obj) {
       Point p = (Point)obj;
       return this.value - p.value;
     }
@@ -64,7 +65,6 @@ class RealDistribution {
     getStatisticalData(props);
     random_generator = new Random();
   }
-
 
   //helper function: Calculate pdf from cdf
   private static double[] getPDF(ArrayList<Point> cdf) {
@@ -156,13 +156,13 @@ class RealDistribution {
   }
 
   //convert CDF from ArrayList<Point> to Map
-  static Map getCDF(String name) {
+  static NavigableMap<Integer, Double> getCDF(String name) {
     ArrayList<Point> points = name.equals("nlinks") ? nlinks_cdf :
       name.equals("nreads") ? nreads_cdf :
       name.equals("nwrites") ? nwrites_cdf : null;
     if (points == null) return null;
 
-    Map<Integer, Double> map = new TreeMap<Integer, Double>();
+    TreeMap<Integer, Double> map = new TreeMap<Integer, Double>();
     for (Point point : points) {
       map.put(point.value, point.probability);
     }
@@ -264,19 +264,20 @@ class RealDistribution {
 
   // searching for smallest idx that p <= data[idx].probability
   static int binarySearch(ArrayList<Point> points, double p) {
-    int idx = 0;
     int left = 0, right = points.size() - 1;
-    while (left <= right) {
+    while (left < right) {
       int mid = (left + right)/2;
       if (points.get(mid).probability >= p) {
-        idx = mid;
-        right = mid - 1;
-      }
-      else {
+        right = mid;
+      } else {
         left = mid + 1;
       }
     }
-    return idx;
+    if (points.get(left).probability >= p) {
+      return left;
+    } else {
+      return left + 1;
+    }
   }
 
   //return a random value within a specific range (inclusive both ends)
@@ -353,19 +354,14 @@ class RealDistribution {
    */
   //find smallest idx that satisfy a[idx] >= p
   static int binarySearch(double[] a, double p) {
-    int left = 0, right = a.length - 1;
-    int idx = left;
-    while (left <= right) {
-      int mid = (left + right)/2;
-      if (a[mid] >= p) {
-        idx = mid;
-        right = mid - 1;
-      }
-      else {
-        left = mid + 1;
-      }
+    // Use built-in binary search
+    int res = Arrays.binarySearch(a, p);
+    if (res >= 0) {
+      return res;
+    } else {
+      // Arrays.binarySearch returns (-(insertion point) - 1) when not found
+      return -(res + 1);
     }
-    return idx;
   }
 
   static long getNextId1(long startid1, long maxid1,

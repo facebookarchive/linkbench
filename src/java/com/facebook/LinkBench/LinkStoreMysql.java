@@ -442,24 +442,22 @@ public class LinkStoreMysql extends LinkStore {
     }
 
     ResultSet rs = stmt.executeQuery(query);
-    boolean found = false;
-
-    while (rs.next()) {
-      // found
-      found = true;
-    }
+    boolean found = rs.next();
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Lookup result: " + id1 + "," + link_type + "," + id2 +
                          " is " + found);
     }
 
-    Link l = new Link();
-    l.id1 = id1;
-    l.id2 = id2;
-    l.link_type = link_type;
-
-    return l;
+    if (found) {
+      Link l = createLinkFromRow(rs);
+      if (rs.next()) {
+        throw new Exception("Error: multiple rows returned for point query");
+      }
+      return l;
+    } else {
+      return null;
+    }
   }
 
 
@@ -487,19 +485,44 @@ public class LinkStoreMysql extends LinkStore {
     }
 
     ResultSet rs = stmt.executeQuery(query);
-
-    int count = 0;
-    while (rs.next()) {
-      count++;
-    }
+    
+    // Find result set size
+    // be sure we fast forward to find result set size
+    assert(rs.getType() != ResultSet.TYPE_FORWARD_ONLY);
+    rs.last();
+    int count = rs.getRow();
+    rs.beforeFirst();
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Range lookup result: " + id1 + "," + link_type +
                          " is " + count);
     }
+    if (count == 0) {
+      return null;
+    }
+    
+    // Fetch the link data
+    Link links[] = new Link[count];
+    int i = 0;
+    while (rs.next()) {
+      Link l = createLinkFromRow(rs);
+      links[i] = l;
+      i++;
+    }
+    assert(i == count);
+    return links;
+  }
 
-    // TODO Populate individual links
-    return (count > 0 ? new Link[count] : null);
+  private Link createLinkFromRow(ResultSet rs) throws SQLException {
+    Link l = new Link();
+    l.id1 = rs.getLong(1);
+    l.id2 = rs.getLong(2);
+    l.link_type = rs.getLong(3);
+    l.visibility = rs.getByte(4);
+    l.data = rs.getBytes(5);
+    l.time = rs.getLong(6);
+    l.version = rs.getInt(7);
+    return l;
   }
 
   // count the #links

@@ -68,11 +68,33 @@ public abstract class LinkStore {
   public abstract Link getLink(String dbid, long id1, long link_type, long id2) 
     throws Exception;
 
-  // lookup using just id1, type
+  /**
+   * lookup using just id1, type
+   * @param dbid
+   * @param id1
+   * @param link_type
+   * @return list of links in descending order of time, or null
+   *                                       if no matching links
+   * @throws Exception
+   */
   public abstract Link[] getLinkList(String dbid, long id1, long link_type) 
     throws Exception;
 
 
+  /**
+   * 
+   * lookup using just id1, type
+   * @param dbid
+   * @param id1
+   * @param link_type
+   * @param minTimestamp
+   * @param maxTimestamp
+   * @param offset
+   * @param limit
+   * @return list of links in descending order of time, or null
+   *                                       if no matching links
+   * @throws Exception
+   */
   public abstract Link[] getLinkList(String dbid, long id1, long link_type, 
                             long minTimestamp, long maxTimestamp, 
                             int offset, int limit)

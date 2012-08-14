@@ -7,6 +7,10 @@
   <property name="build" location="build"/>
   <property name="dist"  location="dist"/>
   <property name="lib"  location="lib"/>
+  <property name="test.output"  location="test-output"/>
+  <property name="test.rawoutput"  location="${test.output}/raw"/>
+  <property name="test.tmp"  location="${test.output}/tmp"/>
+  <property name="test.report"  location="${test.output}/report"/>
 
   <!-- By default, debugging symbols are not created. This
        can be overridden with command line property -->
@@ -47,10 +51,40 @@
     <jar jarfile="${dist}/FacebookLinkBench-${DSTAMP}.jar" basedir="${build}"/>
   </target>
 
+  <target name="test" description="Execute unit tests"
+        depends="compile">
+    <mkdir dir="${test.rawoutput}"/>
+    <junit printsummary="true" failureproperty="junit.failure">
+      <classpath>
+        <pathelement location="${build}"/>
+        <fileset dir="${lib}">
+          <include name="**/*.jar"/>
+        </fileset>
+      </classpath>
+
+      <batchtest todir="${test.rawoutput}">
+        <fileset dir="${build}"> 
+          <include name="**/*Test*.class"/>
+          <exclude name="**/LinkStoreHBaseGeneralAtomicityTesting.class"/>
+          <exclude name="**/LinkStoreTestBase.class"/>
+        </fileset>
+        <formatter type="xml"/>
+      </batchtest>
+    </junit>
+    <mkdir dir="${test.tmp}"/>
+    <mkdir dir="${test.report}"/>
+    <junitreport todir="${test.tmp}">
+      <fileset dir="${test.rawoutput}"/>
+      <report todir="${test.report}"/>
+    </junitreport>
+    <fail if="junit.failure" message="Unit test(s) failed.  See reports!"/>
+  </target>
+
   <target name="clean"
         description="clean up" >
-    <!-- Delete the ${build} and ${dist} directory trees -->
+    <!-- Delete generated directory trees -->
     <delete dir="${build}"/>
     <delete dir="${dist}"/>
+    <delete dir="${test.output}"/>
   </target>
 </project>
