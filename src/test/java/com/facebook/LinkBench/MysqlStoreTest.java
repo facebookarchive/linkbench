@@ -7,9 +7,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
-import com.facebook.LinkBench.LinkStore;
-import com.facebook.LinkBench.LinkStoreMysql;
-
 /**
  * Test the MySQL LinkStore implementation.
  * 
@@ -30,15 +27,40 @@ public class MysqlStoreTest extends LinkStoreTestBase {
   
   private Connection conn;
   
-
+  /** Properties for last initStore call */
+  private Properties currProps;
+  
   @Override
   protected long getIDCount() {
     // Make test smaller so that it doesn't take too long
     return 5000;
   }
+
+  @Override
+  protected int getRequestCount() {
+    // Fewer requests to keep test quick
+    return 10000;
+  }
   
-  @Override protected void setUp() throws Exception {
+  protected Properties basicProps() {
+    Properties props = super.basicProps();
+    props.setProperty("store", "com.facebook.LinkBench.LinkStoreMysql");
+    props.setProperty("host", host);
+    props.setProperty("port", Integer.toString(port));
+    props.setProperty("user", user);
+    props.setProperty("password", pass);
+    props.setProperty("tablename", linktable);
+    props.setProperty("counttable", counttable);
+    return props;
+  }
+
+  @Override
+  protected void initStore(Properties props) throws IOException, Exception {
+    this.currProps = (Properties)props.clone();
     Class.forName("com.mysql.jdbc.Driver").newInstance();
+    if (conn != null) {
+      conn.close();
+    }
     conn = DriverManager.getConnection(
                         "jdbc:mysql://"+ host + ":" + port + "/" + testDB +
                         "?elideSetAutoCommits=true" +
@@ -49,20 +71,18 @@ public class MysqlStoreTest extends LinkStoreTestBase {
     dropTestTables();
     createTestTables();
   }
+  
 
   @Override
-  protected LinkStore createStore(Properties props) throws IOException, Exception {
-    props.setProperty("host", host);
-    props.setProperty("port", Integer.toString(port));
-    props.setProperty("user", user);
-    props.setProperty("password", pass);
-    props.setProperty("tablename", linktable);
-    props.setProperty("counttable", counttable);
-    return new LinkStoreMysql(props);
+  public DummyLinkStore getStoreHandle() throws IOException, Exception {
+    LinkStoreMysql store = new LinkStoreMysql();
+    DummyLinkStore result = new DummyLinkStore(store);
+    result.initialize(currProps, Phase.REQUEST, 0);
+    return result;
   }
 
-
   @Override protected void tearDown() throws Exception {
+    super.tearDown();
     dropTestTables();
     conn.close();
   }

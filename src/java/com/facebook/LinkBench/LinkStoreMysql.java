@@ -193,12 +193,15 @@ public class LinkStoreMysql extends LinkStore {
 
     // based on nrows, determine whether the previous query was an insert
     // or update
-    boolean update_count = false, update_data = false;
+    boolean update_data = false;
+    int update_count = 0;
 
     switch (nrows) {
       case 1:
         // a new row was inserted --> need to update counttable
-        update_count = true;
+        if (l.visibility == VISIBILITY_DEFAULT) {
+          update_count = 1;
+        }
         break;
 
       case 2:
@@ -209,9 +212,14 @@ public class LinkStoreMysql extends LinkStore {
         break;
 
       case 3:
-        // a visibility was changed from VISIBILITY_HIDDEN to DEFAULT
+        // a visibility was changed from VISIBILITY_HIDDEN to DEFAULT 
+        // or vice-versa
         // --> need to update both counttable and other data
-        update_count = true;
+        if (l.visibility == VISIBILITY_DEFAULT) {
+          update_count = 1;
+        } else {
+          update_count = -1;
+        }
         update_data = true;
         break;
 
@@ -221,7 +229,8 @@ public class LinkStoreMysql extends LinkStore {
         throw new Exception(msg);
     }
 
-    if (update_count) {
+    if (update_count != 0) {
+      int base_count = update_count < 0 ? 0 : 1;
       // query to update counttable
       // if (id, id_type) is not there yet, add a new record with count = 1
       String updatecount = "INSERT INTO " + dbid + "." + counttable +
@@ -229,10 +238,11 @@ public class LinkStoreMysql extends LinkStore {
                       "VALUES (" + l.id1 +
                       ", " + l.id1_type +
                       ", " + l.link_type +
-                      ", 1" +
+                      ", " + base_count +
                       ", " + l.time +
                       ", " + l.version + ") " +
-                      "ON DUPLICATE KEY UPDATE count = count + 1;";
+                      "ON DUPLICATE KEY UPDATE count = count + " +
+                      update_count + ";";
 
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
         logger.trace(updatecount);
@@ -298,13 +308,13 @@ public class LinkStoreMysql extends LinkStore {
                     ", " + l.id2 +
                     ", " + l.id2_type +
                     ", " + l.link_type +
-                    ", " + LinkStore.VISIBILITY_DEFAULT +
+                    ", " + l.visibility +
                     ", '" + new String(l.data) +
                     "', " + l.time +
                     ", "  + l.version + ")");
     }
-    sb.append(" ON DUPLICATE KEY UPDATE visibility = " 
-              + LinkStore.VISIBILITY_DEFAULT);
+    sb.append(" ON DUPLICATE KEY UPDATE visibility = " +
+    		"VALUES(visibility)");
     String insert = sb.toString();
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(insert);
@@ -431,7 +441,8 @@ public class LinkStoreMysql extends LinkStore {
   // lookup using id1, type, id2
   public Link getLink(String dbid, long id1, long link_type, long id2)
     throws Exception {
-    String query = " select id1, id2, link_type, visibility, data, time, " +
+    String query = " select id1, id2, link_type, id1_type, id2_type," +
+    		           " visibility, data, time, " +
                    " version from " + dbid + "." + assoctable +
                    " where id1 = " + id1 + " and id2 = " + id2 +
                    " and link_type = " + link_type + "; commit;";
@@ -471,7 +482,8 @@ public class LinkStoreMysql extends LinkStore {
                             long minTimestamp, long maxTimestamp,
                             int offset, int limit)
     throws Exception {
-    String query = " select id1, id2, link_type, visibility, data, time, " +
+    String query = " select id1, id2, link_type, id1_type, id2_type," +
+    		           " visibility, data, time," +
                    " version from " + dbid + "." + assoctable +
                    " where id1 = " + id1 + " and link_type = " + link_type +
                    " and time >= " + minTimestamp +
@@ -518,10 +530,12 @@ public class LinkStoreMysql extends LinkStore {
     l.id1 = rs.getLong(1);
     l.id2 = rs.getLong(2);
     l.link_type = rs.getLong(3);
-    l.visibility = rs.getByte(4);
-    l.data = rs.getBytes(5);
-    l.time = rs.getLong(6);
-    l.version = rs.getInt(7);
+    l.id1_type = rs.getInt(4);
+    l.id2_type = rs.getInt(5);
+    l.visibility = rs.getByte(6);
+    l.data = rs.getBytes(7);
+    l.time = rs.getLong(8);
+    l.version = rs.getInt(9);
     return l;
   }
 

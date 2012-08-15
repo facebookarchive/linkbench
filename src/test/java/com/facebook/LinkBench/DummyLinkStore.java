@@ -23,7 +23,12 @@ public class DummyLinkStore extends LinkStore {
   }
   
   public DummyLinkStore(LinkStore wrappedStore) {
+    this(wrappedStore, false);
+  }
+  
+  public DummyLinkStore(LinkStore wrappedStore, boolean alreadyInitialized) {
     this.wrappedStore = wrappedStore;
+    this.initialized = alreadyInitialized;
   }
   
   /**

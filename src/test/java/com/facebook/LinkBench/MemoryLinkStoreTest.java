@@ -3,15 +3,31 @@ package com.facebook.LinkBench;
 import java.io.IOException;
 import java.util.Properties;
 
-import com.facebook.LinkBench.LinkStore;
-import com.facebook.LinkBench.MemoryLinkStore;
-
 public class MemoryLinkStoreTest extends LinkStoreTestBase {
+  
+  MemoryLinkStore store;
+  
+  @Override
+  public void setUp() throws Exception {
+    super.setUp();
+  }
+  
+  @Override
+  protected Properties basicProps() {
+    Properties props = super.basicProps();
+    props.setProperty("store", "com.facebook.LinkBench.MemoryLinkStore");
+    return props;
+  }
+  
+  @Override
+  protected void initStore(Properties props) throws IOException,
+      Exception {
+    store = new MemoryLinkStore();
+  }
 
   @Override
-  protected LinkStore createStore(Properties props) throws IOException,
-      Exception {
-    return new MemoryLinkStore();
+  protected DummyLinkStore getStoreHandle() {
+    return new DummyLinkStore(store.newHandle(), true);
   }
 
 }

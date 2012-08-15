@@ -64,12 +64,22 @@ public abstract class LinkStore {
   public abstract void updateLink(String dbid, Link a, boolean noinverse) 
     throws Exception;
 
-  // lookup using id1, type, id2
+  /**
+   *  lookup using id1, type, id2
+   *  Returns hidden links.
+   * @param dbid
+   * @param id1
+   * @param link_type
+   * @param id2
+   * @return
+   * @throws Exception
+   */
   public abstract Link getLink(String dbid, long id1, long link_type, long id2) 
     throws Exception;
 
   /**
    * lookup using just id1, type
+   * Does not return hidden links
    * @param dbid
    * @param id1
    * @param link_type
@@ -82,8 +92,8 @@ public abstract class LinkStore {
 
 
   /**
-   * 
    * lookup using just id1, type
+   * Does not return hidden links
    * @param dbid
    * @param id1
    * @param link_type

@@ -12,7 +12,12 @@ import java.util.TreeSet;
 /**
  * Simple in-memory implementation of a Linkstore
  * Not efficient or optimized at all, just for testing purposes.
- * Also not thread-safe.
+ * 
+ * MemoryLinkStore instances sharing the same data can be created
+ * using the newInstance() method.
+ * MemoryLinkStore can be accessed concurrently from multiple threads,
+ * but a simple mutex is used so there is no internal concurrency (requests
+ * are serialized)
  */
 public class MemoryLinkStore extends LinkStore {
   private static class LookupKey {
@@ -76,10 +81,23 @@ public class MemoryLinkStore extends LinkStore {
   
   /** Simple hashmap implementation of LinkStore with nested maps: 
    * dbid ->  (id1, assoc_type) -> timestamp -> link */
-  private final Map<String, Map<LookupKey, SortedSet<Link>>> linkdbs =
-                                      new HashMap<String, Map<LookupKey, SortedSet<Link>>>();
+  private final Map<String, Map<LookupKey, SortedSet<Link>>> linkdbs;
 
   private static final Comparator<Link> LINK_COMPARATOR = new LinkTimeStampComparator();
+  
+  /** 
+   * Create a new MemoryLinkStore instance with fresh data 
+   */
+  public MemoryLinkStore() {
+    this(new HashMap<String, Map<LookupKey, SortedSet<Link>>>());
+  }
+  
+  /** 
+   * Create a new MemoryLinkStore handle sharing data with existing instance 
+   */
+  private MemoryLinkStore(Map<String, Map<LookupKey, SortedSet<Link>>> data) {
+    this.linkdbs = data;
+  }
   
   /**
    * Find a list of links based on 
@@ -112,6 +130,13 @@ public class MemoryLinkStore extends LinkStore {
     return new TreeSet<Link>(LINK_COMPARATOR);
   }
 
+  /** Create a new MemoryLinkStore sharing the same data structures as
+   *  this one
+   */
+  public MemoryLinkStore newHandle() {
+    return new MemoryLinkStore(linkdbs);
+  }
+  
   @Override
   public void initialize(Properties p, Phase currentPhase, int threadId)
       throws IOException, Exception {
@@ -127,78 +152,85 @@ public class MemoryLinkStore extends LinkStore {
 
   @Override
   public void addLink(String dbid, Link a, boolean noinverse) throws Exception {
-    SortedSet<Link> links = findLinkByKey(dbid, a.id1, a.link_type, true);
-
-    // Check for duplicates
-    for (Link existing: links) {
-      if (existing.id2 == a.id2) {
-        throw new Exception(String.format("Link with key (%d, %d, %d) already"
-            + "exists", a.id1, a.link_type, a.id2));
+    synchronized (linkdbs) {
+      SortedSet<Link> links = findLinkByKey(dbid, a.id1, a.link_type, true);
+  
+      // Check for duplicates
+      Iterator<Link> it = links.iterator();
+      while (it.hasNext()) {
+        Link existing = it.next();
+        if (existing.id2 == a.id2) {
+          it.remove();
+        }
       }
+      // Clone argument before inserting
+      links.add(a.clone());
+  
+      /*System.err.println(String.format("added link (%d, %d, %d), %d in list",
+                a.id1, a.link_type, a.id2, links.size()));*/
     }
-    // Clone argument before inserting
-    links.add(a.clone());
-
-    /*System.err.println(String.format("added link (%d, %d, %d), %d in list",
-              a.id1, a.link_type, a.id2, links.size()));*/
   }
 
   @Override
   public void deleteLink(String dbid, long id1, long link_type, long id2,
       boolean noinverse, boolean expunge) throws Exception {
-    //NOTE: does not reclaim space from unused structures
-    SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
-    if (linkSet != null) {
-      Iterator<Link> it = linkSet.iterator();
-      while (it.hasNext()) {
-        Link l = it.next();
-        if (l.id2 == id2) {
-          if (!expunge) {
-            l.visibility = VISIBILITY_HIDDEN;
-          } else {
-            it.remove();
+    synchronized (linkdbs) {
+      //NOTE: does not reclaim space from unused structures
+      SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
+      if (linkSet != null) {
+        Iterator<Link> it = linkSet.iterator();
+        while (it.hasNext()) {
+          Link l = it.next();
+          if (l.id2 == id2) {
+            if (!expunge) {
+              l.visibility = VISIBILITY_HIDDEN;
+            } else {
+              it.remove();
+            }
+            return;
           }
-          return;
         }
       }
     }
-    throw new Exception(String.format("Link with key (%d, %d, %d) does not exist",
-                                    id1, link_type, id2));
   }
 
   @Override
   public void updateLink(String dbid, Link a, boolean noinverse)
       throws Exception {
-    SortedSet<Link> linkSet = findLinkByKey(dbid, a.id1, a.link_type, false);
-    if (linkSet != null) {
-      Iterator<Link> it = linkSet.iterator();
-      while (it.hasNext()) {
-        Link l = it.next();
-        if (l.id2 == a.id2) {
-          it.remove();
-          linkSet.add(a.clone());
-          return;
+    synchronized (linkdbs) {
+      SortedSet<Link> linkSet = findLinkByKey(dbid, a.id1, a.link_type, false);
+      if (linkSet != null) {
+        Iterator<Link> it = linkSet.iterator();
+        while (it.hasNext()) {
+          Link l = it.next();
+          if (l.id2 == a.id2) {
+            it.remove();
+            linkSet.add(a.clone());
+            return;
+          }
         }
       }
+      
+      // Throw error if updating non-existing link
+      throw new Exception(String.format("Link not found: (%d, %d, %d)", a.id1,
+                                                          a.link_type, a.id2));
     }
-    
-    // Throw error if updating non-existing link
-    throw new Exception(String.format("Link not found: (%d, %d, %d)", a.id1,
-                                                                a.link_type));
   }
 
   @Override
   public Link getLink(String dbid, long id1, long link_type, long id2)
       throws Exception {
-    SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
-    if (linkSet != null) {
-      for (Link l: linkSet) {
-        if (l.id2 == id2) {
-          return l;
+    synchronized (linkdbs) {
+      SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
+      if (linkSet != null) {
+        for (Link l: linkSet) {
+          if (l.id2 == id2) {
+            return l.clone();
+          }
         }
       }
+      return null;
     }
-    return null;
   }
 
   @Override
@@ -211,62 +243,75 @@ public class MemoryLinkStore extends LinkStore {
   public Link[] getLinkList(String dbid, long id1, long link_type,
       long minTimestamp, long maxTimestamp, int offset, int limit)
       throws Exception {
-    SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
-    if (linkSet == null || linkSet.size() == 0) {
-      return null;
-    } else {
-      // Do a first pass to find size of result array
-      int matching = 0;
-      for (Link l: linkSet) {
-        if (l.visibility == VISIBILITY_DEFAULT && 
-              l.time >= minTimestamp && l.time <= maxTimestamp) {
-          matching++;
-          if (matching >= limit) {
-            break;
-          }
-        }
-      }
-      if (matching == 0) {
+    int skipped = 0; // used for offset
+    synchronized (linkdbs) {
+      SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
+      if (linkSet == null || linkSet.size() == 0) {
         return null;
-      }
-      Link res[] = new Link[matching];
-      
-      // Iterate in desc order of timestamp, break ties by id2
-      int i = 0;
-      for (Link l: linkSet) {
-        if (l.visibility == VISIBILITY_DEFAULT && 
-              l.time >= minTimestamp && l.time <= maxTimestamp) {
-          res[i++] = l;
-
-          if (i >= limit) {
-            break;
+      } else {
+        // Do a first pass to find size of result array
+        int matching = 0;
+        for (Link l: linkSet) {
+          if (l.visibility == VISIBILITY_DEFAULT && 
+                l.time >= minTimestamp && l.time <= maxTimestamp) {
+            if (skipped < offset) {
+              skipped++;
+              continue;
+            }
+            matching++;
+            if (matching >= limit) {
+              break;
+            }
           }
         }
+        if (matching == 0) {
+          return null;
+        }
+        Link res[] = new Link[matching];
+        
+        // Iterate in desc order of timestamp, break ties by id2
+        int i = 0;
+        skipped = 0;
+        for (Link l: linkSet) {
+          if (l.visibility == VISIBILITY_DEFAULT && 
+                l.time >= minTimestamp && l.time <= maxTimestamp) {
+            if (skipped < offset) {
+              skipped++;
+              continue;
+            }
+            res[i++] = l;
+  
+            if (i >= limit) {
+              break;
+            }
+          }
+        }
+        return res;
       }
-      return res;
     }
   }
 
   @Override
   public long countLinks(String dbid, long id1, long link_type)
       throws Exception {
-    SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
-    if (linkSet == null) {
-      return 0;
-    } else {
-      // Count the number of visible links
-      int visible = 0;
-      for (Link l: linkSet) {
-        if (l.visibility == VISIBILITY_DEFAULT) {
-          visible++;
+    synchronized(linkdbs) {
+      SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
+      if (linkSet == null) {
+        return 0;
+      } else {
+        // Count the number of visible links
+        int visible = 0;
+        for (Link l: linkSet) {
+          if (l.visibility == VISIBILITY_DEFAULT) {
+            visible++;
+          }
         }
+  
+        /*System.err.println(
+             String.format("Lookup (%d, %d): %d visible, %d total", id1, link_type,
+                 visible, linkSet.size()));*/
+        return visible;
       }
-
-      /*System.err.println(
-           String.format("Lookup (%d, %d): %d visible, %d total", id1, link_type,
-               visible, linkSet.size()));*/
-      return visible;
     }
   }
-
 }

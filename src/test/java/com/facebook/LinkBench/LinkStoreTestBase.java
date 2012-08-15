@@ -1,6 +1,7 @@
 package com.facebook.LinkBench;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -8,26 +9,27 @@ import java.util.concurrent.LinkedBlockingQueue;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
+import org.apache.log4j.spi.ErrorHandler;
+import org.apache.log4j.spi.Filter;
+import org.apache.log4j.spi.LoggingEvent;
 import org.junit.Test;
 
-import com.facebook.LinkBench.Link;
-import com.facebook.LinkBench.LinkBenchLatency;
-import com.facebook.LinkBench.LinkBenchLoad;
-import com.facebook.LinkBench.LinkStore;
-import com.facebook.LinkBench.Phase;
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
+import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
 
 public abstract class LinkStoreTestBase extends TestCase {
 
   protected String testDB = "linkbench_unittestdb";
+  private Logger logger = Logger.getLogger("");
 
   /**
+   * Reinitialize link store database properties.
+   * Should attempt to clean database
    * @param props Properties for test DB.
    *        Override any required properties in this property dict
-   * @return new instance of a linkstore, or null just for dummy linkstore
    */
-  protected abstract LinkStore createStore(Properties props)
+  protected abstract void initStore(Properties props)
                                     throws IOException, Exception;
   
   /**
@@ -38,11 +40,233 @@ public abstract class LinkStoreTestBase extends TestCase {
     return 50000;
   }
   
-  protected DummyLinkStore createWrappedStore(Properties props) 
-                                    throws IOException, Exception {
-    return new DummyLinkStore(createStore(props));
+  /**
+   * Override to vary number of requests in test
+   */
+  protected int getRequestCount() {
+    return 100000;
+  }
+  
+  /**
+   * Override to vary maximum number of threads
+   */
+  protected int maxConcurrentThreads() {
+    return Integer.MAX_VALUE;
+  }
+  
+  /** Get a new handle to the initialized store, wrapped in
+   * DummyLinkStore
+   * @return new handle to linkstore
+   */
+  protected abstract DummyLinkStore getStoreHandle() 
+                                    throws IOException, Exception;
+  
+  @Override
+  protected void setUp() throws Exception {
+    super.setUp();
+    initStore(basicProps());
+  }
+  
+  /**
+   * Provide properties for basic test store
+   * @return
+   */
+  protected Properties basicProps() {
+    Properties props = new Properties();
+    props.setProperty("dbid", testDB);
+    return props;
+  }
+  
+  private void fillLoadProps(Properties props, long startId, long idCount,
+      int linksPerId) {
+    props.setProperty("startid1",Long.toString(startId));
+    props.setProperty("maxid1", Long.toString(startId + idCount));
+    props.setProperty("randomid2max", "0");
+    props.setProperty("datasize", "100");
+    props.setProperty("nlinks_func", "-3"); // Fixed number of rows
+    props.setProperty("nlinks_config", "0"); // ignored
+    props.setProperty("nlinks_default", Integer.toString(linksPerId));
+    props.setProperty("displayfreq", "1800");
+    props.setProperty("maxsamples", "10000");
   }
 
+  private void fillReqProps(Properties props, long startId, long idCount,
+      int requests, long timeLimit, double p_addlink, double p_deletelink,
+      double p_updatelink, double p_countlink, double p_getlink,
+      double p_getlinklist) {
+    props.setProperty("startid1",Long.toString(startId));
+    props.setProperty("maxid1", Long.toString(startId + idCount));
+    props.setProperty("requests", Long.toString(requests));
+    props.setProperty("maxtime", Long.toString(timeLimit));
+    
+    props.setProperty("randomid2max", "0");
+    props.setProperty("id2gen_config", "0");
+    
+    props.setProperty("addlink", Double.toString(p_addlink));
+    props.setProperty("deletelink", Double.toString(p_deletelink));
+    props.setProperty("updatelink", Double.toString(p_updatelink));
+    props.setProperty("countlink", Double.toString(p_countlink));
+    props.setProperty("getlink", Double.toString(p_getlink));
+    props.setProperty("getlinklist", Double.toString(p_getlinklist));
+    
+    props.setProperty("write_function", "-1");
+    props.setProperty("write_config", "0");
+    props.setProperty("read_function", "-1");
+    props.setProperty("read_config", "0");
+  }
+
+  /** Simple test with multiple operations on single link */
+  @Test
+  public void testOneLink() throws IOException, Exception {
+    DummyLinkStore store = getStoreHandle();
+
+    long id1 = 1123, id2 = 1124, ltype = 321;
+    Link writtenLink = new Link(id1, ltype, id2, 1, 1, 
+        LinkStore.VISIBILITY_DEFAULT, new byte[] {0x1}, 1, 1994);
+    store.addLink(testDB, writtenLink, true);
+    if (store.isRealStore()) {
+      Link readBack = store.getLink(testDB, id1, ltype, id2);
+      assertNotNull(readBack);
+      if (!writtenLink.equals(readBack)) {
+        throw new Exception("Expected " + readBack.toString() + " to equal "
+            + writtenLink.toString());
+      }
+      assertEquals(1, store.countLinks(testDB, id1, ltype));
+    }
+    
+    // Try expunge
+    store.deleteLink(testDB, id1, ltype, id2, true, true);
+    assertNull(store.getLink(testDB, id1, ltype, id2));
+    assertNull(store.getLinkList(testDB, id1, ltype));
+    assertEquals(0, store.countLinks(testDB, id1, ltype));
+    
+    store.addLink(testDB, writtenLink, true);
+    if (store.isRealStore()) {
+      assertNotNull(store.getLink(testDB, id1, ltype, id2));
+      assertEquals(1, store.countLinks(testDB, id1, ltype));
+    }
+    // try hiding
+    store.deleteLink(testDB, id1, ltype, id2, true, false);
+    if (store.isRealStore()) {
+      Link hidden = store.getLink(testDB, id1, ltype, id2);
+      assertNotNull(hidden);
+      assertEquals(LinkStore.VISIBILITY_HIDDEN, hidden.visibility);
+      // Check it is same up to visibility
+      Link check = hidden.clone();
+      check.visibility = LinkStore.VISIBILITY_DEFAULT;
+      assertTrue(writtenLink.equals(check));
+      assertEquals(0, store.countLinks(testDB, id1, ltype));
+      assertNull(store.getLinkList(testDB, id1, ltype));
+    }
+    
+    // Update link: check it is unhidden
+    store.updateLink(testDB, writtenLink, true);
+    if (store.isRealStore()) {
+      assertTrue(writtenLink.equals(store.getLink(testDB, id1, ltype, id2)));
+      assertEquals(1, store.countLinks(testDB, id1, ltype));
+      Link links[] = store.getLinkList(testDB, id1, ltype);
+      assertEquals(1, links.length);
+      assertTrue(writtenLink.equals(links[0]));
+    }
+    
+    store.deleteLink(testDB, id1, ltype, id2, true, true);
+  }
+  
+  @Test
+  public void testMultipleLinks() throws Exception, IOException {
+    DummyLinkStore store = getStoreHandle();
+    long ida = 5434, idb = 5435, idc = 9999, idd = 9998;
+    long ltypea = 1, ltypeb = 2;
+    int otype = 35342; 
+    
+    byte data[] = new byte[] {0xf, 0xa, 0xc, 0xe, 0xb, 0x0, 0x0, 0xc};
+    long t = 10000000;
+    Link links[] = new Link[] {
+       new Link(ida, ltypea, idc, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+           data, 1, System.currentTimeMillis()),
+       new Link(ida, ltypeb, idc, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+           data, 1, System.currentTimeMillis()),
+       new Link(idb, ltypeb, ida, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+           data, 1,  t + 1),
+       new Link(idb, ltypeb, idb, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+           data, 1, t),
+       new Link(idb, ltypeb, idc, otype, otype, LinkStore.VISIBILITY_HIDDEN,
+           data, 1, t - 2),
+       new Link(idb, ltypeb, idd, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+           data, 1, t + 3),
+    };
+    for (Link l: links) {
+      store.addLink(testDB, l, true);
+    }
+    if (store.isRealStore()) {
+      // Check counts
+      assertEquals(1, store.countLinks(testDB, ida, ltypea));
+      assertEquals(1, store.countLinks(testDB, ida, ltypeb));
+      assertEquals(0, store.countLinks(testDB, idb, ltypea));
+      assertEquals(3, store.countLinks(testDB, idb, ltypeb));
+      
+      Link retrieved[];
+      
+      retrieved = store.getLinkList(testDB, ida, ltypea);
+      assertEquals(1, retrieved.length);
+      assertTrue(links[0].equals(retrieved[0]));
+      
+      retrieved = store.getLinkList(testDB, ida, ltypeb);
+      assertEquals(1, retrieved.length);
+      assertTrue(links[1].equals(retrieved[0]));
+      
+      retrieved = store.getLinkList(testDB, idb, ltypeb);
+      // Check link list, Four matching links, one hidden
+      checkExpectedList(store, idb, ltypeb, links[5], links[2], links[3]);
+      
+      // Check limit
+      retrieved = store.getLinkList(testDB, idb, ltypeb, 
+          0, t + 100, 0, 1);
+      assertEquals(1, retrieved.length);
+      assertTrue(links[5].equals(retrieved[0]));
+      
+      //Check offset + limit
+      retrieved = store.getLinkList(testDB, idb, ltypeb, 
+          0, t + 100, 1, 2);
+      assertEquals(2, retrieved.length);
+      assertTrue(links[2].equals(retrieved[0]));
+      assertTrue(links[3].equals(retrieved[1]));
+      
+      // Check range filtering
+      retrieved = store.getLinkList(testDB, idb, ltypeb, 
+          t + 1, t + 2, 0, Integer.MAX_VALUE);
+      assertEquals(1, retrieved.length);
+      assertTrue(links[2].equals(retrieved[0]));
+    }
+  }
+
+  /**
+   * Regression test for flaw in MySql where visibility is assumed to
+   * be default on add
+   */
+  @Test
+  public void testHiding() throws Exception {
+    DummyLinkStore store = getStoreHandle();
+    Link l = new Link(1, 1, 1, 1, 1, 
+          LinkStore.VISIBILITY_HIDDEN, new byte[] {0x1}, 1,
+          System.currentTimeMillis());
+    store.addLink(testDB, l, true);
+    checkExpectedList(store, 1, 1, new Link[0]);
+    
+    // Check that updating works right
+    store.deleteLink(testDB, 1, 1, 1, true, false);
+    checkExpectedList(store, 1, 1, new Link[0]);
+    
+    // Make it visible
+    l.visibility = LinkStore.VISIBILITY_DEFAULT;
+    store.addLink(testDB, l, true);
+    checkExpectedList(store, 1, 1, l);
+    
+    // Expunge
+    store.deleteLink(testDB, 1, 1, 1, true, true);
+    checkExpectedList(store, 1, 1, new Link[0]);
+  }
+  
   /**
    * Generic test for a loader using a wrapped LinkStore
    * implementation
@@ -56,23 +280,14 @@ public abstract class LinkStoreTestBase extends TestCase {
     int linksPerId = 3;
     long testStartTime = System.currentTimeMillis();
 
-    Properties props = new Properties();
-    props.setProperty("startid1",Long.toString(startId));
-    props.setProperty("maxid1", Long.toString(startId + idCount + 1));
-    props.setProperty("randomid2max", "0");
-    props.setProperty("datasize", "100");
-    props.setProperty("nlinks_func", "-3"); // Fixed number of rows
-    props.setProperty("nlinks_config", "0"); // ignored
-    props.setProperty("nlinks_default", Integer.toString(linksPerId));
-    props.setProperty("displayfreq", "1800");
-    props.setProperty("maxsamples", "10000");
-    props.setProperty("dbid", testDB);
+    Properties props = basicProps();
+    fillLoadProps(props, startId, idCount, linksPerId);
     
-    DummyLinkStore store = createWrappedStore(props);
-    Logger logger = Logger.getLogger("");
+    initStore(props);
+    DummyLinkStore store = getStoreHandle();
     
     try {
-      serialLoad(logger, props, store, startId, idCount);
+      serialLoad(logger, props, store);
       
       long testEndTime = System.currentTimeMillis();
       
@@ -95,20 +310,89 @@ public abstract class LinkStoreTestBase extends TestCase {
       if (!store.initialized) {
         store.initialize(props, Phase.REQUEST, 0);
       }
-      // attempt to delete data
-      for (long i = startId; i < startId + idCount; i++) {
-        Link links[] = store.getLinkList(testDB, i, LinkStore.LINK_TYPE);
-        if (links != null) {
-          for (Link l: links) {
-            assert(l != null);
-            store.deleteLink(testDB, l.id1, l.link_type, l.id2,
-                                    true, true);
-          }
+      deleteIDRange(store, startId, idCount);
+    }
+  }
+
+  /**
+   * Run the requester against 
+   * This test validates both the requester (by looking at counts to make
+   * sure it at least did the right number of ops) and the LinkStore
+   * (by stress-testing it).
+   * @throws Exception 
+   * @throws IOException 
+   */
+  @Test
+  public void testRequester() throws IOException, Exception {
+    long startId = 532;
+    long idCount = getIDCount();
+    int linksPerId = 5;
+    
+    int requests = getRequestCount();
+    long timeLimit = requests;
+
+
+    Properties props = basicProps();
+    fillLoadProps(props, startId, idCount, linksPerId);
+    
+    double p_add = 0.2, p_del = 0.2, p_up = 0.1, p_count = 0.1, 
+           p_get = 0.2, p_getlinks = 0.2;
+    fillReqProps(props, startId, idCount, requests, timeLimit,
+        p_add * 100, p_del * 100, p_up * 100, p_count * 100, p_get * 100,
+        p_getlinks * 100);
+    
+    try {
+      serialLoad(logger, props, getStoreHandle());
+  
+      DummyLinkStore reqStore = getStoreHandle();
+      LinkBenchLatency latencyStats = new LinkBenchLatency(1);
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
+      LinkBenchRequest requester = new LinkBenchRequest(reqStore, 
+          props, latencyStats, tracker, 0, 1);
+      
+      requester.run();
+      
+      // Check that the proportion of operations is roughly right - within 1%
+      // For now, updates are actually implemented as add operations
+      assertTrue(Math.abs(reqStore.adds / (double)requests - 
+          (p_add + p_up)) < 0.01);
+      assertTrue(Math.abs(reqStore.updates / 
+                      (double)requests - 0.0) < 0.01);
+      assertTrue(Math.abs(reqStore.deletes /
+                       (double)requests - p_del) < 0.01);
+      assertTrue(Math.abs(reqStore.countLinks / 
+                       (double)requests - p_count) < 0.01);
+      assertTrue(Math.abs(reqStore.getLinks /
+                       (double)requests - p_get) < 0.01);
+      assertTrue(Math.abs(reqStore.getLinkLists / 
+                       (double)requests - p_getlinks) < 0.01);
+      assertEquals(0, reqStore.bulkLoadCountOps);
+      assertEquals(0, reqStore.bulkLoadLinkOps);
+    } finally {
+      deleteIDRange(getStoreHandle(), startId, idCount);
+    }
+    System.err.println("Done!");
+    //TODO: check request stats
+  }
+
+  private void checkExpectedList(DummyLinkStore store,
+            long id1, long ltype, Link... expected) throws Exception {
+    if (!store.isRealStore()) return;
+    assertEquals(expected.length, store.countLinks(testDB, id1, ltype));
+    Link actual[] = store.getLinkList(testDB, id1, ltype);
+    if (expected.length == 0) {
+      assertNull(actual);
+    } else {
+      assertEquals(expected.length, actual.length);
+      for (int i = 0; i < expected.length; i++) {
+        if (!expected[i].equals(actual[i])) {
+          fail("Mismatch between result lists. Expected: " +
+        		Arrays.toString(expected) + " Actual: " + Arrays.toString(actual));
         }
       }
     }
   }
-
+  
   /**
    * Use the LinkBenchLoad class to do a serial load of data
    * @param logger
@@ -118,17 +402,20 @@ public abstract class LinkStoreTestBase extends TestCase {
    * @throws IOException
    * @throws Exception
    */
-  private void serialLoad(Logger logger, Properties props, DummyLinkStore store,
-      long startId, long idCount) throws IOException, Exception {
-    store.initialize(props, Phase.LOAD, 0);
+  private void serialLoad(Logger logger, Properties props, DummyLinkStore store
+      ) throws IOException, Exception {
     LinkBenchLatency latencyStats = new LinkBenchLatency(1);
     
     /* Load up queue with work */
     BlockingQueue<LoadChunk>  chunk_q = new LinkedBlockingQueue<LoadChunk>();
+    long startId = Long.parseLong(props.getProperty("startid1"));
+    long idCount = Long.parseLong(props.getProperty("maxid1")) - startId;
+    
     int chunkSize = 128;
     int seq = 0;
     for (long i = startId; i < startId + idCount; i+= chunkSize) {
-      LoadChunk chunk = new LoadChunk(seq, i, Math.min(idCount, i + chunkSize));
+      LoadChunk chunk = new LoadChunk(seq, i, 
+                        Math.min(idCount + startId, i + chunkSize));
       chunk_q.add(chunk);
       seq++;
     }
@@ -136,6 +423,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     
     
     LoadProgress tracker = new LoadProgress(logger, idCount);
+    tracker.startTimer();
     LinkBenchLoad loader = new LinkBenchLoad(store, 
         props, latencyStats, 0, false, chunk_q, tracker);
     /* Run the loading process */
@@ -175,5 +463,20 @@ public abstract class LinkStoreTestBase extends TestCase {
       }
     }
     logger.info("Successfully sanity checked data for " + idCount + " ids");
+  }
+
+  private void deleteIDRange(DummyLinkStore store, long startId, long idCount)
+      throws Exception {
+    // attempt to delete data
+    for (long i = startId; i < startId + idCount; i++) {
+      Link links[] = store.getLinkList(testDB, i, LinkStore.LINK_TYPE);
+      if (links != null) {
+        for (Link l: links) {
+          assert(l != null);
+          store.deleteLink(testDB, l.id1, l.link_type, l.id2,
+                                  true, true);
+        }
+      }
+    }
   }
 }

@@ -84,6 +84,11 @@ public class LinkBenchRequest implements Runnable {
 
     nrequesters = input_nrequesters;
     requesterID = input_requesterID;
+    if (requesterID < 0 ||  requesterID >= nrequesters) {
+      throw new IllegalArgumentException("Bad requester id " 
+          + requesterID + "/" + nrequesters);
+    }
+    
     nrequests = Long.parseLong(props.getProperty("requests"));
     maxtime = Long.parseLong(props.getProperty("maxtime"));
     maxid1 = Long.parseLong(props.getProperty("maxid1"));
@@ -325,6 +330,9 @@ public class LinkBenchRequest implements Runnable {
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("getlinklist count = " + count);
         }
+      } else {
+        logger.warn("No-op in requester: last probability < 1.0");
+        return;
       }
 
 
