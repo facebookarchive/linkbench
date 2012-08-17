@@ -18,11 +18,12 @@ public class LinkBenchRequest implements Runnable {
   RequestProgress progressTracker;
 
   long nrequests;
+  /** Requests per second: <= 0 for unlimited rate */
+  private long requestrate;
   long maxtime;
   int nrequesters;
   int requesterID;
   long randomid2max;
-  Random random_id2;
   long maxid1;
   long startid1;
   int datasize;
@@ -45,11 +46,12 @@ public class LinkBenchRequest implements Runnable {
   long numfound;
   long numnotfound;
 
-  // A random number generator for request type
-  Random random_reqtype;
-
-  // A random number generator for id1 of the request
-  Random random_id1;
+  /** 
+   * Random number generator use for generating workload.  If
+   * initialized with same seed, should generate same sequence of requests
+   * so that tests and benchmarks are repeatable.  
+   */
+  Random rng;
 
   Link link;
 
@@ -74,13 +76,14 @@ public class LinkBenchRequest implements Runnable {
                           Properties input_props,
                           LinkBenchLatency latencyStats,
                           RequestProgress progressTracker,
+                          Random rng,
                           int input_requesterID,
                           int input_nrequesters) {
-
     store = input_store;
     props = input_props;
     this.latencyStats = latencyStats;
     this.progressTracker = progressTracker;
+    this.rng = rng;
 
     nrequesters = input_nrequesters;
     requesterID = input_requesterID;
@@ -90,6 +93,8 @@ public class LinkBenchRequest implements Runnable {
     }
     
     nrequests = Long.parseLong(props.getProperty("requests"));
+    requestrate = Long.parseLong(props.getProperty("requestrate", "0"));
+    
     maxtime = Long.parseLong(props.getProperty("maxtime"));
     maxid1 = Long.parseLong(props.getProperty("maxid1"));
     startid1 = Long.parseLong(props.getProperty("startid1"));
@@ -139,16 +144,9 @@ public class LinkBenchRequest implements Runnable {
     }
     int maxsamples = Integer.parseInt(props.getProperty("maxsamples"));
     stats = new LinkBenchStats(requesterID, displayfreq, maxsamples);
-
-    // A random number generator for request type
-    random_reqtype = new Random();
-
-    // A random number generator for id1 of the request
-    random_id1 = new Random();
-
+    
     // random number generator for id2
     randomid2max = Long.parseLong(props.getProperty("randomid2max"));
-    random_id2 = new Random();
 
     // configuration for generating id2
     id2gen_config = Integer.parseInt(props.getProperty("id2gen_config"));
@@ -175,13 +173,13 @@ public class LinkBenchRequest implements Runnable {
   }
 
   // gets id1 for the request based on desired distribution
-  private long getid1_from_distribution(Random random_id1, boolean write,
+  private long getid1_from_distribution(boolean write,
                                         long previousId1) {
 
     // Need to pick a random number between startid1 (inclusive) and maxid1
     // (exclusive)
     long longid1 = startid1 +
-      Math.abs(random_id1.nextLong())%(maxid1 - startid1);
+      Math.abs(rng.nextLong())%(maxid1 - startid1);
     double id1 = longid1;
     double drange = (double)maxid1 - startid1;
 
@@ -203,7 +201,7 @@ public class LinkBenchRequest implements Runnable {
       break;
 
     case -2: //real distribution
-      newid1 = RealDistribution.getNextId1(startid1, maxid1, write);
+      newid1 = RealDistribution.getNextId1(rng, startid1, maxid1, write);
       break;
 
     case -1 : // inverse function f(x) = 1/x.
@@ -253,7 +251,7 @@ public class LinkBenchRequest implements Runnable {
 
   private void onerequest(long requestno) {
 
-    double r = Math.random() * 100.0;
+    double r = rng.nextDouble() * 100.0;
 
     long starttime = 0;
     long endtime = 0;
@@ -265,19 +263,19 @@ public class LinkBenchRequest implements Runnable {
       if (r <= pc_addlink) {
         // generate add request
         type = LinkStoreOp.ADD_LINK;
-        link.id1 = getid1_from_distribution(random_id1, true, link.id1);
+        link.id1 = getid1_from_distribution(true, link.id1);
         starttime = System.nanoTime();
         addLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_deletelink) {
         type = LinkStoreOp.DELETE_LINK;
-        link.id1 = getid1_from_distribution(random_id1, true, link.id1);
+        link.id1 = getid1_from_distribution(true, link.id1);
         starttime = System.nanoTime();
         deleteLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_updatelink) {
         type = LinkStoreOp.UPDATE_LINK;
-        link.id1 = getid1_from_distribution(random_id1, true, link.id1);
+        link.id1 = getid1_from_distribution(true, link.id1);
         starttime = System.nanoTime();
         updateLink(link);
         endtime = System.nanoTime();
@@ -285,7 +283,7 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkStoreOp.COUNT_LINK;
 
-        link.id1 = getid1_from_distribution(random_id1, false, link.id1);
+        link.id1 = getid1_from_distribution(false, link.id1);
         starttime = System.nanoTime();
         countLinks(link);
         endtime = System.nanoTime();
@@ -295,16 +293,17 @@ public class LinkBenchRequest implements Runnable {
         type = LinkStoreOp.GET_LINK;
 
 
-        link.id1 = getid1_from_distribution(random_id1, false, link.id1);
+        link.id1 = getid1_from_distribution(false, link.id1);
 
 
-        long nlinks = LinkBenchLoad.getNlinks(link.id1, startid1, maxid1,
+        long nlinks = LinkBenchLoad.getNlinks(rng,
+            link.id1, startid1, maxid1,
             nlinks_func, nlinks_config, nlinks_default);
 
         // id1 is expected to have nlinks links. Retrieve one of those.
         link.id2 = (randomid2max == 0 ?
-                     (maxid1 + link.id1 + random_id2.nextInt((int)nlinks + 1)) :
-                     random_id2.nextInt((int)randomid2max));
+                     (maxid1 + link.id1 + rng.nextInt((int)nlinks + 1)) :
+                     rng.nextInt((int)randomid2max));
 
         starttime = System.nanoTime();
         boolean found = getLink(link);
@@ -320,7 +319,7 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkStoreOp.GET_LINKS_LIST;
 
-        link.id1 = getid1_from_distribution(random_id1, false, link.id1);
+        link.id1 = getid1_from_distribution(false, link.id1);
         starttime = System.nanoTime();
         Link links[] = getLinkList(link);
         endtime = System.nanoTime();
@@ -363,7 +362,9 @@ public class LinkBenchRequest implements Runnable {
   @Override
   public void run() {
     logger.info("Requester thread #" + requesterID + " started: will do "
-        + nrequests + " ops");
+        + nrequests + " ops.");
+    logger.debug("Requester thread #" + requesterID + " first random number "
+                  + rng.nextLong());
     long starttime = System.currentTimeMillis();
     long endtime = starttime + maxtime * 1000;
     long lastupdate = starttime;
@@ -398,7 +399,12 @@ public class LinkBenchRequest implements Runnable {
     }
     
     int requestsSinceLastUpdate = 0;
+    long reqTime_ns = System.nanoTime();
+    double requestrate_ns = ((double)requestrate)/1e9;
     for (i = 0; i < nrequests; i++) {
+      if (requestrate > 0) {
+        reqTime_ns = Timer.waitExpInterval(rng, reqTime_ns, requestrate_ns);
+      }
       onerequest(i);
       requestsdone++;
       
@@ -469,7 +475,8 @@ public class LinkBenchRequest implements Runnable {
     // note that use use write_function here rather than nlinks_func.
     // This is useful if we want request phase to add links in a different
     // manner than load phase.
-    long nlinks = LinkBenchLoad.getNlinks(link.id1, startid1, maxid1,
+    long nlinks = LinkBenchLoad.getNlinks(rng,
+        link.id1, startid1, maxid1,
         wr_distrfunc, wr_distrconfig, 1);
 
     // We want to sometimes add a link that already exists and sometimes
@@ -478,8 +485,8 @@ public class LinkBenchRequest implements Runnable {
     // upto randomid2max). Plus 1 is used to make nlinks atleast 1.
     nlinks = 2 * nlinks + 1;
     link.id2 = (randomid2max == 0 ?
-                 (maxid1 + link.id1 + random_id2.nextInt((int)nlinks + 1)) :
-                 random_id2.nextInt((int)randomid2max));
+                 (maxid1 + link.id1 + rng.nextInt((int)nlinks + 1)) :
+                   rng.nextInt((int)randomid2max));
 
     if (id2gen_config == 1) {
       link.id2 = fixId2(link.id2, nrequesters, requesterID,
@@ -491,10 +498,9 @@ public class LinkBenchRequest implements Runnable {
     link.time = System.currentTimeMillis();
 
     // generate data as a sequence of random characters from 'a' to 'd'
-    Random random_data = new Random();
     link.data = new byte[datasize];
     for (int k = 0; k < datasize; k++) {
-      link.data[k] = (byte)('a' + Math.abs(random_data.nextInt()) % 4);
+      link.data[k] = (byte)('a' + Math.abs(rng.nextInt()) % 4);
     }
 
     // no inverses for now
@@ -507,13 +513,14 @@ public class LinkBenchRequest implements Runnable {
     link.link_type = LinkStore.LINK_TYPE;
 
 
-    long nlinks = LinkBenchLoad.getNlinks(link.id1, startid1, maxid1,
+    long nlinks = LinkBenchLoad.getNlinks(rng,
+        link.id1, startid1, maxid1,
         nlinks_func, nlinks_config, nlinks_default);
 
     // id1 is expected to have nlinks links. Update one of those.
     link.id2 = (randomid2max == 0 ?
-                 (maxid1 + link.id1 + random_id2.nextInt((int)nlinks + 1)) :
-                 random_id2.nextInt((int)randomid2max));
+                 (maxid1 + link.id1 + rng.nextInt((int)nlinks + 1)) :
+                   rng.nextInt((int)randomid2max));
 
     if (id2gen_config == 1) {
       link.id2 = fixId2(link.id2, nrequesters, requesterID,
@@ -527,10 +534,9 @@ public class LinkBenchRequest implements Runnable {
     link.time = System.currentTimeMillis();
 
     // generate data as a sequence of random characters from 'e' to 'h'
-    Random random_data = new Random();
     link.data = new byte[datasize];
     for (int k = 0; k < datasize; k++) {
-      link.data[k] = (byte)('e' + Math.abs(random_data.nextInt()) % 4);
+      link.data[k] = (byte)('e' + Math.abs(rng.nextInt(4)));
     }
 
     // no inverses for now
@@ -541,13 +547,14 @@ public class LinkBenchRequest implements Runnable {
   void deleteLink(Link link) throws Exception {
     link.link_type = LinkStore.LINK_TYPE;
 
-    long nlinks = LinkBenchLoad.getNlinks(link.id1, startid1, maxid1,
+    long nlinks = LinkBenchLoad.getNlinks(rng,
+        link.id1, startid1, maxid1,
         nlinks_func, nlinks_config, nlinks_default);
 
     // id1 is expected to have nlinks links. Delete one of those.
     link.id2 = (randomid2max == 0 ?
-                (maxid1 + link.id1 + random_id2.nextInt((int)nlinks + 1)) :
-                random_id2.nextInt((int)randomid2max));
+                (maxid1 + link.id1 + rng.nextInt((int)nlinks + 1)) :
+                  rng.nextInt((int)randomid2max));
 
     if (id2gen_config == 1) {
       link.id2 = fixId2(link.id2, nrequesters, requesterID,

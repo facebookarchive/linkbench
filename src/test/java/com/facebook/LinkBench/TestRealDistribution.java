@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.Properties;
+import java.util.Random;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -64,16 +65,20 @@ public class TestRealDistribution extends TestCase {
     //      error values are in the "proper" range
     RealDistribution.reload(props);
     System.out.println("testGetNLinks\n===========");
+    long randSeed = System.currentTimeMillis();
+    System.out.println("random seed: " + randSeed);
+    Random rng = new Random(randSeed);
+    
     double err;
-    err = testGetNlinks(1000000, 2000001);
+    err = testGetNlinks(rng, 1000000, 2000001);
     System.out.println("testGetNlinks(1000000, 2000001) err=" + err);
     assertTrue(err < 0.0001);
     
-    err = testGetNlinks(1234567, 7654321);
+    err = testGetNlinks(rng, 1234567, 7654321);
     System.out.println("testGetNlinks(1234567, 7654321) err=" + err);
     assertTrue(err < 0.0001);
     
-    err = testGetNlinks(97, 10000097);
+    err = testGetNlinks(rng, 97, 10000097);
     System.out.println("testGetNlinks(97, 10000097) err=" + err);
     assertTrue(err < 0.0001);
     System.out.println();
@@ -84,20 +89,25 @@ public class TestRealDistribution extends TestCase {
     //TODO: would be good to have some real measure for whether these
     //      error values are in the "proper" range
     System.out.println("testGetNextId1\n===========");
+    
+    long randSeed = System.currentTimeMillis();
+    System.out.println("random seed: " + randSeed);
+    Random rng = new Random(randSeed);
+    
     double err;
-    err = testGetNextId1(1000000, 2000001, "nreads");
+    err = testGetNextId1(rng, 1000000, 2000001, "nreads");
     System.out.println("testGetNextId1(1000000, 2000001, nreads) err=" + err);
-    err = testGetNextId1(1000000, 2000001, "nwrites");
+    err = testGetNextId1(rng, 1000000, 2000001, "nwrites");
     System.out.println("testGetNextId1(1000000, 2000001, nwrites) err=" + err);
 
-    err = testGetNextId1(1234567, 7654321, "nreads");
+    err = testGetNextId1(rng, 1234567, 7654321, "nreads");
     System.out.println("testGetNextId1(1234567, 7654321, nreads) err=" + err);
-    err = testGetNextId1(1234567, 7654321, "nwrites");
+    err = testGetNextId1(rng, 1234567, 7654321, "nwrites");
     System.out.println("testGetNextId1(1234567, 7654321, nwrites) err=" + err);
   
-    err = testGetNextId1(97, 10000097, "nreads");
+    err = testGetNextId1(rng, 97, 10000097, "nreads");
     System.out.println("testGetNextId1(97, 10000097, nreads) err=" + err);
-    err = testGetNextId1(97, 10000097, "nwrites");
+    err = testGetNextId1(rng, 97, 10000097, "nwrites");
     System.out.println("testGetNextId1(97, 10000097, nwrites) err=" + err);
     System.out.println();
   }
@@ -163,16 +173,15 @@ public class TestRealDistribution extends TestCase {
   //test RealDistribution.getNextId1
   //type is either "nlinks" or "nwrites"
   //maxid1 is exclusive
-  private static double testGetNextId1(int startid1, int maxid1, String type) 
-  throws Exception {
-    
+  private static double testGetNextId1(Random rng, int startid1, int maxid1,
+                                       String type) throws Exception {
     int[] cnt = new int[maxid1];
     
     double nqueries = (maxid1 - startid1)*RealDistribution.getArea(type)
       /100.0;
 
     for (int i = 0; i < nqueries; ++i) {
-      long x = RealDistribution.getNextId1(startid1, maxid1, 
+      long x = RealDistribution.getNextId1(rng, startid1, maxid1, 
           type.equals("nwrites"));
       if (x < startid1 || x >= maxid1) {
         throw new Exception("Invalid value of id1: " + x);
@@ -187,12 +196,12 @@ public class TestRealDistribution extends TestCase {
   }
 
   //test getNLinks
-  private static double testGetNlinks(int startid1, int maxid1) 
+  private static double testGetNlinks(Random rng, int startid1, int maxid1) 
   throws Exception {
 
     int[] nlinks = new int[maxid1];
     for (int i = startid1; i < maxid1; ++i) {
-      long x = RealDistribution.getNlinks(i, startid1, maxid1);
+      long x = RealDistribution.getNlinks(rng, i, startid1, maxid1);
       nlinks[i] = (int)x;
     }
 

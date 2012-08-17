@@ -1,7 +1,5 @@
 package com.facebook.LinkBench;
 
-import java.io.*;
-import java.util.*;
 
 /* 
  * A class to generate permutation of 0, 1, 2, ..(N-1) using O(1) memory.

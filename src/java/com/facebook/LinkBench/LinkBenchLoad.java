@@ -28,7 +28,7 @@ import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 public class LinkBenchLoad implements Runnable {
 
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
-
+  
   private long randomid2max; // whether id2 should be generated randomly
 
   private long maxid1;   // max id1 to generate
@@ -55,11 +55,6 @@ public class LinkBenchLoad implements Runnable {
   long diffShuffle;
   long linksloaded;
   
-  // Random generators
-  Random random_data;
-  Random random_links = new Random(); // for #links
-  private Random random_id2; // random number generator for id2 if needed
-  
   /** 
    * special case for single hot row benchmark. If singleAssoc is set, 
    * then make this method not print any statistics message, all statistics
@@ -81,12 +76,12 @@ public class LinkBenchLoad implements Runnable {
    */
   public LinkBenchLoad(LinkStore store, Properties props,
       LinkBenchLatency latencyStats, int loaderID, boolean singleAssoc,
-      int nloaders, LoadProgress prog_tracker) {
+      int nloaders, LoadProgress prog_tracker, Random rng) {
     this(store, props, latencyStats, loaderID, singleAssoc,
               new ArrayBlockingQueue<LoadChunk>(2), prog_tracker);
     
     // Just add a single chunk to the queue
-    chunk_q.add(new LoadChunk(loaderID, startid1, maxid1));
+    chunk_q.add(new LoadChunk(loaderID, startid1, maxid1, rng));
     chunk_q.add(LoadChunk.SHUTDOWN);
   }
 
@@ -107,7 +102,7 @@ public class LinkBenchLoad implements Runnable {
     this.singleAssoc = singleAssoc;
     this.chunk_q = chunk_q;
     this.prog_tracker = prog_tracker;
-
+    
     
     /*
      * Load settings from properties
@@ -156,13 +151,6 @@ public class LinkBenchLoad implements Runnable {
      */
     // random number generator for id2 if needed
     randomid2max = Long.parseLong(props.getProperty("randomid2max"));
-    random_id2 = (randomid2max > 0) ? (new Random()) : null;
-    
-    // generate data as a sequence of random characters from 'a' to 'd'
-    random_data = new Random();
-    
-    // Random number generators for #links
-    random_links = new Random();
   }
 
   public long getLinksLoaded() {
@@ -171,7 +159,8 @@ public class LinkBenchLoad implements Runnable {
 
   // Gets the #links to generate for an id1 based on distribution specified
   // by nlinks_func, nlinks_config and nlinks_default.
-  public static long getNlinks(long id1, long startid1, long maxid1,
+  public static long getNlinks(Random rng,
+                               long id1, long startid1, long maxid1,
                                int nlinks_func, int nlinks_config,
                                int nlinks_default) {
     long nlinks = nlinks_default; // start with nlinks_default
@@ -182,7 +171,7 @@ public class LinkBenchLoad implements Runnable {
       return nlinks;
     case -2 :
       // real distribution
-      nlinks = RealDistribution.getNlinks(id1, startid1, maxid1);
+      nlinks = RealDistribution.getNlinks(rng, id1, startid1, maxid1);
       break;
 
     case -1 :
@@ -300,7 +289,8 @@ public class LinkBenchLoad implements Runnable {
       long nlinks = 0;
       long id1;
       if (nlinks_func == -2) {
-        long res[] = RealDistribution.getId1AndNLinks(i, startid1, maxid1);
+        long res[] = RealDistribution.getId1AndNLinks(chunk.rng, i, 
+                                            startid1, maxid1);
         id1 = res[0];
         nlinks = res[1];
         if (id1 == i) {
@@ -310,7 +300,7 @@ public class LinkBenchLoad implements Runnable {
         }
       } else {
         id1 = i;
-        nlinks = getNlinks(id1, startid1, maxid1,
+        nlinks = getNlinks(chunk.rng, id1, startid1, maxid1,
                   nlinks_func, nlinks_config, nlinks_default);
       }
       
@@ -321,9 +311,8 @@ public class LinkBenchLoad implements Runnable {
                            " nlinks = " + nlinks);
       }
  
-      createOutLinks(link, loadBuffer, countLoadBuffer,
-          id1, nlinks, singleAssoc,
-          bulkLoad, bulkLoadBatchSize);
+      createOutLinks(chunk.rng, link, loadBuffer, countLoadBuffer,
+          id1, nlinks, singleAssoc, bulkLoad, bulkLoadBatchSize);
  
       if (!singleAssoc) {
         long nloaded = (i - chunk.start) / chunk.step;
@@ -352,7 +341,8 @@ public class LinkBenchLoad implements Runnable {
    * @param bulkLoad
    * @param bulkLoadBatchSize
    */
-  private void createOutLinks(Link link, ArrayList<Link> loadBuffer,
+  private void createOutLinks(Random rng,
+      Link link, ArrayList<Link> loadBuffer,
       ArrayList<LinkCount> countLoadBuffer,
       long id1, long nlinks, boolean singleAssoc, boolean bulkLoad,
       int bulkLoadBatchSize) {
@@ -366,7 +356,7 @@ public class LinkBenchLoad implements Runnable {
         // Can't reuse link object
         link = initLink();
       }
-      constructLink(link, id1, j, singleAssoc);
+      constructLink(rng, link, id1, j, singleAssoc);
       
       if (bulkLoad) {
         loadBuffer.add(link);
@@ -421,8 +411,8 @@ public class LinkBenchLoad implements Runnable {
    *                    id1
    * @param singleAssoc whether we are in singleAssoc mode
    */
-  private void constructLink(Link link, long id1, long outlink_ix,
-      boolean singleAssoc) {
+  private void constructLink(Random rng, Link link, long id1,
+      long outlink_ix, boolean singleAssoc) {
     link.id1 = id1;
 
     // Using random number generator for id2 means we won't know
@@ -434,12 +424,12 @@ public class LinkBenchLoad implements Runnable {
     } else {
       link.id2 = (randomid2max == 0 ?
                  (maxid1 + id1 + outlink_ix) :
-                 random_id2.nextInt((int)randomid2max));
+                 rng.nextInt((int)randomid2max));
       link.time = System.currentTimeMillis();
       // generate data as a sequence of random characters from 'a' to 'd'
       link.data = new byte[datasize];
       for (int k = 0; k < datasize; k++) {
-        link.data[k] = (byte)('a' + Math.abs(random_data.nextInt()) % 4);
+        link.data[k] = (byte)('a' + Math.abs(rng.nextInt(4)));
       }
     }
 
@@ -552,13 +542,13 @@ public class LinkBenchLoad implements Runnable {
    */
   public static class LoadChunk {
     public static LoadChunk SHUTDOWN = new LoadChunk(true,
-                                              0, 0, 0, 1);
+                                              0, 0, 0, 1, null);
 
-    public LoadChunk(long id, long start, long end) {
-      this(false, id, start, end, 1);
+    public LoadChunk(long id, long start, long end, Random rng) {
+      this(false, id, start, end, 1, rng);
     }
     public LoadChunk(boolean shutdown,
-                      long id, long start, long end, long step) {
+                      long id, long start, long end, long step, Random rng) {
       super();
       this.shutdown = shutdown;
       this.id = id;
@@ -566,6 +556,7 @@ public class LinkBenchLoad implements Runnable {
       this.end = end;
       this.step = step;
       this.size = (end - start) / step;
+      this.rng = rng;
     }
     public final boolean shutdown;
     public final long id;
@@ -573,6 +564,7 @@ public class LinkBenchLoad implements Runnable {
     public final long end;
     public final long step;
     public final long size;
+    public Random rng;
     
     public String toString() {
       if (shutdown) {

@@ -8,6 +8,7 @@ import java.lang.reflect.Constructor;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Properties;
+import java.util.Random;
 
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -319,7 +320,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       
       LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats,
                                loaderid.get(), maxid1 == startid1 + 1,
-                               nloaders.get(), prog_tracker);
+                               nloaders.get(), prog_tracker, new Random());
       
       LinkedList<LinkBenchLoad> tasks = new LinkedList<LinkBenchLoad>();
       tasks.add(loader);
@@ -358,7 +359,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       progress.startTimer();    
       final LinkBenchRequest requester =
         new LinkBenchRequest(store, props, latencyStats, progress,
-                             requesterid.get(), nrequesters.get());
+                new Random(), requesterid.get(), nrequesters.get());
       
       
       // Wrap in runnable to handle error

@@ -47,7 +47,6 @@ class RealDistribution {
   private static ArrayList<Point> nlinks_cdf, nreads_cdf, nwrites_cdf;
   private static double[] nreads_cs, nwrites_cs;
   private static long[] nreads_right_points, nwrites_right_points;
-  static Random random_generator;
 
   /*
    * This method loads data from data file into memory;
@@ -63,7 +62,6 @@ class RealDistribution {
 
   static synchronized void reload(Properties props) throws Exception {
     getStatisticalData(props);
-    random_generator = new Random();
   }
 
   //helper function: Calculate pdf from cdf
@@ -281,8 +279,8 @@ class RealDistribution {
   }
 
   //return a random value within a specific range (inclusive both ends)
-  static long randomRange(int left, int right) {
-    return left + random_generator.nextInt(right - left + 1);
+  static long randomRange(Random rng, int left, int right) {
+    return left + rng.nextInt(right - left + 1);
   }
 
   /**
@@ -292,24 +290,28 @@ class RealDistribution {
    * @param maxid1
    * @return
    */
-  static long[] getId1AndNLinks(long unshuffled_id1,
+  static long[] getId1AndNLinks(Random rng, long unshuffled_id1,
                                   long startid1, long maxid1) {
     long id1 = Shuffler.getPermutationValue(unshuffled_id1, startid1, maxid1,
                                                NLINKS_SHUFFLER_PARAMS);
 
-    return new long[] {id1, getNlinks(id1, startid1, maxid1)};
+    return new long[] {id1, getNlinks(rng, id1, startid1, maxid1)};
   }
 
-  static long getNlinks(long id1, long startid1, long maxid1) {
+  static long getNlinks(Random rng, long id1, long startid1, long maxid1) {
     // simple workload balancing
     double p = (100.0 * (id1 - startid1 + 1)) / (maxid1 - startid1);
     int idx = binarySearch(nlinks_cdf, p);
 
     if (idx == 0) {
+      /* Temporary hack to make sure RNG is called regardless of value
+       * of id1 (which is currently nondeterministic
+       */
+      rng.nextInt(); 
       return 0;
     }
     else  {
-      return randomRange(nlinks_cdf.get(idx - 1).value + 1,
+      return randomRange(rng, nlinks_cdf.get(idx - 1).value + 1,
           nlinks_cdf.get(idx).value);
     }
   }
@@ -364,16 +366,23 @@ class RealDistribution {
     }
   }
 
-  static long getNextId1(long startid1, long maxid1,
+  static long getNextId1(Random rng, long startid1, long maxid1,
       boolean write) {
 
     double[] cs = write ? nwrites_cs : nreads_cs;//cumulative sum
     double max_probability = cs[cs.length - 1];
-    double p = max_probability * Math.random();
+    double p = max_probability * rng.nextDouble();
 
     int idx = binarySearch(cs, p);
     if (idx == 0) idx = 1;
 
+    /*
+     * TODO: this algorithm does not appear to generate data
+     * faithful to the distribution.
+     * Additional problems include data races if multiple threads are
+     * concurrently modifying the shared arrays, and the fact
+     * that a workload cannot be reproduced.
+     */
     long result = -1;
     if (write) {
       result = nwrites_right_points[idx];

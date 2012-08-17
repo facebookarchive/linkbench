@@ -3,15 +3,13 @@ package com.facebook.LinkBench;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
-import org.apache.log4j.spi.ErrorHandler;
-import org.apache.log4j.spi.Filter;
-import org.apache.log4j.spi.LoggingEvent;
 import org.junit.Test;
 
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
@@ -113,6 +111,18 @@ public abstract class LinkStoreTestBase extends TestCase {
     props.setProperty("write_config", "0");
     props.setProperty("read_function", "-1");
     props.setProperty("read_config", "0");
+  }
+
+  /** 
+   * Utility to create a random number generator and print
+   * the seed for later reproducibility of test failures
+   * @return
+   */
+  private Random createRNG() {
+    long randSeed = System.currentTimeMillis();
+    System.out.println("Random seed: " + randSeed);
+    Random rng = new Random(randSeed);
+    return rng;
   }
 
   /** Simple test with multiple operations on single link */
@@ -287,7 +297,9 @@ public abstract class LinkStoreTestBase extends TestCase {
     DummyLinkStore store = getStoreHandle();
     
     try {
-      serialLoad(logger, props, store);
+      Random rng = createRNG();
+      
+      serialLoad(rng, logger, props, store);
       
       long testEndTime = System.currentTimeMillis();
       
@@ -342,16 +354,22 @@ public abstract class LinkStoreTestBase extends TestCase {
         p_getlinks * 100);
     
     try {
-      serialLoad(logger, props, getStoreHandle());
+      Random rng = createRNG();
+      
+      serialLoad(rng, logger, props, getStoreHandle());
   
       DummyLinkStore reqStore = getStoreHandle();
       LinkBenchLatency latencyStats = new LinkBenchLatency(1);
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
+      
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, 
-          props, latencyStats, tracker, 0, 1);
+                      props, latencyStats, tracker, rng, 0, 1);
       
       requester.run();
       
+      assertTrue(reqStore.adds + reqStore.updates + reqStore.deletes +
+          reqStore.countLinks + reqStore.getLinks + reqStore.getLinkLists
+          == requests);
       // Check that the proportion of operations is roughly right - within 1%
       // For now, updates are actually implemented as add operations
       assertTrue(Math.abs(reqStore.adds / (double)requests - 
@@ -372,7 +390,54 @@ public abstract class LinkStoreTestBase extends TestCase {
       deleteIDRange(getStoreHandle(), startId, idCount);
     }
     System.err.println("Done!");
-    //TODO: check request stats
+  }
+  
+  /**
+   * Test that the requester throttling slows down requests
+   * @throws Exception 
+   * @throws IOException 
+   */
+  @Test
+  public void testRequesterThrottling() throws IOException, Exception {
+    long startId = 1000000;
+    // Small test
+    long idCount = getIDCount() / 10;
+    int linksPerId = 3;
+    
+    Properties props = basicProps();
+    int requests = 1000;
+    long timeLimit = requests;
+    int requestsPerSec = 500; // Limit to fairly low rate
+    fillLoadProps(props, startId, idCount, linksPerId);
+    fillReqProps(props, startId, idCount, requests, timeLimit,
+                 20, 20, 10, 10, 20, 20);
+    props.setProperty("requestrate", Integer.toString(requestsPerSec));
+    
+    try {
+      Random rng = createRNG();
+      
+      serialLoad(rng, logger, props, getStoreHandle());
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
+      
+      DummyLinkStore reqStore = getStoreHandle();
+      LinkBenchRequest requester = new LinkBenchRequest(reqStore, 
+                      props, new LinkBenchLatency(1), tracker, rng, 0, 1);
+      
+      long startTime = System.currentTimeMillis();
+      requester.run();
+      long endTime = System.currentTimeMillis();
+      
+      assertEquals(requests, reqStore.adds + reqStore.updates + reqStore.deletes +
+          reqStore.countLinks + reqStore.getLinks + reqStore.getLinkLists);
+      double actualArrivalRate = 1000 * requests / (double)(endTime - startTime);
+      System.err.println("Expected request rate: " + requestsPerSec
+          + " actual request rate: " + actualArrivalRate);
+      // Check that it isn't more that 5% faster than expected average
+      assertTrue(actualArrivalRate <= 1.05 * requestsPerSec);
+    } finally {
+      deleteIDRange(getStoreHandle(), startId, idCount);
+    }
+    System.err.println("Done!");
   }
 
   private void checkExpectedList(DummyLinkStore store,
@@ -402,8 +467,8 @@ public abstract class LinkStoreTestBase extends TestCase {
    * @throws IOException
    * @throws Exception
    */
-  private void serialLoad(Logger logger, Properties props, DummyLinkStore store
-      ) throws IOException, Exception {
+  private void serialLoad(Random rng, Logger logger, Properties props,
+      DummyLinkStore store) throws IOException, Exception {
     LinkBenchLatency latencyStats = new LinkBenchLatency(1);
     
     /* Load up queue with work */
@@ -415,7 +480,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     int seq = 0;
     for (long i = startId; i < startId + idCount; i+= chunkSize) {
       LoadChunk chunk = new LoadChunk(seq, i, 
-                        Math.min(idCount + startId, i + chunkSize));
+                        Math.min(idCount + startId, i + chunkSize), rng);
       chunk_q.add(chunk);
       seq++;
     }
