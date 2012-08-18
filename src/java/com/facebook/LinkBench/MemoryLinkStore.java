@@ -10,7 +10,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 /**
- * Simple in-memory implementation of a Linkstore
+ * Simple in-memory implementation of GraphStore
  * Not efficient or optimized at all, just for testing purposes.
  * 
  * MemoryLinkStore instances sharing the same data can be created
@@ -19,12 +19,12 @@ import java.util.TreeSet;
  * but a simple mutex is used so there is no internal concurrency (requests
  * are serialized)
  */
-public class MemoryLinkStore extends LinkStore {
-  private static class LookupKey {
+public class MemoryLinkStore extends GraphStore {
+  private static class LinkLookupKey {
     final long id1;
     final long link_type;
     
-    public LookupKey(long id1, long link_type) {
+    public LinkLookupKey(long id1, long link_type) {
       super();
       this.id1 = id1;
       this.link_type = link_type;
@@ -32,10 +32,10 @@ public class MemoryLinkStore extends LinkStore {
 
     @Override
     public boolean equals(Object other) {
-      if (!(other instanceof LookupKey)) {
+      if (!(other instanceof LinkLookupKey)) {
         return false;
       }
-      LookupKey other2 = (LookupKey)other; 
+      LinkLookupKey other2 = (LinkLookupKey)other; 
       return id1 == other2.id1 && link_type == other2.link_type;
     }
 
@@ -78,10 +78,43 @@ public class MemoryLinkStore extends LinkStore {
     }
   }
   
+  /**
+   * Class for allocating IDs and storing objects
+   */
+  private static class NodeDB {
+    private long nextID; // Next id to allocate
+    Map<Long, Node> data = new HashMap<Long, Node>();
+    
+    /** Construct a new instance allocating ids from 1 */
+    NodeDB() {
+      this(1);
+    }
+    
+    NodeDB(long startID) {
+      this.nextID = startID;
+    }
+    
+    long allocateID() {
+      return nextID++;
+    }
+    
+    void reset(long startID) {
+      nextID = startID;
+      data.clear();
+    }
+  }
   
-  /** Simple hashmap implementation of LinkStore with nested maps: 
-   * dbid ->  (id1, assoc_type) -> timestamp -> link */
-  private final Map<String, Map<LookupKey, SortedSet<Link>>> linkdbs;
+  
+  /** Simple implementation of LinkStore with nested maps and a set of
+   * links sorted by timestamp: 
+   * dbid ->  (id1, assoc_type) -> links */
+  private final Map<String, Map<LinkLookupKey, SortedSet<Link>>> linkdbs;
+  
+  private final Map<String, NodeDB> nodedbs;
+  
+  /**
+   * Storage for objects
+   */
 
   private static final Comparator<Link> LINK_COMPARATOR = new LinkTimeStampComparator();
   
@@ -89,14 +122,17 @@ public class MemoryLinkStore extends LinkStore {
    * Create a new MemoryLinkStore instance with fresh data 
    */
   public MemoryLinkStore() {
-    this(new HashMap<String, Map<LookupKey, SortedSet<Link>>>());
+    this(new HashMap<String, Map<LinkLookupKey, SortedSet<Link>>>(),
+         new HashMap<String, NodeDB>());
   }
   
   /** 
    * Create a new MemoryLinkStore handle sharing data with existing instance 
    */
-  private MemoryLinkStore(Map<String, Map<LookupKey, SortedSet<Link>>> data) {
-    this.linkdbs = data;
+  private MemoryLinkStore(Map<String, Map<LinkLookupKey, SortedSet<Link>>> linkdbs,
+                          Map<String, NodeDB> nodedbs) {
+    this.linkdbs = linkdbs;
+    this.nodedbs = nodedbs;
   }
   
   /**
@@ -111,17 +147,25 @@ public class MemoryLinkStore extends LinkStore {
    */
   private SortedSet<Link> findLinkByKey(String dbid, long id1,
                                   long link_type, boolean createPath) {
-    Map<LookupKey, SortedSet<Link>> db = linkdbs.get(dbid);
+    Map<LinkLookupKey, SortedSet<Link>> db = linkdbs.get(dbid);
     if (db == null) {
-      // Autocreate db
-      db = new HashMap<LookupKey, SortedSet<Link>>();
-      linkdbs.put(dbid, db);
+      if (createPath) {
+        // Autocreate db
+        db = new HashMap<LinkLookupKey, SortedSet<Link>>();
+        linkdbs.put(dbid, db);
+      } else {
+        return null;
+      }
     }
-    LookupKey key = new LookupKey(id1, link_type);
+    LinkLookupKey key = new LinkLookupKey(id1, link_type);
     SortedSet<Link> links = db.get(key);
     if (links == null) {
-      links = newSortedLinkSet();
-      db.put(key, links);
+      if (createPath) {
+        links = newSortedLinkSet();
+        db.put(key, links);
+      } else {
+        return null;
+      }
     }
     return links;
   }
@@ -134,7 +178,7 @@ public class MemoryLinkStore extends LinkStore {
    *  this one
    */
   public MemoryLinkStore newHandle() {
-    return new MemoryLinkStore(linkdbs);
+    return new MemoryLinkStore(linkdbs, nodedbs);
   }
   
   @Override
@@ -311,6 +355,99 @@ public class MemoryLinkStore extends LinkStore {
              String.format("Lookup (%d, %d): %d visible, %d total", id1, link_type,
                  visible, linkSet.size()));*/
         return visible;
+      }
+    }
+  }
+
+  /**
+   * Should be called with lock on nodedbs held
+   * @param dbid
+   * @param autocreate
+   * @return
+   */
+  private NodeDB getNodeDB(String dbid, boolean autocreate) throws Exception {
+    NodeDB db = nodedbs.get(dbid);
+    if (db == null) {
+      if (autocreate) {
+        db = new NodeDB();
+        nodedbs.put(dbid, db);
+      } else {
+        /* Not initialized.. can't autocreate since we don't know the desired
+         * start ID */
+        throw new Exception("dbid " + dbid + " was not initialized");
+      }
+    }
+    return db;
+  }
+
+  @Override
+  public void resetNodeStore(String dbid, long startID) {
+    synchronized(nodedbs) {
+      NodeDB db = nodedbs.get(dbid);
+      if (db == null) {
+        nodedbs.put(dbid, new NodeDB(startID));
+      } else {
+        db.reset(startID);
+      }
+    }
+  }
+
+  @Override
+  public long addNode(String dbid, Node node) throws Exception {
+    synchronized(nodedbs) {
+      NodeDB db = getNodeDB(dbid, false);
+      node.id = db.allocateID();
+      // Put copy of node in map
+      Node prev = db.data.put(node.id, node.clone());
+      if (prev != null) {
+        throw new Exception("Internal error: node " + prev.toString()
+            + " already existing in dbid " + dbid);
+      }
+      return node.id;
+    }
+  }
+
+  @Override
+  public Node getNode(String dbid, int type, long id) throws Exception {
+    synchronized(nodedbs) {
+      NodeDB db = getNodeDB(dbid, false);
+      Node n = db.data.get(id);
+      if (n == null || n.type != type) {
+        // Shouldn't return lookup on type mismatch
+        return null;
+      } else {
+        return n.clone(); // return copy
+      }
+    }
+  }
+
+  @Override
+  public boolean updateNode(String dbid, Node node) throws Exception {
+    synchronized(nodedbs) {
+      NodeDB db = getNodeDB(dbid, false);
+      Node n = db.data.get(node.id);
+      if (n == null || n.type != node.type) {
+        // don't update on type mismatch
+        return false;
+      } else {
+        // Store copy
+        db.data.put(node.id, node.clone());
+        return true;
+      }
+    }
+  }
+
+  @Override
+  public boolean deleteNode(String dbid, int type, long id) throws Exception {
+    synchronized(nodedbs) {
+      NodeDB db = getNodeDB(dbid, false);
+      Node n = db.data.get(id);
+      if (n == null || n.type != type) {
+        // don't delete on type mismatch
+        return false;
+      } else {
+        db.data.remove(id);
+        return true;
       }
     }
   }

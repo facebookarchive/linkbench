@@ -64,6 +64,15 @@ Execute the following commands in the database:
       `version` bigint(20) unsigned NOT NULL DEFAULT '0',
       PRIMARY KEY (`id`,`link_type`)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+    
+    CREATE TABLE `nodetable` (
+        `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        `type` int(10) unsigned NOT NULL,
+        `version` bigint(20) unsigned NOT NULL,
+        `time` int(10) unsigned NOT NULL,
+        `data` mediumtext NOT NULL,
+        primary key(`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=latin1; 
 
 Configuring LinkBench:
 ----------------------

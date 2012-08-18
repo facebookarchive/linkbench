@@ -258,7 +258,6 @@ public class LinkBenchDriver {
     
     // create requesters
     for (int i = 0; i < nrequesters; i++) {
-      final int id = i;
       LinkStore store = initStore(Phase.REQUEST, i);
       LinkBenchRequest l = new LinkBenchRequest(store, props, latencyStats,
               progress, new Random(masterRandom.nextLong()), i, nrequesters);

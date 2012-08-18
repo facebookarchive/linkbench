@@ -67,6 +67,8 @@
           <include name="**/*Test*.class"/>
           <exclude name="**/LinkStoreHBaseGeneralAtomicityTesting.class"/>
           <exclude name="**/LinkStoreTestBase.class"/>
+          <exclude name="**/NodeStoreTestBase.class"/>
+          <exclude name="**/MySqlTestConfig.class"/>
         </fileset>
         <formatter type="xml"/>
       </batchtest>

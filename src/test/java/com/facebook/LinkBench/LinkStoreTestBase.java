@@ -278,6 +278,83 @@ public abstract class LinkStoreTestBase extends TestCase {
   }
   
   /**
+   * Regression test for bad handling of string escaping
+   */
+  @Test
+  public void testSqlInjection() throws IOException, Exception {
+    Link l = new Link(1, 1, 1, 1, 1, LinkStore.VISIBILITY_DEFAULT, 
+                "' asdfasdf".getBytes(), 1, 1);
+    byte updateData[] = "';\\".getBytes();
+    
+    testAddThenUpdate(l, updateData);
+  }
+
+  private void testAddThenUpdate(Link l, byte[] updateData) throws IOException,
+      Exception {
+    DummyLinkStore ls = getStoreHandle();
+    ls.addLink(testDB, l, true);
+    
+    Link l2 = ls.getLink(testDB, 1, 1, 1);
+    if (ls.isRealStore()) {
+      assertNotNull(l2);
+      assertTrue(l.equals(l2));
+    }
+    
+    l.data = updateData;
+    ls.updateLink(testDB, l, true);
+    l2 = ls.getLink(testDB, 1, 1, 1);
+    if (ls.isRealStore()) {
+      assertNotNull(l2);
+      assertTrue(l.equals(l2));
+    }
+  }
+  
+  /** Check handling of bytes 0-127 */
+  @Test
+  public void testBinary1() throws IOException, Exception {
+    binaryDataTest(0, 128);
+  }
+  
+  /** Check handling of bytes 160-256 */
+  @Test
+  public void testBinary2() throws IOException, Exception {
+    int start = 160;
+    binaryDataTest(start, 256-start);
+  }
+  
+  /** Check handling of bytes 128-159 */
+  @Test
+  public void testBinary3() throws IOException, Exception {
+    int start = 128;
+    binaryDataTest(start, 159-start);
+  }
+
+  /**
+   * Test insertion/update of binary data: insert binary string with
+   * bytes [startByte:startByte + dataMaxSize) and read back
+   * @throws IOException
+   * @throws Exception
+   */
+  private void binaryDataTest(int startByte, int dataMaxSize)
+      throws IOException, Exception {
+    byte data[] = new byte[dataMaxSize];
+    for (int i = 0; i < data.length; i++) {
+      byte b = (byte)((i + startByte) % 256);
+      data[i] = b;
+    }
+    Link l = new Link(1, 1, 1, 1, 1, LinkStore.VISIBILITY_DEFAULT, 
+                data, 1, 1);
+    // Different length and data
+    byte updateData[] = new byte[dataMaxSize/2];
+    for (int i = 0; i < updateData.length; i++) {
+      updateData[i] = (byte)((i + startByte ) % 256);
+    }
+    testAddThenUpdate(l, updateData);
+  }
+  
+  
+  
+  /**
    * Generic test for a loader using a wrapped LinkStore
    * implementation
    * @throws Exception 

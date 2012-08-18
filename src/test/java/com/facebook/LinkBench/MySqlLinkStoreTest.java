@@ -2,7 +2,6 @@ package com.facebook.LinkBench;
 
 import java.io.IOException;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
@@ -14,16 +13,7 @@ import java.util.Properties;
  * with permissions for a user/pass linkbench/linkbench to create tables, select,
  * insert, delete, etc.
  */
-public class MysqlStoreTest extends LinkStoreTestBase {
-
-
-  // Hardcoded parameters for now
-  private String host = "localhost";
-  private int port = 3306;
-  private String user = "linkbench";
-  private String pass = "linkbench";
-  private String linktable = "test_linktable";
-  private String counttable = "test_counttable";
+public class MySqlLinkStoreTest extends LinkStoreTestBase {
   
   private Connection conn;
   
@@ -44,33 +34,22 @@ public class MysqlStoreTest extends LinkStoreTestBase {
   
   protected Properties basicProps() {
     Properties props = super.basicProps();
-    props.setProperty("store", "com.facebook.LinkBench.LinkStoreMysql");
-    props.setProperty("host", host);
-    props.setProperty("port", Integer.toString(port));
-    props.setProperty("user", user);
-    props.setProperty("password", pass);
-    props.setProperty("tablename", linktable);
-    props.setProperty("counttable", counttable);
+    MySqlTestConfig.fillMySqlTestServerProps(props);
     return props;
   }
+
 
   @Override
   protected void initStore(Properties props) throws IOException, Exception {
     this.currProps = (Properties)props.clone();
-    Class.forName("com.mysql.jdbc.Driver").newInstance();
     if (conn != null) {
       conn.close();
     }
-    conn = DriverManager.getConnection(
-                        "jdbc:mysql://"+ host + ":" + port + "/" + testDB +
-                        "?elideSetAutoCommits=true" +
-                        "&useLocalTransactionState=true" +
-                        "&allowMultiQueries=true" +
-                        "&useLocalSessionState=true",
-                        user, pass);
+    conn = MySqlTestConfig.createConnection(testDB);
     dropTestTables();
     createTestTables();
   }
+
   
 
   @Override
@@ -104,7 +83,7 @@ public class MysqlStoreTest extends LinkStoreTestBase {
         "KEY `id2_vis` (`id2`,`visibility`)," +
         "KEY `id1_type` (`id1`,`link_type`,`visibility`,`time`,`version`,`data`)" +
         ") ENGINE=InnoDB DEFAULT CHARSET=latin1;", 
-        testDB, linktable));
+        testDB, MySqlTestConfig.linktable));
     stmt.executeUpdate(String.format("CREATE TABLE `%s`.`%s` (" +
         "`id` bigint(20) unsigned NOT NULL DEFAULT '0'," +
         "`id_type` int(10) unsigned NOT NULL DEFAULT '0'," +
@@ -114,14 +93,14 @@ public class MysqlStoreTest extends LinkStoreTestBase {
         "`version` bigint(20) unsigned NOT NULL DEFAULT '0'," +
         "PRIMARY KEY (`id`,`link_type`)" +
         ") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
-        testDB, counttable));
+        testDB, MySqlTestConfig.counttable));
   }
 
   private void dropTestTables() throws SQLException {
     Statement stmt = conn.createStatement();
     stmt.executeUpdate(String.format("DROP TABLE IF EXISTS `%s`.`%s`;",
-                       testDB, linktable));
+        testDB, MySqlTestConfig.linktable));
     stmt.executeUpdate(String.format("DROP TABLE IF EXISTS `%s`.`%s`;",
-                       testDB, counttable));
+        testDB, MySqlTestConfig.counttable));
   }
 }
