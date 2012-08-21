@@ -15,7 +15,7 @@ public class MemoryLinkStoreTest extends LinkStoreTestBase {
   @Override
   protected Properties basicProps() {
     Properties props = super.basicProps();
-    props.setProperty("store", "com.facebook.LinkBench.MemoryLinkStore");
+    props.setProperty(Config.LINKSTORE_CLASS, MemoryLinkStore.class.getName());
     return props;
   }
   

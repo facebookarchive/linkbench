@@ -17,14 +17,15 @@ public class MySqlTestConfig {
   static String nodetable = "test_nodetable";
   
   public static void fillMySqlTestServerProps(Properties props) {
-    props.setProperty("store", "com.facebook.LinkBench.LinkStoreMysql");
-    props.setProperty("host", host);
-    props.setProperty("port", Integer.toString(port));
-    props.setProperty("user", user);
-    props.setProperty("password", pass);
-    props.setProperty("tablename", linktable);
-    props.setProperty("counttable", counttable);
-    props.setProperty("nodetable", nodetable);
+    props.setProperty(Config.LINKSTORE_CLASS, LinkStoreMysql.class.getName());
+    props.setProperty(Config.NODESTORE_CLASS, LinkStoreMysql.class.getName());
+    props.setProperty(LinkStoreMysql.CONFIG_HOST, host);
+    props.setProperty(LinkStoreMysql.CONFIG_PORT, Integer.toString(port));
+    props.setProperty(LinkStoreMysql.CONFIG_USER, user);
+    props.setProperty(LinkStoreMysql.CONFIG_PASSWORD, pass);
+    props.setProperty(Config.LINK_TABLE, linktable);
+    props.setProperty(Config.COUNT_TABLE, counttable);
+    props.setProperty(Config.NODE_TABLE, nodetable);
   }
 
   static Connection createConnection(String testDB) 

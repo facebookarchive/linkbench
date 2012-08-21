@@ -18,13 +18,20 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 public class LinkStoreMysql extends GraphStore {
-  public static final int MYSQL_DEFAULT_BULKINSERT_SIZE = 1024;
+  
+  /* MySql database server configuration keys */
+  public static final String CONFIG_HOST = "host";
+  public static final String CONFIG_PORT = "port";
+  public static final String CONFIG_USER = "user";
+  public static final String CONFIG_PASSWORD = "password";
+  public static final String CONFIG_BULK_INSERT_BATCH = "mysql_bulk_insert_batch";
+  public static final String CONFIG_DISABLE_BINLOG_LOAD = "mysql_disable_binlog_load";
+  
+  public static final int DEFAULT_BULKINSERT_SIZE = 1024;
   
   private static final boolean INTERNAL_TESTING = false;
-
   
-  
-  String assoctable;
+  String linktable;
   String counttable;
   String nodetable;
   
@@ -38,7 +45,7 @@ public class LinkStoreMysql extends GraphStore {
   
   private Phase phase;
 
-  int bulkInsertSize = MYSQL_DEFAULT_BULKINSERT_SIZE;
+  int bulkInsertSize = DEFAULT_BULKINSERT_SIZE;
   // Optional optimization: disable binary logging
   boolean disableBinLogForLoad = false;
 
@@ -55,7 +62,7 @@ public class LinkStoreMysql extends GraphStore {
 
   public void initialize(Properties props, Phase currentPhase,
     int threadId) throws IOException, Exception {
-    counttable = props.getProperty("counttable");
+    counttable = props.getProperty(Config.COUNT_TABLE);
     if (counttable == null || counttable.equals("")) {
       String msg = "Error! counttable is empty/ not found!"
           + "Please check configuration file.";
@@ -63,7 +70,7 @@ public class LinkStoreMysql extends GraphStore {
       throw new RuntimeException(msg);
     }
     
-    nodetable = props.getProperty("nodetable");
+    nodetable = props.getProperty(Config.NODE_TABLE);
     if (nodetable.equals("")) {
       // For now, don't assume that nodetable is provided
       String msg = "Error! nodetable is empty!"
@@ -72,21 +79,21 @@ public class LinkStoreMysql extends GraphStore {
       throw new RuntimeException(msg);
     }
     
-    host = props.getProperty("host");
-    user = props.getProperty("user");
-    pwd = props.getProperty("password");
-    port = props.getProperty("port");
+    host = props.getProperty(CONFIG_HOST);
+    user = props.getProperty(CONFIG_USER);
+    pwd = props.getProperty(CONFIG_PASSWORD);
+    port = props.getProperty(CONFIG_PORT);
     if (port == null || port.equals("")) port = "3306"; //use default port
     debuglevel = ConfigUtil.getDebugLevel(props);
     phase = currentPhase;
 
-    if (props.containsKey("mysql_bulk_insert_size")) {
+    if (props.containsKey(CONFIG_BULK_INSERT_BATCH)) {
       bulkInsertSize = Integer.parseInt(
-                        props.getProperty("mysql_bulk_insert_batch"));
+                        props.getProperty(CONFIG_BULK_INSERT_BATCH));
     }
-    if (props.containsKey("mysql_disable_binlog_load")) {
+    if (props.containsKey(CONFIG_DISABLE_BINLOG_LOAD)) {
       disableBinLogForLoad = Boolean.parseBoolean(
-                        props.getProperty("mysql_disable_binlog_load"));
+                        props.getProperty(CONFIG_DISABLE_BINLOG_LOAD));
     }
     
     // connect
@@ -101,7 +108,7 @@ public class LinkStoreMysql extends GraphStore {
       System.exit(1);
     }
 
-    assoctable = props.getProperty("tablename");
+    linktable = props.getProperty(Config.LINK_TABLE);
   }
 
   // connects to test database
@@ -270,7 +277,7 @@ public class LinkStoreMysql extends GraphStore {
     if (update_data) {
       // query to update link data (the first query only updates visibility)
       // TODO: why is this necessary?
-      String updatedata = "UPDATE " + dbid + "." + assoctable +
+      String updatedata = "UPDATE " + dbid + "." + linktable +
                   " SET id1_type = " + l.id1_type +
                   ", id2_type = " + l.id2_type +
                   ", visibility = " + LinkStore.VISIBILITY_DEFAULT +
@@ -289,7 +296,7 @@ public class LinkStoreMysql extends GraphStore {
     }
 
     if (INTERNAL_TESTING) {
-      testCount(stmt, dbid, assoctable, counttable, l.id1, l.link_type);
+      testCount(stmt, dbid, linktable, counttable, l.id1, l.link_type);
     }
 
     conn.commit();
@@ -310,7 +317,7 @@ public class LinkStoreMysql extends GraphStore {
 
     // query to insert a link;
     StringBuilder sb = new StringBuilder();
-    sb.append("INSERT INTO " + dbid + "." + assoctable +
+    sb.append("INSERT INTO " + dbid + "." + linktable +
                     "(id1, id1_type, id2, id2_type, link_type, " +
                     "visibility, data, time, version) VALUES ");
     boolean first = true;
@@ -358,7 +365,7 @@ public class LinkStoreMysql extends GraphStore {
     // In case of VISIBILITY_DEFAULT, later we need to mark the link as
     // hidden, and update counttable.
     String select = "SELECT visibility" +
-                    " FROM " + dbid + "." + assoctable +
+                    " FROM " + dbid + "." + linktable +
                     " WHERE id1 = " + id1 +
                     " AND id2 = " + id2 +
                     " AND link_type = " + link_type + ";";
@@ -389,13 +396,13 @@ public class LinkStoreMysql extends GraphStore {
       String delete;
 
       if (!expunge) {
-        delete = "UPDATE " + dbid + "." + assoctable +
+        delete = "UPDATE " + dbid + "." + linktable +
                  " SET visibility = " + VISIBILITY_HIDDEN +
                  " WHERE id1 = " + id1 +
                  " AND id2 = " + id2 +
                  " AND link_type = " + link_type + ";";
       } else {
-        delete = "DELETE FROM " + dbid + "." + assoctable +
+        delete = "DELETE FROM " + dbid + "." + linktable +
                  " WHERE id1 = " + id1 +
                  " AND id2 = " + id2 +
                  " AND link_type = " + link_type + ";";
@@ -439,7 +446,7 @@ public class LinkStoreMysql extends GraphStore {
     }
 
     if (INTERNAL_TESTING) {
-      testCount(stmt, dbid, assoctable, counttable, id1, link_type);
+      testCount(stmt, dbid, linktable, counttable, id1, link_type);
     }
 
     conn.commit();
@@ -459,7 +466,7 @@ public class LinkStoreMysql extends GraphStore {
     throws Exception {
     String query = " select id1, id2, link_type, id1_type, id2_type," +
     		           " visibility, data, time, " +
-                   " version from " + dbid + "." + assoctable +
+                   " version from " + dbid + "." + linktable +
                    " where id1 = " + id1 + " and id2 = " + id2 +
                    " and link_type = " + link_type + "; commit;";
 
@@ -500,7 +507,7 @@ public class LinkStoreMysql extends GraphStore {
     throws Exception {
     String query = " select id1, id2, link_type, id1_type, id2_type," +
     		           " visibility, data, time," +
-                   " version from " + dbid + "." + assoctable +
+                   " version from " + dbid + "." + linktable +
                    " where id1 = " + id1 + " and link_type = " + link_type +
                    " and time >= " + minTimestamp +
                    " and time <= " + maxTimestamp +

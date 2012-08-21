@@ -34,7 +34,7 @@ public class ConfigUtil {
     if (props == null) {
       return Level.DEBUG;
     }
-    String levStr = props.getProperty("debuglevel");
+    String levStr = props.getProperty(Config.DEBUGLEVEL);
     
     if (levStr == null) {
       return Level.DEBUG;

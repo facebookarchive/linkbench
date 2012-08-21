@@ -78,7 +78,7 @@ public class LinkBenchDriver {
     LinkStore newstore = null;
 
     if (store == null) {
-      store = props.getProperty("store");
+      store = props.getProperty(Config.LINKSTORE_CLASS);
       logger.info("Using LinkStore implementation: " + store);
     }
 
@@ -123,7 +123,7 @@ public class LinkBenchDriver {
 
     // load data
 
-    int nloaders = Integer.parseInt(props.getProperty("loaders"));
+    int nloaders = Integer.parseInt(props.getProperty(Config.NUM_LOADERS));
     int nthreads = nloaders + 1;
     List<LinkBenchLoad> loaders = new LinkedList<LinkBenchLoad>();
     LinkBenchLatency latencyStats = new LinkBenchLatency(nthreads);
@@ -132,15 +132,15 @@ public class LinkBenchDriver {
     BlockingQueue<LoadChunk> chunk_q = new LinkedBlockingQueue<LoadChunk>();
     
     // max id1 to generate
-    long maxid1 = Long.parseLong(props.getProperty("maxid1"));
+    long maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
     // id1 at which to start
-    long startid1 = Long.parseLong(props.getProperty("startid1"));
+    long startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
     
     // Create loaders
     logger.info("Starting loaders " + nloaders);
     logger.debug("Bulk Load setting: " + bulkLoad);
     
-    Random masterRandom = createMasterRNG(props, "load_random_seed");
+    Random masterRandom = createMasterRNG(props, Config.LOAD_RANDOM_SEED);
     
     LoadProgress loadTracker = new LoadProgress(logger, maxid1 - startid1); 
     for (int i = 0; i < nloaders; i++) {
@@ -159,7 +159,8 @@ public class LinkBenchDriver {
     long loadtime = concurrentExec(loaders);
 
     // compute total #links loaded
-    int nlinks_default = Integer.parseInt(props.getProperty("nlinks_default"));
+    int nlinks_default = Integer.parseInt(props.getProperty(
+                                            Config.NLINKS_DEFAULT));
 
     long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
 
@@ -217,7 +218,7 @@ public class LinkBenchDriver {
     // load balancing, since queue is FIFO and later chunks tend to be larger
     
     int chunkSize = Integer.parseInt(
-                      props.getProperty("loader_chunk_size", "2048"));
+                      props.getProperty(Config.LOADER_CHUNK_SIZE, "2048"));
     long chunk_num = 0;
     ArrayList<LoadChunk> stack = new ArrayList<LoadChunk>();
     for (long id1 = startid1; id1 < maxid1; id1 += chunkSize) {
@@ -244,7 +245,8 @@ public class LinkBenchDriver {
     }
 
     // config info for requests
-    int nrequesters = Integer.parseInt(props.getProperty("requesters"));
+    int nrequesters = Integer.parseInt(props.getProperty(
+                                            Config.NUM_REQUESTERS));
     if (nrequesters == 0) {
       logger.info("NO REQUEST PHASE CONFIGURED. ");
       return;
@@ -254,7 +256,7 @@ public class LinkBenchDriver {
 
     RequestProgress progress = LinkBenchRequest.createProgress(logger, props);
     
-    Random masterRandom = createMasterRNG(props, "request_random_seed");
+    Random masterRandom = createMasterRNG(props, Config.REQUEST_RANDOM_SEED);
     
     // create requesters
     for (int i = 0; i < nrequesters; i++) {

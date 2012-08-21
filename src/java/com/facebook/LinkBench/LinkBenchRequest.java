@@ -11,7 +11,7 @@ import org.apache.log4j.Logger;
 import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 
 public class LinkBenchRequest implements Runnable {
-  
+ 
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   Properties props;
   LinkStore store;
@@ -92,12 +92,12 @@ public class LinkBenchRequest implements Runnable {
           + requesterID + "/" + nrequesters);
     }
     
-    nrequests = Long.parseLong(props.getProperty("requests"));
-    requestrate = Long.parseLong(props.getProperty("requestrate", "0"));
+    nrequests = Long.parseLong(props.getProperty(Config.NUM_REQUESTS));
+    requestrate = Long.parseLong(props.getProperty(Config.REQUEST_RATE, "0"));
     
-    maxtime = Long.parseLong(props.getProperty("maxtime"));
-    maxid1 = Long.parseLong(props.getProperty("maxid1"));
-    startid1 = Long.parseLong(props.getProperty("startid1"));
+    maxtime = Long.parseLong(props.getProperty(Config.MAX_TIME));
+    maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
+    startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
 
     // math functions may cause problems for id1 = 0. Start at 1.
     if (startid1 <= 0) {
@@ -110,21 +110,21 @@ public class LinkBenchRequest implements Runnable {
       logger.info("Testing single row assoc read.");
     }
 
-    datasize = Integer.parseInt(props.getProperty("datasize"));
+    datasize = Integer.parseInt(props.getProperty(Config.LINK_DATASIZE));
     debuglevel = ConfigUtil.getDebugLevel(props);
-    dbid = props.getProperty("dbid");
+    dbid = props.getProperty(Config.DBID);
 
-    pc_addlink = Double.parseDouble(props.getProperty("addlink"));
-    pc_deletelink = pc_addlink + Double.parseDouble(props.getProperty("deletelink"));
-    pc_updatelink = pc_deletelink + Double.parseDouble(props.getProperty("updatelink"));
-    pc_countlink = pc_updatelink + Double.parseDouble(props.getProperty("countlink"));
-    pc_getlink = pc_countlink + Double.parseDouble(props.getProperty("getlink"));
-    pc_getlinklist = pc_getlink + Double.parseDouble(props.getProperty("getlinklist"));
+    pc_addlink = Double.parseDouble(props.getProperty(Config.PR_ADD_LINK));
+    pc_deletelink = pc_addlink + Double.parseDouble(props.getProperty(Config.PR_DELETE_LINK));
+    pc_updatelink = pc_deletelink + Double.parseDouble(props.getProperty(Config.PR_UPDATE_LINK));
+    pc_countlink = pc_updatelink + Double.parseDouble(props.getProperty(Config.PR_COUNT_LINKS));
+    pc_getlink = pc_countlink + Double.parseDouble(props.getProperty(Config.PR_GET_LINK));
+    pc_getlinklist = pc_getlink + Double.parseDouble(props.getProperty(Config.PR_GET_LINK_LIST));
 
-    wr_distrfunc = Integer.parseInt(props.getProperty("write_function"));
-    wr_distrconfig = Integer.parseInt(props.getProperty("write_config"));
-    rd_distrfunc = Integer.parseInt(props.getProperty("read_function"));
-    rd_distrconfig = Integer.parseInt(props.getProperty("read_config"));
+    wr_distrfunc = Integer.parseInt(props.getProperty(Config.WRITE_FUNCTION));
+    wr_distrconfig = Integer.parseInt(props.getProperty(Config.WRITE_CONFIG));
+    rd_distrfunc = Integer.parseInt(props.getProperty(Config.READ_FUNCTION));
+    rd_distrconfig = Integer.parseInt(props.getProperty(Config.READ_CONFIG));
 
 
     if (Math.abs(pc_getlinklist - 100.0) > 1e-5) {//compare real numbers
@@ -135,27 +135,27 @@ public class LinkBenchRequest implements Runnable {
     numfound = 0;
     numnotfound = 0;
 
-    long displayfreq = Long.parseLong(props.getProperty("displayfreq"));
-    String progressfreq = props.getProperty("progressfreq");
+    long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
+    String progressfreq = props.getProperty(Config.PROGRESS_FREQ);
     if (progressfreq == null) {
       progressfreq_ms = 6000L;
     } else {
       progressfreq_ms = Long.parseLong(progressfreq) * 1000L;
     }
-    int maxsamples = Integer.parseInt(props.getProperty("maxsamples"));
+    int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
     stats = new LinkBenchStats(requesterID, displayfreq, maxsamples);
     
     // random number generator for id2
-    randomid2max = Long.parseLong(props.getProperty("randomid2max"));
+    randomid2max = Long.parseLong(props.getProperty(Config.RANDOM_ID2_MAX));
 
     // configuration for generating id2
-    id2gen_config = Integer.parseInt(props.getProperty("id2gen_config"));
+    id2gen_config = Integer.parseInt(props.getProperty(Config.ID2GEN_CONFIG));
 
     link = new Link();
 
-    nlinks_func = Integer.parseInt(props.getProperty("nlinks_func"));
-    nlinks_config = Integer.parseInt(props.getProperty("nlinks_config"));
-    nlinks_default = Integer.parseInt(props.getProperty("nlinks_default"));
+    nlinks_func = Integer.parseInt(props.getProperty(Config.NLINKS_FUNC));
+    nlinks_config = Integer.parseInt(props.getProperty(Config.NLINKS_CONFIG));
+    nlinks_default = Integer.parseInt(props.getProperty(Config.NLINKS_DEFAULT));
     if (nlinks_func == -2) {//real distribution has its own initialization
       try {
         //in case there is no load phase, real distribution
@@ -618,10 +618,10 @@ public class LinkBenchRequest implements Runnable {
 
   public static RequestProgress createProgress(Logger logger,
        Properties props) {
-    long total_requests = Long.parseLong(props.getProperty("requests"))
-                      * Long.parseLong(props.getProperty("requesters"));
+    long total_requests = Long.parseLong(props.getProperty(Config.NUM_REQUESTS))
+                      * Long.parseLong(props.getProperty(Config.NUM_REQUESTERS));
     return new RequestProgress(logger, total_requests,
-        Long.parseLong(props.getProperty("maxtime")));
+        Long.parseLong(props.getProperty(Config.MAX_TIME)));
   }
 }
 

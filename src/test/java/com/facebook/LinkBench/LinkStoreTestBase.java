@@ -71,46 +71,46 @@ public abstract class LinkStoreTestBase extends TestCase {
    */
   protected Properties basicProps() {
     Properties props = new Properties();
-    props.setProperty("dbid", testDB);
+    props.setProperty(Config.DBID, testDB);
     return props;
   }
   
   private void fillLoadProps(Properties props, long startId, long idCount,
       int linksPerId) {
-    props.setProperty("startid1",Long.toString(startId));
-    props.setProperty("maxid1", Long.toString(startId + idCount));
-    props.setProperty("randomid2max", "0");
-    props.setProperty("datasize", "100");
-    props.setProperty("nlinks_func", "-3"); // Fixed number of rows
-    props.setProperty("nlinks_config", "0"); // ignored
-    props.setProperty("nlinks_default", Integer.toString(linksPerId));
-    props.setProperty("displayfreq", "1800");
-    props.setProperty("maxsamples", "10000");
+    props.setProperty(Config.MIN_ID,Long.toString(startId));
+    props.setProperty(Config.MAX_ID, Long.toString(startId + idCount));
+    props.setProperty(Config.RANDOM_ID2_MAX, "0");
+    props.setProperty(Config.LINK_DATASIZE, "100");
+    props.setProperty(Config.NLINKS_FUNC, "-3"); // Fixed number of rows
+    props.setProperty(Config.NLINKS_CONFIG, "0"); // ignored
+    props.setProperty(Config.NLINKS_DEFAULT, Integer.toString(linksPerId));
+    props.setProperty(Config.DISPLAY_FREQ, "1800");
+    props.setProperty(Config.MAX_STAT_SAMPLES, "10000");
   }
 
   private void fillReqProps(Properties props, long startId, long idCount,
       int requests, long timeLimit, double p_addlink, double p_deletelink,
       double p_updatelink, double p_countlink, double p_getlink,
       double p_getlinklist) {
-    props.setProperty("startid1",Long.toString(startId));
-    props.setProperty("maxid1", Long.toString(startId + idCount));
-    props.setProperty("requests", Long.toString(requests));
-    props.setProperty("maxtime", Long.toString(timeLimit));
+    props.setProperty(Config.MIN_ID,Long.toString(startId));
+    props.setProperty(Config.MAX_ID, Long.toString(startId + idCount));
+    props.setProperty(Config.NUM_REQUESTS, Long.toString(requests));
+    props.setProperty(Config.MAX_TIME, Long.toString(timeLimit));
     
-    props.setProperty("randomid2max", "0");
-    props.setProperty("id2gen_config", "0");
+    props.setProperty(Config.RANDOM_ID2_MAX, "0");
+    props.setProperty(Config.ID2GEN_CONFIG, "0");
     
-    props.setProperty("addlink", Double.toString(p_addlink));
-    props.setProperty("deletelink", Double.toString(p_deletelink));
-    props.setProperty("updatelink", Double.toString(p_updatelink));
-    props.setProperty("countlink", Double.toString(p_countlink));
-    props.setProperty("getlink", Double.toString(p_getlink));
-    props.setProperty("getlinklist", Double.toString(p_getlinklist));
+    props.setProperty(Config.PR_ADD_LINK, Double.toString(p_addlink));
+    props.setProperty(Config.PR_DELETE_LINK, Double.toString(p_deletelink));
+    props.setProperty(Config.PR_UPDATE_LINK, Double.toString(p_updatelink));
+    props.setProperty(Config.PR_COUNT_LINKS, Double.toString(p_countlink));
+    props.setProperty(Config.PR_GET_LINK, Double.toString(p_getlink));
+    props.setProperty(Config.PR_GET_LINK_LIST, Double.toString(p_getlinklist));
     
-    props.setProperty("write_function", "-1");
-    props.setProperty("write_config", "0");
-    props.setProperty("read_function", "-1");
-    props.setProperty("read_config", "0");
+    props.setProperty(Config.WRITE_FUNCTION, "-1");
+    props.setProperty(Config.WRITE_CONFIG, "0");
+    props.setProperty(Config.READ_FUNCTION, "-1");
+    props.setProperty(Config.READ_CONFIG, "0");
   }
 
   /** 
@@ -550,8 +550,8 @@ public abstract class LinkStoreTestBase extends TestCase {
     
     /* Load up queue with work */
     BlockingQueue<LoadChunk>  chunk_q = new LinkedBlockingQueue<LoadChunk>();
-    long startId = Long.parseLong(props.getProperty("startid1"));
-    long idCount = Long.parseLong(props.getProperty("maxid1")) - startId;
+    long startId = Long.parseLong(props.getProperty(Config.MIN_ID));
+    long idCount = Long.parseLong(props.getProperty(Config.MAX_ID)) - startId;
     
     int chunkSize = 128;
     int seq = 0;

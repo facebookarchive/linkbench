@@ -21,7 +21,7 @@ public abstract class NodeStoreTestBase extends TestCase {
  
   protected Properties basicProps() {
     Properties props = new Properties();
-    props.setProperty("dbid", testDB);
+    props.setProperty(Config.DBID, testDB);
     return props;
   }
   

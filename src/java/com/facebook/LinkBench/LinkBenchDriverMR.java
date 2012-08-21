@@ -76,7 +76,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     LinkStore newstore = null;
 
     if (store == null) {
-      store = props.getProperty("store");
+      store = props.getProperty(Config.LINKSTORE_CLASS);
       logger.info("Using store class: " + store);
     }
 
@@ -312,8 +312,8 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       LinkStore store = initStore(Phase.LOAD, loaderid.get());
       LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders.get());
 
-      long maxid1 = Long.parseLong(props.getProperty("maxid1"));
-      long startid1 = Long.parseLong(props.getProperty("startid1"));
+      long maxid1 = Long.parseLong(Config.MAX_ID);
+      long startid1 = Long.parseLong(Config.MIN_ID);
       
       LoadProgress prog_tracker = new LoadProgress(
           Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER), maxid1 - startid1);
@@ -437,13 +437,14 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    * main route of the LOAD phase
    */
   private void load() throws IOException, InterruptedException {
-    boolean loaddata = Boolean.parseBoolean(props.getProperty("loaddata"));
+    boolean loaddata = Boolean.parseBoolean(
+            props.getProperty(Config.LOAD_DATA));
     if (!loaddata) {
       logger.info("Skipping load data per the config");
       return;
     }
 
-    int nloaders = Integer.parseInt(props.getProperty("loaders"));
+    int nloaders = Integer.parseInt(props.getProperty(Config.NUM_LOADERS));
     final JobConf jobconf = createJobConf(LOAD, nloaders);
     FileSystem fs = setupInputFiles(jobconf, nloaders);
 
@@ -454,9 +455,10 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       long loadtime = (System.currentTimeMillis() - starttime);
 
       // compute total #links loaded
-      long maxid1 = Long.parseLong(props.getProperty("maxid1"));
-      long startid1 = Long.parseLong(props.getProperty("startid1"));
-      int nlinks_default = Integer.parseInt(props.getProperty("nlinks_default"));
+      long maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
+      long startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
+      int nlinks_default = Integer.parseInt(
+                             props.getProperty(Config.NLINKS_DEFAULT));
       long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
       long actuallinks = readOutput(fs, jobconf);
 
@@ -474,7 +476,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    */
   private void sendrequests() throws IOException, InterruptedException {
     // config info for requests
-    int nrequesters = Integer.parseInt(props.getProperty("requesters"));
+    int nrequesters = Integer.parseInt(props.getProperty(Config.NUM_REQUESTERS));
     final JobConf jobconf = createJobConf(REQUEST, nrequesters);
     FileSystem fs = setupInputFiles(jobconf, nrequesters);
 
@@ -510,14 +512,16 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     props.load(new FileInputStream(args[0]));
 
     // get name or temporary directory
-    String tempdirname = props.getProperty("tempdir");
+    String tempdirname = props.getProperty(Config.TEMPDIR);
     if (tempdirname != null) {
       TMP_DIR = new Path(tempdirname);
     }
     // whether report progress through reporter
-    REPORT_PROGRESS = Boolean.parseBoolean(props.getProperty("reportprogress"));
+    REPORT_PROGRESS = Boolean.parseBoolean(
+                props.getProperty(Config.MAPRED_REPORT_PROGRESS));
     // whether store mapper input in files
-    USE_INPUT_FILES = Boolean.parseBoolean(props.getProperty("useinputfiles"));
+    USE_INPUT_FILES = Boolean.parseBoolean(
+                props.getProperty(Config.MAPRED_USE_INPUT_FILES));
 
     load();
     sendrequests();

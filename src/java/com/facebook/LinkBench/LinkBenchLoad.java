@@ -107,8 +107,8 @@ public class LinkBenchLoad implements Runnable {
     /*
      * Load settings from properties
      */
-    maxid1 = Long.parseLong(props.getProperty("maxid1"));
-    startid1 = Long.parseLong(props.getProperty("startid1"));
+    maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
+    startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
 
     // math functions may cause problems for id1 = 0. Start at 1.
     if (startid1 <= 0) {
@@ -116,11 +116,11 @@ public class LinkBenchLoad implements Runnable {
     }
 
     debuglevel = ConfigUtil.getDebugLevel(props);
-    datasize = Integer.parseInt(props.getProperty("datasize"));
+    datasize = Integer.parseInt(props.getProperty(Config.LINK_DATASIZE));
 
-    nlinks_func = Integer.parseInt(props.getProperty("nlinks_func"));
-    nlinks_config = Integer.parseInt(props.getProperty("nlinks_config"));
-    nlinks_default = Integer.parseInt(props.getProperty("nlinks_default"));
+    nlinks_func = Integer.parseInt(props.getProperty(Config.NLINKS_FUNC));
+    nlinks_config = Integer.parseInt(props.getProperty(Config.NLINKS_CONFIG));
+    nlinks_default = Integer.parseInt(props.getProperty(Config.NLINKS_DEFAULT));
     if (nlinks_func == -2) {//real distribution has it own initialization
       try {
         //load statistical data into RealDistribution
@@ -131,10 +131,10 @@ public class LinkBenchLoad implements Runnable {
       }
     }
 
-    displayfreq = Long.parseLong(props.getProperty("displayfreq"));
-    maxsamples = Integer.parseInt(props.getProperty("maxsamples"));
+    displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
+    maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
     
-    dbid = props.getProperty("dbid");
+    dbid = props.getProperty(Config.DBID);
     
 
     /*
@@ -145,12 +145,7 @@ public class LinkBenchLoad implements Runnable {
     diffShuffle = 0;
     stats = new LinkBenchStats(loaderID, displayfreq, maxsamples);
     
-    
-    /*
-     * Setup random number generators
-     */
-    // random number generator for id2 if needed
-    randomid2max = Long.parseLong(props.getProperty("randomid2max"));
+    randomid2max = Long.parseLong(props.getProperty(Config.RANDOM_ID2_MAX));
   }
 
   public long getLinksLoaded() {

@@ -27,6 +27,12 @@ class RealDistribution {
   final static long[] WRITE_SHUFFLER_PARAMS = {13, 7};
   final static long[] READ_SHUFFLER_PARAMS = {13, 7};
 
+  public static enum DistributionType {
+    LINKS,
+    READS,
+    WRITES
+  }
+
   //helper class to store (value, probability)
   static class Point implements Comparable<Point> {
     int value;
@@ -134,9 +140,11 @@ class RealDistribution {
    * [40%, 40%+20%, 40%+20%+10%] = [40%, 60%, 80%], then just need to
    * return the last cumulative sum (80%).
    */
-  static double getArea(String type) {
-    if (type.equals("nreads")) return nreads_cs[nreads_cs.length - 1];
-    else if (type.equals("nwrites")) return nwrites_cs[nwrites_cs.length - 1];
+  static double getArea(DistributionType type) {
+    if (type == DistributionType.READS)
+        return nreads_cs[nreads_cs.length - 1];
+    else if (type == DistributionType.WRITES)
+        return nwrites_cs[nwrites_cs.length - 1];
     else return 0;
   }
 
@@ -154,10 +162,11 @@ class RealDistribution {
   }
 
   //convert CDF from ArrayList<Point> to Map
-  static NavigableMap<Integer, Double> getCDF(String name) {
-    ArrayList<Point> points = name.equals("nlinks") ? nlinks_cdf :
-      name.equals("nreads") ? nreads_cdf :
-      name.equals("nwrites") ? nwrites_cdf : null;
+  static NavigableMap<Integer, Double> getCDF(DistributionType dist) {
+    ArrayList<Point> points = 
+      dist == DistributionType.LINKS ? nlinks_cdf :
+      dist == DistributionType.READS? nreads_cdf :
+      dist == DistributionType.WRITES ? nwrites_cdf : null;
     if (points == null) return null;
 
     TreeMap<Integer, Double> map = new TreeMap<Integer, Double>();
@@ -185,8 +194,7 @@ class RealDistribution {
    * value and the cumulative distribution at that value i.e. <x, CDF(x)>.
    */
   private static void getStatisticalData(Properties props) throws Exception {
-    String propName = "data_file";
-    String filename = props.getProperty(propName);
+    String filename = props.getProperty(Config.DISTRIBUTION_DATA_FILE);
     
     // If relative path, should be relative to linkbench home directory
     String fileAbsPath;
@@ -195,7 +203,8 @@ class RealDistribution {
     } else {
       String linkBenchHome = ConfigUtil.findLinkBenchHome();
       if (linkBenchHome == null) {
-        throw new Exception("Data file config property " + propName
+        throw new Exception("Data file config property "
+            + Config.DISTRIBUTION_DATA_FILE
             + " was specified using a relative path, but linkbench home"
             + " directory was not specified through environment var "
             + ConfigUtil.linkbenchHomeEnvVar);
