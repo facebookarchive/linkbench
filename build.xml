@@ -1,4 +1,6 @@
 <project name="FacebookLinkBench" default="dist" basedir=".">
+  <property name="linkbench.version" value="0.1"/>
+
     <description>
         simple example build file
     </description>
@@ -11,6 +13,9 @@
   <property name="test.rawoutput"  location="${test.output}/raw"/>
   <property name="test.tmp"  location="${test.output}/tmp"/>
   <property name="test.report"  location="${test.output}/report"/>
+  <property name="linkbench.jar" 
+            value="${dist}/FacebookLinkBench-${linkbench.version}.jar"/>
+  <property name="linkbench.latest.jar" value="${dist}/FacebookLinkBench.jar"/>
 
   <!-- By default, debugging symbols are not created. This
        can be overridden with command line property -->
@@ -47,21 +52,26 @@
     <!-- Create the distribution directory -->
     <mkdir dir="${dist}"/>
 
-    <!-- Put everything in ${build} into the MyProject-${DSTAMP}.jar file -->
-    <jar jarfile="${dist}/FacebookLinkBench-${DSTAMP}.jar" basedir="${build}"/>
+    <!-- Put everything in ${build} into the jar file -->
+    <jar jarfile="${linkbench.jar}" basedir="${build}"/>
+
+    <!-- Symlink latest -->
+    <delete file="${linkbench.latest.jar}" />
+    <symlink link="${linkbench.latest.jar}" resource="${linkbench.jar}" />
   </target>
 
   <target name="test" description="Execute unit tests"
-        depends="compile">
+        depends="dist">
     <mkdir dir="${test.rawoutput}"/>
-    <junit printsummary="true" failureproperty="junit.failure">
+    <junit printsummary="true" failureproperty="junit.failure" fork="on">
       <classpath>
-        <pathelement location="${build}"/>
+        <pathelement location="${linkbench.jar}"/>
         <fileset dir="${lib}">
           <include name="**/*.jar"/>
         </fileset>
       </classpath>
 
+      <assertions> <enable /> </assertions>
       <batchtest todir="${test.rawoutput}">
         <fileset dir="${build}"> 
           <include name="**/*Test*.class"/>

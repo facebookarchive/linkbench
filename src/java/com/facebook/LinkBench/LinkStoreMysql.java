@@ -126,7 +126,8 @@ public class LinkStoreMysql extends GraphStore {
                         user, pwd);
     //System.err.println("connected");
     conn.setAutoCommit(false);
-    stmt = conn.createStatement();
+    stmt = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
+                                ResultSet.CONCUR_READ_ONLY);
     
     if (phase == Phase.LOAD && disableBinLogForLoad) {
       // Turn binary logging off for duration of connection
@@ -682,7 +683,7 @@ public class LinkStoreMysql extends GraphStore {
       throw new Exception("Generated key not returned");
     }
     long newID = rs.getLong(1);
-    assert(rs.next()); // check done
+    assert(!rs.next()); // check done
     rs.close();
     
     node.id = newID;

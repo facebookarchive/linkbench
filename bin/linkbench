@@ -71,10 +71,8 @@ for f in $LINKBENCH_HOME/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
-# add dist to CLASSPATH
-for f in $LINKBENCH_HOME/dist/*.jar; do
-  CLASSPATH=${CLASSPATH}:$f;
-done
+# add latest jar to CLASSPATH
+CLASSPATH=${CLASSPATH}:dist/FacebookLinkBench.jar;
 
 # restore ordinary behaviour
 unset IFS
