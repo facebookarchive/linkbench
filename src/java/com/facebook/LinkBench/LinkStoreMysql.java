@@ -383,7 +383,8 @@ public class LinkStoreMysql extends GraphStore {
     }
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-      System.out.println("visibility = " + visibility);
+      logger.trace(String.format("(%d, %d, %d) visibility = %d",
+                id1, link_type, id2, visibility));
     }
 
     if (visibility == -1) {
@@ -666,28 +667,51 @@ public class LinkStoreMysql extends GraphStore {
 
   @Override
   public long addNode(String dbid, Node node) throws Exception {
+    long ids[] = bulkAddNodes(dbid, Collections.singletonList(node));
+    assert(ids.length == 1);
+    return ids[0];
+  }
+
+  @Override
+  public long[] bulkAddNodes(String dbid, List<Node> nodes) throws Exception {
     checkNodeTableConfigured();
-    String sql = "INSERT INTO `" + dbid + "`.`" + nodetable + "` " +
+    StringBuilder sql = new StringBuilder();
+    sql.append("INSERT INTO `" + dbid + "`.`" + nodetable + "` " +
         "(type, version, time, data) " +
-        "VALUES (" + node.type + "," + node.version + 
-        "," + node.time + "," + stringLiteral(node.data) + ");";
+        "VALUES ");
+    boolean first = true;
+    for (Node node: nodes) {
+      if (first) {
+        first = false;
+      } else {
+        sql.append(",");
+      }
+      sql.append("(" + node.type + "," + node.version + 
+          "," + node.time + "," + stringLiteral(node.data) + ")");
+    }
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(sql);
     }
-    stmt.executeUpdate(sql, Statement.RETURN_GENERATED_KEYS);
+    stmt.executeUpdate(sql.toString(), Statement.RETURN_GENERATED_KEYS);
     ResultSet rs = stmt.getGeneratedKeys();
     conn.commit();
     
+    long newIds[] = new long[nodes.size()];
     // Find the generated id
-    if (!rs.next()) {
-      throw new Exception("Generated key not returned");
+    int i = 0;
+    while (rs.next() && i < nodes.size()) {
+      newIds[i++] = rs.getLong(1);
     }
-    long newID = rs.getLong(1);
+    
+    if (i != nodes.size()) {
+      throw new Exception("Wrong number of generated keys on insert: "
+          + " expected " + nodes.size() + " actual " + i);
+    }
+    
     assert(!rs.next()); // check done
     rs.close();
     
-    node.id = newID;
-    return newID;
+    return newIds;
   }
 
   @Override
@@ -726,6 +750,8 @@ public class LinkStoreMysql extends GraphStore {
     }    
     
     int rows = stmt.executeUpdate(sql);
+    
+    conn.commit();
     if (rows == 1) return true;
     else if (rows == 0) return false;
     else throw new Exception("Did not expect " + rows +  "affected rows: only "
@@ -738,6 +764,8 @@ public class LinkStoreMysql extends GraphStore {
     int rows = stmt.executeUpdate(
         "DELETE FROM `" + dbid + "`.`" + nodetable + "` " +
         "WHERE id=" + id + " and type =" + type + ";");
+    
+    conn.commit();
     if (rows == 0) {
       return false;
     } else if (rows == 1) {

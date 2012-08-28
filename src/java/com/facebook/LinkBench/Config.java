@@ -24,11 +24,13 @@ public class Config {
   public static final String LOAD_RANDOM_SEED = "load_random_seed";
   public static final String MIN_ID = "startid1";
   public static final String MAX_ID = "maxid1";
+  public static final String GENERATE_NODES = "generate_nodes";
   public static final String RANDOM_ID2_MAX = "randomid2max";
   public static final String NLINKS_FUNC = "nlinks_func";
   public static final String NLINKS_CONFIG = "nlinks_config";
   public static final String NLINKS_DEFAULT = "nlinks_default";
   public static final String LINK_DATASIZE = "datasize";
+  
 
   /* Loading performance tuning */
   public static final String NUM_LOADERS = "loaders";
@@ -54,7 +56,10 @@ public class Config {
   public static final String MAX_TIME = "maxtime";
   public static final String REQUEST_RATE = "requestrate";
   public static final String NUM_REQUESTS = "requests";
+  public static final String MAX_FAILED_REQUESTS = "max_failed_requests";
   public static final String ID2GEN_CONFIG = "id2gen_config";
+  public static final String NODE_ACCESS_DIST = "node_access_dist";
+  public static final String NODE_ACCESS_DIST_KEY_PREFIX = "node_access_dist_";
   
   /* Statistics collection and reporting */
   public static final String MAX_STAT_SAMPLES = "maxsamples";

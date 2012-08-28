@@ -6,13 +6,23 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
-import org.apache.log4j.Logger;
 import org.junit.Test;
 
+/**
+ * This test implements unit tests that *all* implementations of NodeStore 
+ * should pass.
+ * 
+ * Different implementations of NodeStore will require different configuration
+ * and different setups for testing, so in order to test out a particular 
+ * NodeStore implementation, you can subclass this test and implement the
+ * required abstract methods so that the test store is initialized correctly
+ * and all required configuration properties are filled in.
+ * 
+ * @author tarmstrong
+ */
 public abstract class NodeStoreTestBase extends TestCase {
 
   protected String testDB = "linkbench_unittestdb";
-  private Logger logger = Logger.getLogger("");
   
   protected abstract void initNodeStore(Properties props)
           throws Exception, IOException;
@@ -44,11 +54,13 @@ public abstract class NodeStoreTestBase extends TestCase {
     store.resetNodeStore(testDB, 4); // We always start counting from 4 at Facebook
     long id = store.addNode(testDB, test);
     // Check id allocated
-    assertEquals(4, test.id);
     assertEquals(4, id);
+    assertEquals(-1, test.id); // Check not modified
+    test.id = id;
     
     // Allocate another
     id = store.addNode(testDB, test);
+    test.id = id;
     assertEquals(5, id);
     
     // Check retrieval
@@ -79,7 +91,7 @@ public abstract class NodeStoreTestBase extends TestCase {
     store.resetNodeStore(testDB, 0);
     
     Node test = new Node(-1, 1234, 3, 3, "the quick brown fox".getBytes());
-    store.addNode(testDB, test);
+    test.id = store.addNode(testDB, test);
     test.data = "jumped over the lazy dog".getBytes();
     assertTrue(store.updateNode(testDB, test));
     
@@ -100,7 +112,7 @@ public abstract class NodeStoreTestBase extends TestCase {
     store.resetNodeStore(testDB, 0);
     
     Node test = new Node(-1, 1234, 3, 3, data);
-    store.addNode(testDB, test);
+    test.id = store.addNode(testDB, test);
     
     Node test2 = store.getNode(testDB, test.type, test.id);
     assertNotNull(test2);

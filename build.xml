@@ -79,6 +79,8 @@
           <exclude name="**/LinkStoreTestBase.class"/>
           <exclude name="**/NodeStoreTestBase.class"/>
           <exclude name="**/MySqlTestConfig.class"/>
+          <exclude name="**/DistributionTestBase.class"/>
+          <exclude name="**/*$*.class"/> <!-- ignore nested classes -->
         </fileset>
         <formatter type="xml"/>
       </batchtest>

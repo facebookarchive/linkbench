@@ -3,7 +3,6 @@ package com.facebook.LinkBench;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -29,6 +28,7 @@ import org.apache.log4j.Logger;
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
+import com.facebook.LinkBench.util.ClassLoadUtil;
 
 /*
  LinkBenchDriver class.
@@ -51,9 +51,6 @@ public class LinkBenchDriver {
   private static boolean doRequest = false;
   
   private Properties props;
-  private String store;
-
-  private static final Class<?>[] EMPTY_ARRAY = new Class[]{};
   
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
 
@@ -66,52 +63,98 @@ public class LinkBenchDriver {
     for (String key: overrideProps.stringPropertyNames()) {
       props.setProperty(key, overrideProps.getProperty(key));
     }
-    store = null;
     
     ConfigUtil.setupLogging(props, logFile);
   }
 
-  // generate an instance of LinkStore
-  private LinkStore initStore(Phase currentphase, int threadid)
-    throws IOException {
-
-    LinkStore newstore = null;
-
-    if (store == null) {
-      store = props.getProperty(Config.LINKSTORE_CLASS);
-      logger.info("Using LinkStore implementation: " + store);
+  private static class Stores {
+    final LinkStore linkStore;
+    final NodeStore nodeStore;
+    public Stores(LinkStore linkStore, NodeStore nodeStore) {
+      super();
+      this.linkStore = linkStore;
+      this.nodeStore = nodeStore;
     }
+  }
 
-    // The property "store" defines the class name that will be used to
+  // generate instances of LinkStore and NodeStore
+  private Stores initStores(Phase currentphase, int threadid)
+    throws Exception {
+    LinkStore linkStore = createLinkStore(currentphase, threadid);
+    NodeStore nodeStore = createNodeStore(currentphase, threadid, linkStore);
+    
+    return new Stores(linkStore, nodeStore);
+  }
+
+  private LinkStore createLinkStore(Phase currentphase, int threadid)
+      throws Exception, IOException {
+    // The property "linkstore" defines the class name that will be used to
     // store data in a database. The folowing class names are pre-packaged
     // for easy access:
     //   LinkStoreMysql :  run benchmark on  mySQL
-    //   LinkStoreHBase :  run benchmark on  HBase
     //   LinkStoreHBaseGeneralAtomicityTesting : atomicity testing on HBase.
-    //   LinkStoreTaoAtomicityTesting:  atomicity testing for Facebook's HBase
-    //
-    Class<?> clazz = null;
-    try {
-      clazz = getClassByName(store);
-    } catch (java.lang.ClassNotFoundException nfe) {
-      throw new IOException("Cound not find class for " + store);
-    }
-    newstore = (LinkStore)newInstance(clazz);
-    if (clazz == null) {
-      System.err.println("Unknown data store " + store);
-      System.exit(1);
-      return null;
-    }
     
+    String linkStoreClassName = props.getProperty(Config.LINKSTORE_CLASS);
+    if (linkStoreClassName == null) {
+      throw new Exception("Config key " + Config.LINKSTORE_CLASS + 
+                          " must be defined");
+    }
+    logger.info("Using LinkStore implementation: " + linkStoreClassName);
+    
+    LinkStore linkStore;
     try {
-      newstore.initialize(props, currentphase, threadid);
+      linkStore = ClassLoadUtil.newInstance(linkStoreClassName, 
+                                            LinkStore.class);
+    } catch (ClassNotFoundException nfe) {
+      throw new IOException("Cound not find class for " + linkStoreClassName);
+    }
+  
+    try {
+      linkStore.initialize(props, currentphase, threadid);
     } catch (Exception e) {
       System.err.println("Error while initializing data store:");
       e.printStackTrace();
       System.exit(1);
     }
+    return linkStore;
+  }
 
-    return newstore;
+  /**
+   * @param linkStore a LinkStore instance to be reused if it turns out
+   * that linkStore and nodeStore classes are same
+   * @return
+   * @throws Exception
+   * @throws IOException
+   */
+  private NodeStore createNodeStore(Phase currentPhase, int threadId, 
+                                        LinkStore linkStore) throws Exception,
+      IOException {
+    String nodeStoreClassName = props.getProperty(Config.NODESTORE_CLASS);
+    if (nodeStoreClassName == null) {
+      logger.info("No NodeStore implementation provided");
+    } else {
+      logger.info("Using NodeStore implementation: " + nodeStoreClassName);
+    }
+    
+    if (linkStore != null && linkStore.getClass().getName().equals(
+                                                nodeStoreClassName)) {
+      // Same class, reuse object
+      if (!NodeStore.class.isAssignableFrom(linkStore.getClass())) {
+        throw new Exception("Specified NodeStore class " + nodeStoreClassName 
+                          + " is not a subclass of NodeStore");
+      }
+      return (NodeStore)linkStore;
+    } else {
+      NodeStore nodeStore;
+      try {
+        nodeStore = ClassLoadUtil.newInstance(nodeStoreClassName,
+                                                            NodeStore.class);
+        nodeStore.initialize(props, currentPhase, threadId);
+        return nodeStore;
+      } catch (java.lang.ClassNotFoundException nfe) {
+        throw new IOException("Cound not find class for " + nodeStoreClassName);
+      }
+    }
   }
 
   void load() throws IOException, InterruptedException, Throwable {
@@ -122,11 +165,8 @@ public class LinkBenchDriver {
     }
 
     // load data
-
-    int nloaders = Integer.parseInt(props.getProperty(Config.NUM_LOADERS));
-    int nthreads = nloaders + 1;
-    List<LinkBenchLoad> loaders = new LinkedList<LinkBenchLoad>();
-    LinkBenchLatency latencyStats = new LinkBenchLatency(nthreads);
+    int nLinkLoaders = Integer.parseInt(props.getProperty(Config.NUM_LOADERS));
+    
 
     boolean bulkLoad = true;
     BlockingQueue<LoadChunk> chunk_q = new LinkedBlockingQueue<LoadChunk>();
@@ -137,21 +177,39 @@ public class LinkBenchDriver {
     long startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
     
     // Create loaders
-    logger.info("Starting loaders " + nloaders);
+    logger.info("Starting loaders " + nLinkLoaders);
     logger.debug("Bulk Load setting: " + bulkLoad);
     
     Random masterRandom = createMasterRNG(props, Config.LOAD_RANDOM_SEED);
     
+
+    boolean genNodes = Boolean.parseBoolean(props.getProperty(
+                                            Config.GENERATE_NODES));
+    int nTotalLoaders = genNodes ? nLinkLoaders + 1 : nLinkLoaders;
+    
+    LinkBenchLatency latencyStats = new LinkBenchLatency(nTotalLoaders);
+    List<Runnable> loaders = new ArrayList<Runnable>(nTotalLoaders);
+    
     LoadProgress loadTracker = new LoadProgress(logger, maxid1 - startid1); 
-    for (int i = 0; i < nloaders; i++) {
-      LinkStore store = initStore(Phase.LOAD, i);
-      bulkLoad = bulkLoad && store.bulkLoadBatchSize() > 0;
-      LinkBenchLoad l = new LinkBenchLoad(store, props, latencyStats, i,
+    for (int i = 0; i < nLinkLoaders; i++) {
+      LinkStore linkStore = createLinkStore(Phase.LOAD, i);
+      
+      bulkLoad = bulkLoad && linkStore.bulkLoadBatchSize() > 0;
+      LinkBenchLoad l = new LinkBenchLoad(linkStore, props, latencyStats, i,
                           maxid1 == startid1 + 1, chunk_q, loadTracker);
       loaders.add(l);
     }
     
-    enqueueLoadWork(chunk_q, startid1, maxid1, nloaders, 
+    if (genNodes) {
+      logger.info("Will generate graph nodes during loading");
+      int loaderId = nTotalLoaders - 1;
+      NodeStore nodeStore = createNodeStore(Phase.LOAD, loaderId, null);
+      Random rng = new Random(masterRandom.nextLong());
+      loaders.add(new NodeLoader(props, logger, nodeStore, rng,
+          latencyStats, loaderId));
+    }
+    
+    enqueueLoadWork(chunk_q, startid1, maxid1, nLinkLoaders, 
                     new Random(masterRandom.nextLong()));
 
     // run loaders
@@ -163,17 +221,24 @@ public class LinkBenchDriver {
                                             Config.NLINKS_DEFAULT));
 
     long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
-
+    long expectedNodes = maxid1 - startid1;
     long actuallinks = 0;
-    for (final LinkBenchLoad l:loaders) {
-      actuallinks += l.getLinksLoaded();
+    long actualNodes = 0;
+    for (final Runnable l:loaders) {
+      if (l instanceof LinkBenchLoad) {
+        actuallinks += ((LinkBenchLoad)l).getLinksLoaded();
+      } else {
+        assert(l instanceof NodeLoader);
+        actualNodes += ((NodeLoader)l).getNodesLoaded();
+      }
     }
 
     latencyStats.displayLatencyStats();
-    logger.info("LOAD PHASE COMPLETED. Expected to load " +
-                       expectedlinks + " links. " +
-                       actuallinks + " loaded in " + (loadtime/1000) + " seconds." +
-                       "Links/second = " + ((1000*actuallinks)/loadtime));
+    logger.info("LOAD PHASE COMPLETED. Loaded " + actualNodes + "/" + 
+          expectedNodes + " nodes. " +
+          "Expected to load " + expectedlinks + " links. " +
+           actuallinks + " links loaded in " + (loadtime/1000) 
+           + " seconds." + "Links/second = " + ((1000*actuallinks)/loadtime));
 
   }
 
@@ -260,9 +325,10 @@ public class LinkBenchDriver {
     
     // create requesters
     for (int i = 0; i < nrequesters; i++) {
-      LinkStore store = initStore(Phase.REQUEST, i);
-      LinkBenchRequest l = new LinkBenchRequest(store, props, latencyStats,
-              progress, new Random(masterRandom.nextLong()), i, nrequesters);
+      Stores stores = initStores(Phase.REQUEST, i);
+      LinkBenchRequest l = new LinkBenchRequest(stores.linkStore,
+              stores.nodeStore, props, latencyStats, progress, 
+              new Random(masterRandom.nextLong()), i, nrequesters);
       requesters.add(l);
     }
 
@@ -271,15 +337,24 @@ public class LinkBenchDriver {
     long requesttime = concurrentExec(requesters);
 
     long requestsdone = 0;
+    int abortedRequesters = 0;
     // wait for requesters
-    for (int j = 0; j < nrequesters; j++) {
-      requestsdone += requesters.get(j).getRequestsDone();
+    for (LinkBenchRequest requester: requesters) {
+      requestsdone += requester.getRequestsDone();
+      if (requester.didAbort()) {
+        abortedRequesters++;
+      }
     }
 
     latencyStats.displayLatencyStats();
     logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
                        " requests done in " + (requesttime/1000) + " seconds." +
                        "Requests/second = " + (1000*requestsdone)/requesttime);
+    if (abortedRequesters > 0) {
+      logger.error(String.format("Benchmark did not complete cleanly: %d/%d " +
+      		"request threads aborted.  See error log entries for details.",
+      		abortedRequesters, nrequesters));  
+    }
   }
 
   /**
@@ -325,35 +400,6 @@ public class LinkBenchDriver {
   void drive() throws IOException, InterruptedException, Throwable {
     load();
     sendrequests();
-  }
-
-  /**
-   * Load a class by name.
-   * @param name the class name.
-   * @return the class object.
-   * @throws ClassNotFoundException if the class is not found.
-   */
-  public Class<?> getClassByName(String name) throws ClassNotFoundException {
-    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-    return Class.forName(name, true, classLoader);
-  }
-
-  /** Create an object for the given class and initialize it from conf
-   *
-   * @param theClass class of which an object is created
-   * @param conf Configuration
-   * @return a new object
-   */
-  public static <T> T newInstance(Class<T> theClass) {
-    T result;
-    try {
-      Constructor<T> meth = theClass.getDeclaredConstructor(EMPTY_ARRAY);
-      meth.setAccessible(true);
-      result = meth.newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    return result;
   }
 
   public static void main(String[] args)

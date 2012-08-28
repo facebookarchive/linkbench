@@ -357,8 +357,9 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       RequestProgress progress =
                               LinkBenchRequest.createProgress(logger, props);
       progress.startTimer();    
+      // TODO: Don't support NodeStore yet
       final LinkBenchRequest requester =
-        new LinkBenchRequest(store, props, latencyStats, progress,
+        new LinkBenchRequest(store, null, props, latencyStats, progress,
                 new Random(), requesterid.get(), nrequesters.get());
       
       

@@ -396,14 +396,16 @@ public class MemoryLinkStore extends GraphStore {
   public long addNode(String dbid, Node node) throws Exception {
     synchronized(nodedbs) {
       NodeDB db = getNodeDB(dbid, false);
-      node.id = db.allocateID();
+      long newId = db.allocateID();
       // Put copy of node in map
-      Node prev = db.data.put(node.id, node.clone());
+      Node inserted = node.clone();
+      inserted.id = newId;
+      Node prev = db.data.put(newId, inserted);
       if (prev != null) {
         throw new Exception("Internal error: node " + prev.toString()
             + " already existing in dbid " + dbid);
       }
-      return node.id;
+      return newId;
     }
   }
 

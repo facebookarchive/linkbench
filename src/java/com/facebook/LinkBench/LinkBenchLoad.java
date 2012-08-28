@@ -13,7 +13,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.facebook.LinkBench.LinkStore.LinkStoreOp;
+import com.facebook.LinkBench.generators.UniformDataGenerator;
+
 
 /*
  * TODO: update to reflect changes
@@ -39,8 +40,6 @@ public class LinkBenchLoad implements Runnable {
   private int datasize; // 'data' column size for one (id1, type, id2)
   private LinkBenchStats stats;
   private LinkBenchLatency latencyStats;
-  long displayfreq;
-  int maxsamples;
 
   Level debuglevel;
   String dbid;
@@ -49,7 +48,7 @@ public class LinkBenchLoad implements Runnable {
   int nlinks_config; // any additional config to go with above the above func
   int nlinks_default; // default value of #links - expected to be 0 or 1
 
-  
+
   // Counters for load statistics
   long sameShuffle;
   long diffShuffle;
@@ -65,7 +64,7 @@ public class LinkBenchLoad implements Runnable {
 
   private LoadProgress prog_tracker;
 
-
+  
   /**
    * Convenience constructor
    * @param store2
@@ -86,7 +85,7 @@ public class LinkBenchLoad implements Runnable {
   }
 
   
-  public LinkBenchLoad(LinkStore store,
+  public LinkBenchLoad(LinkStore linkStore,
                        Properties props,
                        LinkBenchLatency latencyStats,
                        int loaderID,
@@ -96,7 +95,7 @@ public class LinkBenchLoad implements Runnable {
     /*
      * Initialize fields from arguments
      */
-    this.store = store;
+    this.store = linkStore;
     this.latencyStats = latencyStats;
     this.loaderID = loaderID;
     this.singleAssoc = singleAssoc;
@@ -109,7 +108,7 @@ public class LinkBenchLoad implements Runnable {
      */
     maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
     startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
-
+    
     // math functions may cause problems for id1 = 0. Start at 1.
     if (startid1 <= 0) {
       startid1 = 1;
@@ -130,9 +129,9 @@ public class LinkBenchLoad implements Runnable {
         System.exit(1);
       }
     }
-
-    displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
-    maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
+    
+    long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
+    int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
     
     dbid = props.getProperty(Config.DBID);
     
@@ -219,7 +218,7 @@ public class LinkBenchLoad implements Runnable {
       countLoadBuffer = new ArrayList<LinkCount>(bulkLoadBatchSize);
     }
 
-    logger.info("Starting loader thread  #" + loaderID);
+    logger.info("Starting loader thread  #" + loaderID + " loading links");
     
     while (true) {
       LoadChunk chunk;
@@ -250,11 +249,11 @@ public class LinkBenchLoad implements Runnable {
       logger.info(" Same shuffle = " + sameShuffle +
                          " Different shuffle = " + diffShuffle);
       if (bulkLoad) {
-        stats.displayStats(Arrays.asList(LinkStoreOp.LOAD_LINKS_BULK,
-            LinkStoreOp.LOAD_COUNTS_BULK, LinkStoreOp.LOAD_LINKS_BULK_NLINKS,
-            LinkStoreOp.LOAD_COUNTS_BULK_NLINKS));
+        stats.displayStats(Arrays.asList(LinkBenchOp.LOAD_LINKS_BULK,
+            LinkBenchOp.LOAD_COUNTS_BULK, LinkBenchOp.LOAD_LINKS_BULK_NLINKS,
+            LinkBenchOp.LOAD_COUNTS_BULK_NLINKS));
       } else {
-        stats.displayStats(Arrays.asList(LinkStoreOp.LOAD_LINK));
+        stats.displayStats(Arrays.asList(LinkBenchOp.LOAD_LINK));
       }
     }
     
@@ -305,7 +304,7 @@ public class LinkBenchLoad implements Runnable {
         logger.trace("i = " + i + " id1 = " + id1 +
                            " nlinks = " + nlinks);
       }
- 
+
       createOutLinks(chunk.rng, link, loadBuffer, countLoadBuffer,
           id1, nlinks, singleAssoc, bulkLoad, bulkLoadBatchSize);
  
@@ -422,10 +421,8 @@ public class LinkBenchLoad implements Runnable {
                  rng.nextInt((int)randomid2max));
       link.time = System.currentTimeMillis();
       // generate data as a sequence of random characters from 'a' to 'd'
-      link.data = new byte[datasize];
-      for (int k = 0; k < datasize; k++) {
-        link.data[k] = (byte)('a' + Math.abs(rng.nextInt(4)));
-      }
+      link.data = UniformDataGenerator.gen(rng, new byte[datasize],
+                                                       (byte)'a', 4);
     }
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
@@ -461,17 +458,17 @@ public class LinkBenchLoad implements Runnable {
         long timetaken = (System.nanoTime() - timestart);
   
         // convert to microseconds
-        stats.addStats(LinkStoreOp.LOAD_LINK, timetaken/1000, false);
+        stats.addStats(LinkBenchOp.LOAD_LINK, timetaken/1000, false);
   
         latencyStats.recordLatency(loaderID, 
-                      LinkStoreOp.LOAD_LINK, timetaken);
+                      LinkBenchOp.LOAD_LINK, timetaken);
       }
   
     } catch (Throwable e){//Catch exception if any
         long endtime2 = System.nanoTime();
         long timetaken2 = (endtime2 - timestart)/1000;
         logger.error("Error: " + e.getMessage(), e);
-        stats.addStats(LinkStoreOp.LOAD_LINK, timetaken2, true);
+        stats.addStats(LinkBenchOp.LOAD_LINK, timetaken2, true);
         store.clearErrors(loaderID);
     }
   }
@@ -489,16 +486,16 @@ public class LinkBenchLoad implements Runnable {
       long timetaken = (System.nanoTime() - timestart);
   
       // convert to microseconds
-      stats.addStats(LinkStoreOp.LOAD_LINKS_BULK, timetaken/1000, false);
-      stats.addStats(LinkStoreOp.LOAD_LINKS_BULK_NLINKS, nlinks, false);
+      stats.addStats(LinkBenchOp.LOAD_LINKS_BULK, timetaken/1000, false);
+      stats.addStats(LinkBenchOp.LOAD_LINKS_BULK_NLINKS, nlinks, false);
   
-      latencyStats.recordLatency(loaderID, LinkStoreOp.LOAD_LINKS_BULK,
+      latencyStats.recordLatency(loaderID, LinkBenchOp.LOAD_LINKS_BULK,
                                                              timetaken);
     } catch (Throwable e){//Catch exception if any
         long endtime2 = System.nanoTime();
         long timetaken2 = (endtime2 - timestart)/1000;
         logger.error("Error: " + e.getMessage(), e);
-        stats.addStats(LinkStoreOp.LOAD_LINKS_BULK, timetaken2, true);
+        stats.addStats(LinkBenchOp.LOAD_LINKS_BULK, timetaken2, true);
         store.clearErrors(loaderID);
     }
   }
@@ -515,16 +512,16 @@ public class LinkBenchLoad implements Runnable {
       long timetaken = (System.nanoTime() - timestart);
   
       // convert to microseconds
-      stats.addStats(LinkStoreOp.LOAD_COUNTS_BULK, timetaken/1000, false);
-      stats.addStats(LinkStoreOp.LOAD_COUNTS_BULK_NLINKS, ncounts, false);
+      stats.addStats(LinkBenchOp.LOAD_COUNTS_BULK, timetaken/1000, false);
+      stats.addStats(LinkBenchOp.LOAD_COUNTS_BULK_NLINKS, ncounts, false);
   
-      latencyStats.recordLatency(loaderID, LinkStoreOp.LOAD_COUNTS_BULK,
+      latencyStats.recordLatency(loaderID, LinkBenchOp.LOAD_COUNTS_BULK,
                                                              timetaken);
     } catch (Throwable e){//Catch exception if any
         long endtime2 = System.nanoTime();
         long timetaken2 = (endtime2 - timestart)/1000;
         logger.error("Error: " + e.getMessage(), e);
-        stats.addStats(LinkStoreOp.LOAD_COUNTS_BULK, timetaken2, true);
+        stats.addStats(LinkBenchOp.LOAD_COUNTS_BULK, timetaken2, true);
         store.clearErrors(loaderID);
     }
   }

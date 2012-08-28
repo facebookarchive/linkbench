@@ -6,7 +6,6 @@ import java.util.Collection;
 
 import org.apache.log4j.Logger;
 
-import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 
 // Compute statistics
 public class LinkBenchStats {
@@ -62,7 +61,7 @@ public class LinkBenchStats {
     }
   }
 
-  public void addStats(LinkStoreOp type, long timetaken, boolean error) {
+  public void addStats(LinkBenchOp type, long timetaken, boolean error) {
 
     if (error) {
       errors[type.ordinal()]++;
@@ -96,12 +95,12 @@ public class LinkBenchStats {
 
 
   // display stats for samples from start (inclusive) to end (exclusive)
-  private void displayStats(LinkStoreOp type, int start, int end) {
+  private void displayStats(LinkBenchOp type, int start, int end) {
     int elems = end - start;
 
     if (elems <= 0) {
         logger.info("ThreadID = " + threadID +
-                         " " + LinkStore.displayName(type) +
+                         " " + type.displayName() +
                          " numops = " + numops[type.ordinal()] +
                          " errors = " + errors[type.ordinal()] +
                          " samples = " + elems);
@@ -112,7 +111,7 @@ public class LinkBenchStats {
     Arrays.sort(samples[type.ordinal()], start, end);
 
     logger.info("ThreadID = " + threadID +
-                     " " + LinkStore.displayName(type) +
+                     " " + type.displayName() +
                      " totalops = " + numops[type.ordinal()] +
                      " totalerrors = " + errors[type.ordinal()] +
                      " ops = " + elems +
@@ -128,11 +127,11 @@ public class LinkBenchStats {
   }
 
   public void displayStatsAll() {
-    displayStats(Arrays.asList(LinkStoreOp.values()));
+    displayStats(Arrays.asList(LinkBenchOp.values()));
   }
   
-  public void displayStats(Collection<LinkStoreOp> ops) {
-    for (LinkStoreOp op: ops) {
+  public void displayStats(Collection<LinkBenchOp> ops) {
+    for (LinkBenchOp op: ops) {
       displayStats(op, 0, samplestaken[op.ordinal()]);
     }
   }

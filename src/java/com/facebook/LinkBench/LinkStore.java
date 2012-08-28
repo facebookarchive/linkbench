@@ -15,31 +15,8 @@ public abstract class LinkStore {
   public static final byte VISIBILITY_HIDDEN = 0;
   public static final byte VISIBILITY_DEFAULT = 1;
   
-  // Various operation types for which we want to gather stats
-  public static enum LinkStoreOp {
-    ADD_LINK,
-    DELETE_LINK,
-    UPDATE_LINK,
-    COUNT_LINK,
-    GET_LINK,
-    GET_LINKS_LIST,
-    LOAD_LINK,
-    LOAD_LINKS_BULK,
-    LOAD_COUNTS_BULK,
-    // Although the following are not truly operations, we need stats
-    // for them 
-    RANGE_SIZE,    // how big range scans are
-    LOAD_LINKS_BULK_NLINKS, // how many links inserted in bulk
-    LOAD_COUNTS_BULK_NLINKS, // how many counts inserted in bulk
-    UNKNOWN,
-  }
+  public static final int MAX_OPTYPES = LinkBenchOp.values().length;
 
-  public static final int MAX_OPTYPES = LinkStoreOp.values().length;
-
-  
-  public static final String displayName(LinkStoreOp op) {
-    return op.name();
-  }
 
   /** The default constructor */
   public LinkStore() {

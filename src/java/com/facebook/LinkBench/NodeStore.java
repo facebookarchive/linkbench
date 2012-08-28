@@ -1,5 +1,9 @@
 package com.facebook.LinkBench;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.Properties;
+
 /**
  * Some implementations of NodeStore may require that each
  * dbid be initialized with reset before any data is written to it (so as to
@@ -7,6 +11,9 @@ package com.facebook.LinkBench;
  */
 public interface NodeStore {
 
+  /** initialize the store object */
+  public void initialize(Properties p,
+      Phase currentPhase, int threadId) throws IOException, Exception;
   
   /**
    * Reset node storage to a clean state in shard:
@@ -21,10 +28,25 @@ public interface NodeStore {
    * This allocates a new id for the object and returns i
    * @param dbid the db shard to put that object in
    * @param node a node with all data aside from id filled in.  The id
-   *    field is filled in by this function
+   *    field is *not* updated to the new value by this function
    * @return the id allocated for the node
    */
   public long addNode(String dbid, Node node) throws Exception;
+  
+  /**
+   * Bulk loading to more efficiently load nodes
+   * @param dbid
+   * @param nodes
+   * @return the actual IDs allocated to the nodes
+   * @throws Exception
+   */
+  public long[] bulkAddNodes(String dbid, List<Node> nodes) throws Exception;
+  
+  /** 
+   * Preferred size of data to load
+   * @return
+   */
+  public int bulkLoadBatchSize();
   
   /**
    * Get a node of the specified type
@@ -51,4 +73,6 @@ public interface NodeStore {
    * @return true if the node was deleted, false if not present
    */
   public boolean deleteNode(String dbid, int type, long id) throws Exception;
+
+  public void clearErrors(int loaderId);
 }

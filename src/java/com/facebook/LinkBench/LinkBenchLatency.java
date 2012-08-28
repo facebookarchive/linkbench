@@ -2,7 +2,6 @@ package com.facebook.LinkBench;
 
 import org.apache.log4j.Logger;
 
-import com.facebook.LinkBench.LinkStore.LinkStoreOp;
 
 /**
  * Compute percentile latencies.
@@ -54,7 +53,7 @@ public class LinkBenchLatency {
    * Used by the linkbench driver to record latency of each 
    * individual call
    */
-  public void recordLatency(int threadid, LinkStoreOp type,
+  public void recordLatency(int threadid, LinkBenchOp type,
         long nanotimetaken) {
 
     long timetaken = nanotimetaken/1000; // in milli seconds
@@ -109,12 +108,12 @@ public class LinkBenchLatency {
 
     Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
     // print percentiles
-    for (LinkStoreOp type: LinkStoreOp.values()) {
+    for (LinkBenchOp type: LinkBenchOp.values()) {
       if (lhigh[type.ordinal()] == 0) { // no samples of this type
         continue;
       }
 
-      logger.info(LinkStore.displayName(type) +
+      logger.info(type.displayName() +
                        " p25 = " + getPercentile(type, 25)  + "ms " +
                        " p50 = " + getPercentile(type, 50)  + "ms " +
                        " p75 = " + getPercentile(type, 75)  + "ms " +
@@ -124,7 +123,7 @@ public class LinkBenchLatency {
     }
   }
    
-  private long getPercentile(LinkStoreOp type, long percentile) {
+  private long getPercentile(LinkBenchOp type, long percentile) {
     int type_ix = type.ordinal();
     long p = (lhigh[type_ix] * percentile)/100;
 

@@ -5,6 +5,11 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
+/**
+ * Class containing hardcoded parameters and helper functions used to create
+ * and connect to the unit test database for MySql
+ * @author tarmstrong
+ */
 public class MySqlTestConfig {
   
   // Hardcoded parameters for now

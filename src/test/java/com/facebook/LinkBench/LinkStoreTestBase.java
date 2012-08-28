@@ -16,6 +16,18 @@ import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
 
+/**
+ * This test implements unit tests that *all* implementations of LinkStore 
+ * should pass.
+ * 
+ * Different implementations of LinkStore will require different configuration
+ * and different setups for testing, so in order to test out a particular 
+ * LinkStore implementation, you can subclass this test and implement the
+ * required abstract methods so that the test store is initialized correctly
+ * and all required configuration properties are filled in.
+ * 
+ * @author tarmstrong
+ */
 public abstract class LinkStoreTestBase extends TestCase {
 
   protected String testDB = "linkbench_unittestdb";
@@ -439,8 +451,8 @@ public abstract class LinkStoreTestBase extends TestCase {
       LinkBenchLatency latencyStats = new LinkBenchLatency(1);
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
       
-      LinkBenchRequest requester = new LinkBenchRequest(reqStore, 
-                      props, latencyStats, tracker, rng, 0, 1);
+      LinkBenchRequest requester = new LinkBenchRequest(reqStore,
+                      null, props, latencyStats, tracker, rng, 0, 1);
       
       requester.run();
       
@@ -482,7 +494,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     int linksPerId = 3;
     
     Properties props = basicProps();
-    int requests = 1000;
+    int requests = 2000;
     long timeLimit = requests;
     int requestsPerSec = 500; // Limit to fairly low rate
     fillLoadProps(props, startId, idCount, linksPerId);
@@ -497,7 +509,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
       
       DummyLinkStore reqStore = getStoreHandle();
-      LinkBenchRequest requester = new LinkBenchRequest(reqStore, 
+      LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
                       props, new LinkBenchLatency(1), tracker, rng, 0, 1);
       
       long startTime = System.currentTimeMillis();
