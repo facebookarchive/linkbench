@@ -381,7 +381,6 @@ public abstract class LinkStoreTestBase extends TestCase {
     long startId = 0;
     long idCount = getIDCount();
     int linksPerId = 3;
-    long testStartTime = System.currentTimeMillis();
 
     Properties props = basicProps();
     fillLoadProps(props, startId, idCount, linksPerId);
@@ -409,7 +408,7 @@ public abstract class LinkStoreTestBase extends TestCase {
         store.initialize(props, Phase.REQUEST, 0);
         // read back data and sanity check
         validateLoadedData(logger, store, startId, idCount, linksPerId,
-            testStartTime, testEndTime);
+                                                            testEndTime);
       }
     } finally {
       if (!store.initialized) {
@@ -593,8 +592,8 @@ public abstract class LinkStoreTestBase extends TestCase {
   }
 
   private void validateLoadedData(Logger logger, DummyLinkStore wrappedStore,
-      long startId, long idCount, int linksPerId, long minTimestamp,
-      long maxTimestamp) throws Exception {
+      long startId, long idCount, int linksPerId, long maxTimestamp)
+                                                          throws Exception {
     for (long i = startId; i < startId + idCount; i++) {
       assertEquals(wrappedStore.countLinks(testDB, i, LinkStore.LINK_TYPE),
                    linksPerId);
@@ -611,8 +610,10 @@ public abstract class LinkStoreTestBase extends TestCase {
           assertEquals(l.visibility, LinkStore.VISIBILITY_DEFAULT);
           assertEquals(l.id1_type, LinkStore.ID1_TYPE);
           assertEquals(l.id2_type, LinkStore.ID2_TYPE);
-          // Check timestamp in correct range
-          assertTrue(l.time >= minTimestamp);
+          // Check timestamp correc
+          if (l.time > maxTimestamp) {
+            System.err.println(l.time + ", " + maxTimestamp);
+          }
           assertTrue(l.time <= maxTimestamp);
           // Check descending
           assertTrue(lastTimestamp >= l.time);

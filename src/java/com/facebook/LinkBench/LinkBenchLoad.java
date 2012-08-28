@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.distributions.ID2Chooser;
 import com.facebook.LinkBench.distributions.LinkDistributions;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
@@ -31,8 +32,6 @@ import com.facebook.LinkBench.generators.UniformDataGenerator;
 public class LinkBenchLoad implements Runnable {
 
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
-  
-  private long randomid2max; // whether id2 should be generated randomly
 
   private long maxid1;   // max id1 to generate
   private long startid1; // id1 at which to start
@@ -48,7 +47,8 @@ public class LinkBenchLoad implements Runnable {
   
   private LinkDistribution linkDist;
   private InvertibleShuffler linkShuffler;
-
+  
+  private ID2Chooser id2chooser;
 
   // Counters for load statistics
   long sameShuffle;
@@ -136,7 +136,7 @@ public class LinkBenchLoad implements Runnable {
     diffShuffle = 0;
     stats = new LinkBenchStats(loaderID, displayfreq, maxsamples);
     
-    randomid2max = Long.parseLong(props.getProperty(Config.RANDOM_ID2_MAX));
+    id2chooser = new ID2Chooser(props, startid1, maxid1, 1, 1);
   }
 
   public long getLinksLoaded() {
@@ -300,7 +300,7 @@ public class LinkBenchLoad implements Runnable {
           linkTypeCounts.put(link.link_type, count);
         } else {
           count.count++;
-          count.time = link.time;
+          count.time = Math.max(count.time, link.time);
           count.version = link.version;
         }
       } else {
@@ -350,10 +350,8 @@ public class LinkBenchLoad implements Runnable {
     if (singleAssoc) {
       link.id2 = 45; // some constant
     } else {
-      link.id2 = (randomid2max == 0 ?
-                 (maxid1 + id1 + outlink_ix) :
-                 rng.nextInt((int)randomid2max));
-      link.time = System.currentTimeMillis();
+      link.id2 = id2chooser.chooseForLoad(rng, id1, outlink_ix);
+      
       // generate data as a sequence of random characters from 'a' to 'd'
       link.data = UniformDataGenerator.gen(rng, new byte[datasize],
                                                        (byte)'a', 4);
@@ -362,8 +360,16 @@ public class LinkBenchLoad implements Runnable {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("id2 chosen is " + link.id2);
     }
-    
-    link.time = System.currentTimeMillis();
+
+    // Randomize time so that id2 and timestamp aren't closely correlated
+    link.time = chooseInitialTimestamp(rng);
+  }
+
+
+  private long chooseInitialTimestamp(Random rng) {
+    // Choose something from now back to about 50 days
+    return (System.currentTimeMillis() - Integer.MAX_VALUE - 1L)
+                                        + rng.nextInt();
   }
 
   /**

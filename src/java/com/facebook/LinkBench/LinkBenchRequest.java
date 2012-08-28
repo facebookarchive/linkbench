@@ -11,8 +11,7 @@ import org.apache.log4j.Logger;
 import com.facebook.LinkBench.RealDistribution.DistributionType;
 import com.facebook.LinkBench.distributions.AccessDistributions;
 import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistribution;
-import com.facebook.LinkBench.distributions.LinkDistributions;
-import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
+import com.facebook.LinkBench.distributions.ID2Chooser;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
 
 
@@ -34,7 +33,6 @@ public class LinkBenchRequest implements Runnable {
   long maxtime;
   int nrequesters;
   int requesterID;
-  long randomid2max;
   long maxid1;
   long startid1;
   int datasize;
@@ -68,26 +66,20 @@ public class LinkBenchRequest implements Runnable {
    * so that tests and benchmarks are repeatable.  
    */
   Random rng;
-
-  Link link;
   
   // Last node id accessed
   long lastNodeId;
-
-  // #links distribution from properties file
-  private LinkDistribution linkDist;
   
   long requestsdone = 0;
   long errors = 0;
   boolean aborted;
-  
-  // configuration for generating id2
-  int id2gen_config;
 
   // Access distributions
   private AccessDistribution writeDist; // link writes
   private AccessDistribution readDist; // link reads
   private AccessDistribution nodeAccessDist; // node reads and writes
+  
+  private ID2Chooser id2chooser;
   
   public LinkBenchRequest(LinkStore linkStore,
                           NodeStore nodeStore,
@@ -176,6 +168,9 @@ public class LinkBenchRequest implements Runnable {
       }
       nodeAccessDist = null;
     }
+    
+    id2chooser = new ID2Chooser(props, startid1, maxid1, 
+                                nrequesters, requesterID);
 
     numfound = 0;
     numnotfound = 0;
@@ -190,17 +185,7 @@ public class LinkBenchRequest implements Runnable {
     int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
     stats = new LinkBenchStats(requesterID, displayfreq, maxsamples);
     
-    // random number generator for id2
-    randomid2max = Long.parseLong(props.getProperty(Config.RANDOM_ID2_MAX));
-    
-    // configuration for generating id2
-    id2gen_config = Integer.parseInt(props.getProperty(Config.ID2GEN_CONFIG));
-
-    link = new Link();
-    
     lastNodeId = startid1;
-    
-    linkDist = LinkDistributions.loadLinkDistribution(props, startid1, maxid1);
   }
 
   public long getRequestsDone() {
@@ -259,7 +244,7 @@ public class LinkBenchRequest implements Runnable {
     long endtime = 0;
 
     LinkBenchOp type = LinkBenchOp.UNKNOWN; // initialize to invalid value
-
+    Link link = new Link();
     try {
 
       if (r <= pc_addlink) {
@@ -294,15 +279,8 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkBenchOp.GET_LINK;
 
-
         link.id1 = chooseRequestID(DistributionType.READS, link.id1);
-
-        long nlinks = linkDist.getNlinks(link.id1);
-
-        // id1 is expected to have nlinks links. Retrieve one of those.
-        link.id2 = (randomid2max == 0 ?
-                     (maxid1 + link.id1 + rng.nextInt((int)nlinks + 1)) :
-                     rng.nextInt((int)randomid2max));
+        link.id2 = id2chooser.chooseForOp(rng, link.id1, 0.5);
 
         starttime = System.nanoTime();
         boolean found = getLink(link);
@@ -431,6 +409,7 @@ public class LinkBenchRequest implements Runnable {
     if (singleAssoc) {
       LinkBenchOp type = LinkBenchOp.UNKNOWN;
       try {
+        Link link = new Link();
         // add a single assoc to the database
         link.id1 = 45;
         link.id1 = 46;
@@ -524,38 +503,12 @@ public class LinkBenchRequest implements Runnable {
     return linkStore.countLinks(dbid, link.id1, link.link_type);
   }
 
-  // return a new id2 that satisfies 3 conditions:
-  // 1. close to current id2 (can be slightly smaller, equal, or larger);
-  // 2. new_id2 % nrequesters = requestersId;
-  // 3. smaller or equal to randomid2max unless randomid2max = 0
-  private static long fixId2(long id2, long nrequesters,
-                             long requesterID, long randomid2max) {
-
-    long newid2 = id2 - (id2 % nrequesters) + requesterID;
-    if ((newid2 > randomid2max) && (randomid2max > 0)) newid2 -= nrequesters;
-    return newid2;
-  }
-
   void addLink(Link link) throws Exception {
     link.link_type = LinkStore.LINK_TYPE;
     link.id1_type = LinkStore.ID1_TYPE;
     link.id2_type = LinkStore.ID2_TYPE;
 
-    long nlinks = linkDist.getNlinks(link.id1);
-
-    // We want to sometimes add a link that already exists and sometimes
-    // add a new link. So generate id2 between 0 and 2 * links.
-    // unless randomid2max is non-zero (in which case just pick a random id2
-    // upto randomid2max). Plus 1 is used to make nlinks atleast 1.
-    nlinks = 2 * nlinks + 1;
-    link.id2 = (randomid2max == 0 ?
-                 (maxid1 + link.id1 + rng.nextInt((int)nlinks + 1)) :
-                   rng.nextInt((int)randomid2max));
-
-    if (id2gen_config == 1) {
-      link.id2 = fixId2(link.id2, nrequesters, requesterID,
-          randomid2max);
-    }
+    link.id2 = id2chooser.chooseForOp(rng, link.id1, 0.5);
 
     link.visibility = LinkStore.VISIBILITY_DEFAULT;
     link.version = 0;
@@ -570,21 +523,11 @@ public class LinkBenchRequest implements Runnable {
 
   }
 
-
   void updateLink(Link link) throws Exception {
     link.link_type = LinkStore.LINK_TYPE;
-
-    long nlinks = linkDist.getNlinks(link.id1);
-
-    // id1 is expected to have nlinks links. Update one of those.
-    link.id2 = (randomid2max == 0 ?
-                 (maxid1 + link.id1 + rng.nextInt((int)nlinks + 1)) :
-                   rng.nextInt((int)randomid2max));
-
-    if (id2gen_config == 1) {
-      link.id2 = fixId2(link.id2, nrequesters, requesterID,
-        randomid2max);
-    }
+    
+    // Update one of the existing links
+    link.id2 = id2chooser.chooseForOp(rng, link.id1, 0.5);
 
     link.id1_type = LinkStore.ID1_TYPE;
     link.id2_type = LinkStore.ID2_TYPE;
@@ -604,18 +547,7 @@ public class LinkBenchRequest implements Runnable {
 
   void deleteLink(Link link) throws Exception {
     link.link_type = LinkStore.LINK_TYPE;
-
-    long nlinks = linkDist.getNlinks(link.id1);
-
-    // id1 is expected to have nlinks links. Delete one of those.
-    link.id2 = (randomid2max == 0 ?
-                (maxid1 + link.id1 + rng.nextInt((int)nlinks + 1)) :
-                  rng.nextInt((int)randomid2max));
-
-    if (id2gen_config == 1) {
-      link.id2 = fixId2(link.id2, nrequesters, requesterID,
-        randomid2max);
-    }
+    link.id2 = id2chooser.chooseForOp(rng, link.id1, 1.0);
 
     // no inverses for now
     linkStore.deleteLink(dbid, link.id1, link.link_type, link.id2,
