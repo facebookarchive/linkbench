@@ -1,8 +1,8 @@
 package com.facebook.LinkBench;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.Random;
@@ -11,11 +11,14 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.distributions.PiecewiseLinearDistribution;
+
 /*
  * This class simulates the real distribution based on statistical data.
  */
 
-class RealDistribution {
+public class RealDistribution extends PiecewiseLinearDistribution {
+  public static final String DISTRIBUTION_CONFIG = "realdist";
   private static final Logger logger = 
                       Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
   /* params to shuffle
@@ -23,9 +26,9 @@ class RealDistribution {
   final static long[] WRITE_SHUFFLER_PARAMS = {23, 13};
   final static long[] READ_SHUFFLER_PARAMS = {19, 11};
   */
-  final static long[] NLINKS_SHUFFLER_PARAMS = {13, 7};
-  final static long[] WRITE_SHUFFLER_PARAMS = {13, 7};
-  final static long[] READ_SHUFFLER_PARAMS = {13, 7};
+  public final static long[] NLINKS_SHUFFLER_PARAMS = {13, 7};
+  public final static long[] WRITE_SHUFFLER_PARAMS = {13, 7};
+  public final static long[] READ_SHUFFLER_PARAMS = {13, 7};
 
   public static enum DistributionType {
     LINKS,
@@ -33,81 +36,90 @@ class RealDistribution {
     WRITES
   }
 
-  //helper class to store (value, probability)
-  static class Point implements Comparable<Point> {
-    int value;
-    double probability;
-    Point(int input_value, double input_probability) {
-      this.value = input_value;
-      this.probability = input_probability;
+  private DistributionType type = null;
+  
+  public RealDistribution() {
+    this.type = null;
+  }
+  
+  @Override
+  public void init(long min, long max, Properties props, String keyPrefix) {
+    this.min = min;
+    this.max = max; 
+    String dist = props.getProperty(keyPrefix + DISTRIBUTION_CONFIG);
+    if (dist == null) {
+      throw new RuntimeException("Distribution for RealDistribution was not"
+         + " specified in either object constructor or properties");
     }
-    public int compareTo(Point obj) {
-      Point p = (Point)obj;
-      return this.value - p.value;
+    
+    DistributionType configuredType;
+    if (dist.equals("reads")) {
+      configuredType = DistributionType.READS;
+    } else if (dist.equals("writes")) {
+      configuredType = DistributionType.WRITES;
+    } else if (dist.equals("links")) {
+      configuredType = DistributionType.LINKS;
+    } else {
+      throw new RuntimeException("Invalid distribution type for "
+          + "RealDistribution: " + dist);
     }
-    public String toString() {
-      return "(" + value + ", " + probability + ")";
-    }
-  };
+      
+    init(props, min, max, configuredType);
+  }
 
+  /*
+   * Initialize this with one of the empirical distribution types
+   * This will automatically load the data file if needed
+   */
+  public void init(Properties props, long min, long max,
+                                              DistributionType type) {
+    loadOneShot(props);
+    switch (type) {
+    case LINKS:
+      init(min, max, nlinks_cdf, null, null, nlinks_expected_val);
+      break;
+    case WRITES:
+      init(min, max, nwrites_cdf, nwrites_cs, nwrites_right_points,
+                                              nwrites_expected_val);
+      break;
+    case READS:
+      init(min, max, nreads_cdf, nreads_cs, nreads_right_points,
+                                              nreads_expected_val);
+      break;
+    default:
+      throw new RuntimeException("Unknown distribution type: " + type);
+    }
+  }
+  
   private static ArrayList<Point> nlinks_cdf, nreads_cdf, nwrites_cdf;
   private static double[] nreads_cs, nwrites_cs;
+  /**
+   * These right_points arrays are used to keep track of state of
+   * the id1 generation, with each cell holding the next id to
+   * return.  These are shared between RealDistribution instances
+   * and different threads.
+   * 
+   * It is not clear that this works entirely as intended and it
+   * certainly is non-deterministic when multiple threads are
+   * involved.
+   */
   private static long[] nreads_right_points, nwrites_right_points;
+  private static double nlinks_expected_val, nreads_expected_val, nwrites_expected_val;
 
   /*
    * This method loads data from data file into memory;
    * must be called before any getNlinks or getNextId1s;
    * must be declared as synchronized method to prevent race condition.
    */
-  static synchronized void loadOneShot(Properties props) throws Exception {
+  public static synchronized void loadOneShot(Properties props) {
     if (nlinks_cdf == null) {
       logger.info("Loading real distribution data...");
-      reload(props);
+      try {
+        getStatisticalData(props);
+      } catch (FileNotFoundException e) {
+        throw new RuntimeException(e);
+      }
     }
-  }
-
-  static synchronized void reload(Properties props) throws Exception {
-    getStatisticalData(props);
-  }
-
-  //helper function: Calculate pdf from cdf
-  private static double[] getPDF(ArrayList<Point> cdf) {
-    int max_value = cdf.get(cdf.size() - 1).value;
-    double[] pdf = new double[max_value + 1];
-
-    // set all 0
-    for (int i = 0; i < pdf.length; ++i) pdf[i] = 0;
-
-    // convert cdf to pdf
-    pdf[cdf.get(0).value] = cdf.get(0).probability;
-    for (int i = 1; i < cdf.size(); ++i) {
-      pdf[cdf.get(i).value] = cdf.get(i).probability -
-        cdf.get(i - 1).probability;
-    }
-    return pdf;
-  }
-
-  //helper function: Calculate complementary cumulative distribution
-  //function from pdf
-  private static double[] getCCDF(double[] pdf) {
-    int length = pdf.length;
-    double[] ccdf = new double[length];
-    ccdf[length - 1] = pdf[length - 1];
-    for (int i = length - 2; i >= 0; --i) {
-      ccdf[i] = ccdf[i + 1] + pdf[i];
-    }
-    return ccdf;
-  }
-
-  //helper function: Calculate cumulative sum
-  private static double[] getCumulativeSum(double[] cdf) {
-    int length = cdf.length;
-    double[] cs = new double[length];
-    cs[0] = 0; //ignore cdf[0]
-    for (int i = 1; i < length; ++i) {
-      cs[i] = cs[i - 1] + cdf[i];
-    }
-    return cs;
   }
 
   /*
@@ -154,7 +166,9 @@ class RealDistribution {
     ArrayList<Point> points = new ArrayList<Point>();
     while (scanner.hasNextInt()) {
       int value = scanner.nextInt();
-      double probability = scanner.nextDouble();
+      // File on disk has percentages
+      double percent = scanner.nextDouble();
+      double probability = percent / 100;
       Point temp = new Point(value, probability);
       points.add(temp);
     }
@@ -175,13 +189,7 @@ class RealDistribution {
     }
     return map;
   }
-
-  //for debugging purpose
-  private static void print(double[] a) {
-    for (int i=0; i < a.length; ++i) System.out.print(a[i] + " ");
-    System.out.println();
-  }
-
+  
   /*
    * This method reads from data_file nlinks, nreads, nwrites discreate
    * cumulative distribution function (CDF) and produces corresponding
@@ -193,7 +201,7 @@ class RealDistribution {
    * CDF is returned under the form of an array whose elements are pairs of
    * value and the cumulative distribution at that value i.e. <x, CDF(x)>.
    */
-  private static void getStatisticalData(Properties props) throws Exception {
+  private static void getStatisticalData(Properties props) throws FileNotFoundException {
     String filename = props.getProperty(Config.DISTRIBUTION_DATA_FILE);
     
     // If relative path, should be relative to linkbench home directory
@@ -203,7 +211,7 @@ class RealDistribution {
     } else {
       String linkBenchHome = ConfigUtil.findLinkBenchHome();
       if (linkBenchHome == null) {
-        throw new Exception("Data file config property "
+        throw new RuntimeException("Data file config property "
             + Config.DISTRIBUTION_DATA_FILE
             + " was specified using a relative path, but linkbench home"
             + " directory was not specified through environment var "
@@ -218,6 +226,7 @@ class RealDistribution {
       String type = scanner.next();
       if (type.equals("nlinks")) {
         nlinks_cdf = readCDF(scanner);
+        nlinks_expected_val = expectedValue(nlinks_cdf);
       }
       else if (type.equals("nreads")) {
         nreads_cdf = readCDF(scanner);
@@ -229,6 +238,7 @@ class RealDistribution {
         for (int i = 0; i < nreads_right_points.length; ++i) {
           nreads_right_points[i] = 0;
         }
+        nreads_expected_val = expectedValue(nreads_cdf);
       }
       else if (type.equals("nwrites")) {
         nwrites_cdf = readCDF(scanner);
@@ -240,179 +250,38 @@ class RealDistribution {
         for (int i = 0; i < nwrites_right_points.length; ++i) {
           nwrites_right_points[i] = 0;
         }
+        nwrites_expected_val = expectedValue(nwrites_cdf);
       }
       else {
-        throw new Exception("Invalid file content: " + type);
+        throw new RuntimeException("Invalid file content: " + type);
       }
     }
   }
 
-  /*
-   * To estimate #nlinks of id1, we search for the smallest x and
-   * largest y in the CDF data that satisfies
-   * CDF(y) < CDF(id1/maxid1) <= CDF(x) and then return a random number
-   * between (y+1) and x as #nlinks of id1.
-   *
-   * That is equivalent to searching for the idx that satisfies
-   * data[idx - 1].probability < p <= data[idx].probability and then
-   * return a random number between (data[idx - 1].value + 1) and
-   * data[idx].value.
-   *
-   * Caution: getNlinks is meant to estimate #nlinks of id1. In the
-   * function, we use random number. Therefore, even with the same
-   * parameter, two calls of getNlinks can result in different results.
-   *
-   * Large ids tend to have (very) large #nlinks, so we swap 50% large ids
-   * with small ids to make workload more balanced. This technique is not
-   * very effective (only reduce around 30% running time in case of
-   * assoc_type FRIEND_REQUESTS_SEND_RECEIVED_ASSOC), but for now it is
-   * better than nothing.
-   */
-
-  // searching for smallest idx that p <= data[idx].probability
-  static int binarySearch(ArrayList<Point> points, double p) {
-    int left = 0, right = points.size() - 1;
-    while (left < right) {
-      int mid = (left + right)/2;
-      if (points.get(mid).probability >= p) {
-        right = mid;
-      } else {
-        left = mid + 1;
-      }
-    }
-    if (points.get(left).probability >= p) {
-      return left;
-    } else {
-      return left + 1;
-    }
-  }
-
-  //return a random value within a specific range (inclusive both ends)
-  static long randomRange(Random rng, int left, int right) {
-    return left + rng.nextInt(right - left + 1);
-  }
-
-  /**
-   * Return [id1, nlinks] 
-   * @param unshuffled_id1 id1 to be permuted in range [startid1, maxid1]
-   * @param startid1
-   * @param maxid1
-   * @return
-   */
-  static long[] getId1AndNLinks(Random rng, long unshuffled_id1,
-                                  long startid1, long maxid1) {
-    long id1 = Shuffler.getPermutationValue(unshuffled_id1, startid1, maxid1,
-                                               NLINKS_SHUFFLER_PARAMS);
-
-    return new long[] {id1, getNlinks(rng, id1, startid1, maxid1)};
-  }
-
-  static long getNlinks(Random rng, long id1, long startid1, long maxid1) {
+  static long getNlinks(long id1, long startid1, long maxid1) {
     // simple workload balancing
-    double p = (100.0 * (id1 - startid1 + 1)) / (maxid1 - startid1);
-    int idx = binarySearch(nlinks_cdf, p);
-
-    if (idx == 0) {
-      /* Temporary hack to make sure RNG is called regardless of value
-       * of id1 (which is currently nondeterministic
-       */
-      rng.nextInt(); 
-      return 0;
-    }
-    else  {
-      return randomRange(rng, nlinks_cdf.get(idx - 1).value + 1,
-          nlinks_cdf.get(idx).value);
-    }
+    return (long)expectedCount(startid1, maxid1, id1, nlinks_cdf);
   }
-
-  /*
-   * Like Random.nextInt() generates a sequence of random numbers,
-   * this function generates a sequence of random id1s. The different
-   * is taht it follows the distribution of nwrites_cdf or nreads_cdf
-   * rather than uniform distribution.
-   *
-   * The algorithm is a bit tricky. For illustration, let's consider
-   * the following pdf (where x stands for #writes or #reads):
-   * p(x=0)=0.6; p(x=1)=0.2; p(x=3)=0.1; p(x=5)=0.1.
-   *
-   * Firstly, we take the complementary cumulative distribution (A):
-   * p(x>=5)=0.1; p(x>=4)=0.1; p(x>=3)=0.2; p(x>=2)=0.2; p(x>=1)=0.4;
-   * p(x>=0)=1;
-   *
-   * Say we have N id1s, this is how we want the final result to be:
-   * id1s in [0->0.1*N) have x>=5
-   * id1s in [0->0.1*N) have x>=4 (meaning there is no x=4)
-   * id1s in [0->0.2*N) have x>=3 (meaning id1s in [0.1*N, 0.2*N) have x=3)
-   * id1s in [0->0.2*N) have x>=2 (meaning there is no x=2)
-   * id1s in [0->0.4*N) have x>=1 (meaning id1s in [0.2*N, 0.4*N) have x=1)
-   * id1s in [0->N) have x>=0 (meaning id1s in [0.4*N, N) have x=0)
-   *
-   * To do this, we use an array "right" where right[i] means that id1s
-   * in [0->right[i]] have x>=i. We initialize all right[i] (for all i)
-   * value 0. In this example, right[i]=0 for i from 0 to 6. Our aim is
-   * to eventually make right[5]=0.1*N; right[4]=0.1*N; right[3]=0.2*N;
-   * right[2]=0.2*N; right[1]=0.4*N; and right[0]=N.
-   *
-   * Now every time getNextId1s is called, one right[i] will be randomly
-   * picked according to distribution (A). Its value is returned by
-   * getNextId1s as the new id1 before getting increased.
-   *
-   * The last question is how to randomly pick a right point according to
-   * (A) effectively? In order to do this, we calculate the cumulative
-   * sum of (A): 0, 0.4, 0.6, 0.8, 0.9, 1.0. To pick a right point, we
-   * randomly generate a number from 0 to 1.0, and then use binary search
-   * to find the corresonding range.
-   */
-  //find smallest idx that satisfy a[idx] >= p
-  static int binarySearch(double[] a, double p) {
-    // Use built-in binary search
-    int res = Arrays.binarySearch(a, p);
-    if (res >= 0) {
-      return res;
-    } else {
-      // Arrays.binarySearch returns (-(insertion point) - 1) when not found
-      return -(res + 1);
+ 
+  @Override
+  public long choose(Random rng) {
+    if (type == DistributionType.LINKS) {
+      throw new RuntimeException("choose not supported for LINKS");
     }
+    return super.choose(rng);
   }
 
   static long getNextId1(Random rng, long startid1, long maxid1,
       boolean write) {
-
-    double[] cs = write ? nwrites_cs : nreads_cs;//cumulative sum
-    double max_probability = cs[cs.length - 1];
-    double p = max_probability * rng.nextDouble();
-
-    int idx = binarySearch(cs, p);
-    if (idx == 0) idx = 1;
-
-    /*
-     * TODO: this algorithm does not appear to generate data
-     * faithful to the distribution.
-     * Additional problems include data races if multiple threads are
-     * concurrently modifying the shared arrays, and the fact
-     * that a workload cannot be reproduced.
-     */
-    long result = -1;
-    if (write) {
-      result = nwrites_right_points[idx];
-      nwrites_right_points[idx] = (nwrites_right_points[idx] + 1)%maxid1;
+    double cs[] = write ? nwrites_cs : nreads_cs;//cumulative sum
+    long right_points[] = write ? nwrites_right_points : nreads_right_points;
+    long shuffle[] = write ? WRITE_SHUFFLER_PARAMS : READ_SHUFFLER_PARAMS;
+    long id1 = choose(rng, startid1, maxid1, cs, right_points);
+    
+    if (shuffle != null) {
+      id1 = Shuffler.getPermutationValue(id1, startid1, maxid1, shuffle);
     }
-    else {
-      result = nreads_right_points[idx];
-      nreads_right_points[idx] = (nreads_right_points[idx] + 1)%maxid1;
-    }
-
-    long id1 = startid1 + result;
-
-    if (write) {
-      id1 = Shuffler.getPermutationValue(id1, startid1, maxid1,
-          WRITE_SHUFFLER_PARAMS);
-    }
-    else {
-      id1 = Shuffler.getPermutationValue(id1, startid1, maxid1,
-          READ_SHUFFLER_PARAMS);
-    }
-
+    
     return id1;
   }
 }

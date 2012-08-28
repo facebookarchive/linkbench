@@ -26,6 +26,21 @@ public interface ProbabilityDistribution {
                           Properties props, String keyPrefix);
   
   /**
+   * Probability density function, i.e. P(X = id)
+   * @param id
+   * @return
+   */
+  public abstract double pdf(long id);
+  
+  /**
+   * Probability density function scaled by an implementation-defined
+   * factor (e.g. the number of trials, giving the expected number of values)
+   * @param id
+   * @return
+   */
+  public abstract double expectedCount(long id);
+  
+  /**
    * Cumulative distribution function, i.e. for a random variable
    * X chosen accord to the distribution P(X <= id).
    * E.g. cdf(min - 1) = 0.0, and cdf(max - 1) = 1.0
@@ -47,6 +62,5 @@ public interface ProbabilityDistribution {
    * Quantile function for the distribution
    * @return x such that Pr(X <= x) = p
    */
-  //public abstract long quantile(double p);
-
+  public abstract long quantile(double p);
 }

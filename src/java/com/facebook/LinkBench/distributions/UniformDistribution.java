@@ -3,6 +3,8 @@ package com.facebook.LinkBench.distributions;
 import java.util.Properties;
 import java.util.Random;
 
+import com.facebook.LinkBench.Config;
+
 /**
  * Uniform distribution over integers in range [minID, maxID),
  * where minID is included in range and maxID excluded
@@ -11,6 +13,7 @@ import java.util.Random;
 public class UniformDistribution implements ProbabilityDistribution {
   private long min = 0; 
   private long max = 1;
+  private double scale = 1.0;
   
   public void init(long min, long max, Properties props, String keyPrefix) {
     if (max <= min) {
@@ -19,8 +22,31 @@ public class UniformDistribution implements ProbabilityDistribution {
     }
     this.min = min;
     this.max = max;
+    if (props != null && props.containsKey(keyPrefix + Config.PROB_SCALE)) {
+      scale = Double.parseDouble(props.getProperty(
+                                  keyPrefix + Config.PROB_SCALE));
+    } else {
+      scale = 1.0;
+    }
   }
   
+  @Override
+  public double pdf(long id) {
+    return scaledPDF(id, 1.0);
+  }
+  
+  @Override
+  public double expectedCount(long id) {
+    return scaledPDF(id, scale);
+  }
+
+  private double scaledPDF(long id, double scale) {
+    // Calculate this way to avoid losing precision by calculating very
+    // small pdf number
+    if (id < min || id >= max) return 0.0;
+    return scale / (double) (max - min);
+  }
+
   /**
    * Cumulative distribution function for distribution
    * @param id
@@ -45,7 +71,8 @@ public class UniformDistribution implements ProbabilityDistribution {
   public long quantile(double p) {
     assert(p >= 0.0 && p <= 1.0);
     long n = max - min;
-    long i = Math.round(p * n);
+    long i = (long)Math.floor(p * n);
+    if (i == n) return max - 1;
     return i + min;
   }
   

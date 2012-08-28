@@ -36,6 +36,11 @@ public abstract class DistributionTestBase extends TestCase {
   protected int cdfChecks() {
     return 50000;
   }
+  
+  /** Number of pdf checks */
+  protected int pdfChecks() { 
+    return 50000;
+  }
 
   protected Bucketer getBucketer() {
     return new UniformBucketer(cdfChecks());
@@ -75,6 +80,54 @@ public abstract class DistributionTestBase extends TestCase {
       last = p;
     }
   }
+  
+  @Test
+  public void testPDFSanity() {
+    ProbabilityDistribution dist = getDist();
+    long min = 453, max = 26546454;
+    dist.init(min, max, getDistParams(), "");
+    
+    assertEquals(0.0, dist.pdf(min-1));
+    assertEquals(0.0, dist.pdf(min-234321));
+    assertEquals(0.0, dist.pdf(max));
+    assertEquals(0.0, dist.pdf(max+2343242224234L));
+    
+    // Check pdf is in correct range
+    double total = 0.0;
+    long step = (max - min) / pdfChecks();
+    for (long id = min; id < max; id += step) {
+      double p = dist.pdf(id);
+      if ((id - min) < step * 100) { 
+        System.err.println("p(X=" + id + ") = " + p);
+      }
+      assertTrue(p >= 0.0);
+      assertTrue(p <= 1.0);
+      total += p;
+    }
+    assert(total <= 1.0);
+  }
+  
+  @Test
+  public void testPDFSum() {
+    ProbabilityDistribution dist = getDist();
+    long min = 1, max = 50;
+    dist.init(min, max, getDistParams(), "");
+   
+    // Check sum of pdf over small range
+    // Order of least to most probably to minimize sum error
+    double total = 0.0;
+    for (long id = max - 1; id >= min; id--) {
+      double p = dist.pdf(id);
+      assertTrue(p >= 0.0);
+      assertTrue(p <= 1.0);
+      System.err.println("p(X=" + id + ") = " + p);
+      total += p;
+    }
+    System.err.println("Total = " + total);
+    // Give significant tolerance due to rounding errors
+    assertTrue(total <= 1.05);
+    assertTrue(total >= 0.95 );
+  }
 
   @Test
   public void testChooseSanity() {
@@ -95,10 +148,12 @@ public abstract class DistributionTestBase extends TestCase {
    */
   @Test
   public void testCDFChooseConsistency() {
+    
+    long min = 100, max = 100000;
     Bucketer bucketer = getBucketer();
     int bucketCount = bucketer.getBucketCount();
     int buckets[] = new int[bucketCount];
-    long min = 252352, max = 6544543;
+    
     long n = max - min;
     
     Random rng = initRandom("testCDFChooseConsistency");
@@ -132,6 +187,46 @@ public abstract class DistributionTestBase extends TestCase {
       fail("Divergence between cdf and choose methods: see preceding output " +
       		"for details");
     }
+  }
+  
+  @Test
+  public void testCDFPDFConsistency() {
+    long min = 252352, max = 6544543;
+    ProbabilityDistribution dist = getDist();
+    dist.init(min, max, getDistParams(), "");
+    
+    long step = (max - min) / cdfChecks();
+    for (long id = min + 1; id < max; id += step) {
+      double c = dist.cdf(id);
+      double c1 = dist.cdf(id - 1);
+      double p = dist.pdf(id);
+      
+      double err = Math.abs((c - c1) - p);
+      if (err > 0.0001) {
+        fail(String.format("Error > 0.001: cdf(%d) - cdf(%d) = %f, pdf(%d) = %f",
+                              id, id -1, c1 - c, id, p));
+      }
+    }
+  }
+  
+  @Test
+  public void testQuantileSanity() {
+    long min = 0, max = 1000;
+    ProbabilityDistribution dist = getDist();
+    dist.init(min, max, getDistParams(), "");
+    
+    long last = dist.quantile(0.0);
+    for (double q = 0.0; q <= 1.0; q += 0.125) {
+      long id = dist.quantile(q);
+      assertTrue(id >= min);
+      assertTrue(id < max);
+      assertTrue(id >= last);
+      last = id;
+    }
+    
+    // min should be most probable, and therefore should definitely
+    // be returned by quantile
+    assertEquals(min, dist.quantile(0.0));
   }
 
   /**

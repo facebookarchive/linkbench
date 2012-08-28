@@ -26,6 +26,7 @@ public class Config {
   public static final String MAX_ID = "maxid1";
   public static final String GENERATE_NODES = "generate_nodes";
   public static final String RANDOM_ID2_MAX = "randomid2max";
+  public static final String NLINKS_PREFIX = "nlinks_";
   public static final String NLINKS_FUNC = "nlinks_func";
   public static final String NLINKS_CONFIG = "nlinks_config";
   public static final String NLINKS_DEFAULT = "nlinks_default";
@@ -60,6 +61,9 @@ public class Config {
   public static final String ID2GEN_CONFIG = "id2gen_config";
   public static final String NODE_ACCESS_DIST = "node_access_dist";
   public static final String NODE_ACCESS_DIST_KEY_PREFIX = "node_access_dist_";
+  
+  /* Probability distribution parameters */
+  public static final String PROB_SCALE = "scale";
   
   /* Statistics collection and reporting */
   public static final String MAX_STAT_SAMPLES = "maxsamples";

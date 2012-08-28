@@ -15,6 +15,7 @@ import org.junit.Test;
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
+import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistMode;
 
 /**
  * This test implements unit tests that *all* implementations of LinkStore 
@@ -93,7 +94,8 @@ public abstract class LinkStoreTestBase extends TestCase {
     props.setProperty(Config.MAX_ID, Long.toString(startId + idCount));
     props.setProperty(Config.RANDOM_ID2_MAX, "0");
     props.setProperty(Config.LINK_DATASIZE, "100");
-    props.setProperty(Config.NLINKS_FUNC, "-3"); // Fixed number of rows
+    // Fixed number of rows
+    props.setProperty(Config.NLINKS_FUNC, LinkDistMode.CONST.name()); 
     props.setProperty(Config.NLINKS_CONFIG, "0"); // ignored
     props.setProperty(Config.NLINKS_DEFAULT, Integer.toString(linksPerId));
     props.setProperty(Config.DISPLAY_FREQ, "1800");

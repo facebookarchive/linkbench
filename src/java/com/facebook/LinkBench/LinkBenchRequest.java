@@ -8,8 +8,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.distributions.LinkDistributions;
 import com.facebook.LinkBench.distributions.ProbabilityDistribution;
 import com.facebook.LinkBench.distributions.UniformDistribution;
+import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
 import com.facebook.LinkBench.util.ClassLoadUtil;
 
@@ -70,10 +72,8 @@ public class LinkBenchRequest implements Runnable {
   Link link;
 
   // #links distribution from properties file
-  int nlinks_func;
-  int nlinks_config;
-  int nlinks_default;
-
+  private LinkDistribution linkDist;
+  
   long requestsdone = 0;
   long errors = 0;
   boolean aborted;
@@ -202,20 +202,8 @@ public class LinkBenchRequest implements Runnable {
     id2gen_config = Integer.parseInt(props.getProperty(Config.ID2GEN_CONFIG));
 
     link = new Link();
-
-    nlinks_func = Integer.parseInt(props.getProperty(Config.NLINKS_FUNC));
-    nlinks_config = Integer.parseInt(props.getProperty(Config.NLINKS_CONFIG));
-    nlinks_default = Integer.parseInt(props.getProperty(Config.NLINKS_DEFAULT));
-    if (nlinks_func == -2) {//real distribution has its own initialization
-      try {
-        //in case there is no load phase, real distribution
-        //will be initialized here
-        RealDistribution.loadOneShot(props);
-      } catch (Exception e) {
-        logger.error(e);
-        System.exit(1);
-      }
-    }
+    
+    linkDist = LinkDistributions.loadLinkDistribution(props, startid1, maxid1);
   }
 
   public long getRequestsDone() {
@@ -368,10 +356,7 @@ public class LinkBenchRequest implements Runnable {
 
         link.id1 = chooseRequestID1(false, link.id1);
 
-
-        long nlinks = LinkBenchLoad.getNlinks(rng,
-            link.id1, startid1, maxid1,
-            nlinks_func, nlinks_config, nlinks_default);
+        long nlinks = linkDist.getNlinks(link.id1);
 
         // id1 is expected to have nlinks links. Retrieve one of those.
         link.id2 = (randomid2max == 0 ?
@@ -609,12 +594,7 @@ public class LinkBenchRequest implements Runnable {
     link.id1_type = LinkStore.ID1_TYPE;
     link.id2_type = LinkStore.ID2_TYPE;
 
-    // note that use use write_function here rather than nlinks_func.
-    // This is useful if we want request phase to add links in a different
-    // manner than load phase.
-    long nlinks = LinkBenchLoad.getNlinks(rng,
-        link.id1, startid1, maxid1,
-        wr_distrfunc, wr_distrconfig, 1);
+    long nlinks = linkDist.getNlinks(link.id1);
 
     // We want to sometimes add a link that already exists and sometimes
     // add a new link. So generate id2 between 0 and 2 * links.
@@ -647,10 +627,7 @@ public class LinkBenchRequest implements Runnable {
   void updateLink(Link link) throws Exception {
     link.link_type = LinkStore.LINK_TYPE;
 
-
-    long nlinks = LinkBenchLoad.getNlinks(rng,
-        link.id1, startid1, maxid1,
-        nlinks_func, nlinks_config, nlinks_default);
+    long nlinks = linkDist.getNlinks(link.id1);
 
     // id1 is expected to have nlinks links. Update one of those.
     link.id2 = (randomid2max == 0 ?
@@ -681,9 +658,7 @@ public class LinkBenchRequest implements Runnable {
   void deleteLink(Link link) throws Exception {
     link.link_type = LinkStore.LINK_TYPE;
 
-    long nlinks = LinkBenchLoad.getNlinks(rng,
-        link.id1, startid1, maxid1,
-        nlinks_func, nlinks_config, nlinks_default);
+    long nlinks = linkDist.getNlinks(link.id1);
 
     // id1 is expected to have nlinks links. Delete one of those.
     link.id2 = (randomid2max == 0 ?
