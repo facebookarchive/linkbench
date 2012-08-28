@@ -8,12 +8,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.RealDistribution.DistributionType;
+import com.facebook.LinkBench.distributions.AccessDistributions;
+import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistribution;
 import com.facebook.LinkBench.distributions.LinkDistributions;
-import com.facebook.LinkBench.distributions.ProbabilityDistribution;
-import com.facebook.LinkBench.distributions.UniformDistribution;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
-import com.facebook.LinkBench.util.ClassLoadUtil;
 
 
 public class LinkBenchRequest implements Runnable {
@@ -70,6 +70,9 @@ public class LinkBenchRequest implements Runnable {
   Random rng;
 
   Link link;
+  
+  // Last node id accessed
+  long lastNodeId;
 
   // #links distribution from properties file
   private LinkDistribution linkDist;
@@ -81,18 +84,10 @@ public class LinkBenchRequest implements Runnable {
   // configuration for generating id2
   int id2gen_config;
 
-  private int wr_distrfunc;
-
-  private int wr_distrconfig;
-
-  private int rd_distrfunc;
-
-  private int rd_distrconfig;
-  
-  // Access distribution for nodes
-  private ProbabilityDistribution nodeAccessDist;
-  // TODO: temporarily hardcode some shuffling paramters
-  private static final long[] NODE_ACCESS_SHUFFLER_PARAMS = {27, 13};
+  // Access distributions
+  private AccessDistribution writeDist; // link writes
+  private AccessDistribution readDist; // link reads
+  private AccessDistribution nodeAccessDist; // node reads and writes
   
   public LinkBenchRequest(LinkStore linkStore,
                           NodeStore nodeStore,
@@ -164,23 +159,23 @@ public class LinkBenchRequest implements Runnable {
       System.exit(1);
     }
     
-    wr_distrfunc = Integer.parseInt(props.getProperty(Config.WRITE_FUNCTION));
-    wr_distrconfig = Integer.parseInt(props.getProperty(Config.WRITE_CONFIG));
-    rd_distrfunc = Integer.parseInt(props.getProperty(Config.READ_FUNCTION));
-    rd_distrconfig = Integer.parseInt(props.getProperty(Config.READ_CONFIG));
+    writeDist = AccessDistributions.loadAccessDistribution(props, 
+            startid1, maxid1, DistributionType.WRITES);
+    readDist = AccessDistributions.loadAccessDistribution(props, 
+        startid1, maxid1, DistributionType.READS);
 
-    String nodeAccessDistClass = props.getProperty(Config.NODE_ACCESS_DIST,
-                                       UniformDistribution.class.getName());
     try {
-      nodeAccessDist = ClassLoadUtil.newInstance(nodeAccessDistClass,
-                                              ProbabilityDistribution.class);
-    } catch (ClassNotFoundException ex) {
-      logger.error("Class load error:", ex);
-      throw new RuntimeException(ex);
+      nodeAccessDist  = AccessDistributions.loadAccessDistribution(props, 
+        startid1, maxid1, DistributionType.NODE_ACCESSES);
+    } catch (LinkBenchConfigError e) {
+      // Not defined
+      logger.info("Node access distribution not configured");
+      if (pc_getnode > pc_getlinklist) {
+        throw new LinkBenchConfigError("Node access distribution not " +
+        		"configured but node operations have non-zero probability");
+      }
+      nodeAccessDist = null;
     }
-    
-    nodeAccessDist.init(startid1, maxid1, props, 
-                                    Config.NODE_ACCESS_DIST_KEY_PREFIX);
 
     numfound = 0;
     numnotfound = 0;
@@ -197,11 +192,13 @@ public class LinkBenchRequest implements Runnable {
     
     // random number generator for id2
     randomid2max = Long.parseLong(props.getProperty(Config.RANDOM_ID2_MAX));
-
+    
     // configuration for generating id2
     id2gen_config = Integer.parseInt(props.getProperty(Config.ID2GEN_CONFIG));
 
     link = new Link();
+    
+    lastNodeId = startid1;
     
     linkDist = LinkDistributions.loadLinkDistribution(props, startid1, maxid1);
   }
@@ -215,93 +212,37 @@ public class LinkBenchRequest implements Runnable {
   }
 
   // gets id1 for the request based on desired distribution
-  private long chooseRequestID1(boolean write,
+  private long chooseRequestID(DistributionType type,
                                         long previousId1) {
-
-    // Need to pick a random number between startid1 (inclusive) and maxid1
-    // (exclusive)
-    long longid1 = startid1 +
-      Math.abs(rng.nextLong())%(maxid1 - startid1);
-    double id1 = longid1;
-    double drange = (double)maxid1 - startid1;
-
-    int distrfunc = write ? wr_distrfunc : rd_distrfunc;
-    int distrconfig = write ? wr_distrconfig : rd_distrconfig;
-    
-    long newid1;
-    switch(distrfunc) {
-
-    case -3: //sequential from startid1 to maxid1 (circular)
-      if (previousId1 <= 0) {
-        newid1 = startid1;
-      } else {
-        newid1 = previousId1+1;
-        if (newid1 > maxid1) {
-          newid1 = startid1;
-        }
-      }
+    AccessDistribution dist;
+    switch (type) {
+    case READS:
+      dist = readDist;
       break;
-
-    case -2: //real distribution
-      newid1 = RealDistribution.getNextId1(rng, startid1, maxid1, write);
+    case WRITES:
+      dist = writeDist;
       break;
-
-    case -1 : // inverse function f(x) = 1/x.
-      newid1 = (long)(Math.ceil(drange/id1));
+    case NODE_ACCESSES:
+      dist = nodeAccessDist;
       break;
-    case 0 : // generate id1 that is even multiple of distrconfig
-      newid1 = distrconfig * (long)(Math.ceil(id1/distrconfig));
-      break;
-    case 100 : // generate id1 that is power of distrconfig
-      double log = Math.ceil(Math.log(id1)/Math.log(distrconfig));
-
-      newid1 = (long)Math.pow(distrconfig, log);
-      break;
-    default: // generate id1 that is perfect square if distrfunc is 2,
-      // perfect cube if distrfunc is 3 etc
-
-      // get the nth root where n = distrconfig
-      long nthroot = (long)Math.ceil(Math.pow(id1, (1.0)/distrfunc));
-
-      // get nthroot raised to power n
-      newid1 = (long)Math.pow(nthroot, distrfunc);
-      break;
+    default:
+      throw new RuntimeException("Unknown value for type: " + type);
     }
-
-    if ((newid1 >= startid1) && (newid1 < maxid1)) {
-      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-        logger.trace("id1 generated = " + newid1 +
-                             " for (distrfunc, distrconfig): " +
-                             distrfunc + "," +  distrconfig);
-      }
-
-      return newid1;
-    } else if (newid1 < startid1) {
-      longid1 = startid1;
-    } else if (newid1 >= maxid1) {
-      longid1 = maxid1 - 1;
-    }
-
+    long newid1 = dist.nextID(rng, previousId1);
+    // Distribution responsible for generating number in range
+    assert((newid1 >= startid1) && (newid1 < maxid1));
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-      logger.debug("Using " + longid1 + " as id1 generated = " + newid1 +
-                         " out of bounds for (distrfunc, distrconfig): " +
-                         distrfunc + "," +  distrconfig);
+      logger.trace("id1 generated = " + newid1 +
+         " for access distribution: " + dist.getClass().getName() + ": " +
+         dist.toString());
     }
-
-    return longid1;
-  }
-
-  /** 
-   * Choose an ID in the range of currently existing IDs
-   * based on the access distribution for nodes
-   * @return
-   */
-  private long chooseRequestNodeID() {
-    // Shuffle by different values to the link accesses
-    long unshuffled = nodeAccessDist.choose(rng);
-    long shuffled = Shuffler.getPermutationValue(unshuffled, startid1, maxid1,
-                        NODE_ACCESS_SHUFFLER_PARAMS);
-    return shuffled;
+     
+    // Shuffle in the id space if needed
+    if (dist.getShuffleParams() != null) {
+      Shuffler.getPermutationValue(newid1, startid1, maxid1,
+                                      dist.getShuffleParams());
+    }
+    return newid1;
   }
 
   /**
@@ -324,19 +265,19 @@ public class LinkBenchRequest implements Runnable {
       if (r <= pc_addlink) {
         // generate add request
         type = LinkBenchOp.ADD_LINK;
-        link.id1 = chooseRequestID1(true, link.id1);
+        link.id1 = chooseRequestID(DistributionType.WRITES, link.id1);
         starttime = System.nanoTime();
         addLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_deletelink) {
         type = LinkBenchOp.DELETE_LINK;
-        link.id1 = chooseRequestID1(true, link.id1);
+        link.id1 = chooseRequestID(DistributionType.WRITES, link.id1);
         starttime = System.nanoTime();
         deleteLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_updatelink) {
         type = LinkBenchOp.UPDATE_LINK;
-        link.id1 = chooseRequestID1(true, link.id1);
+        link.id1 = chooseRequestID(DistributionType.WRITES, link.id1);
         starttime = System.nanoTime();
         updateLink(link);
         endtime = System.nanoTime();
@@ -344,7 +285,7 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkBenchOp.COUNT_LINK;
 
-        link.id1 = chooseRequestID1(false, link.id1);
+        link.id1 = chooseRequestID(DistributionType.READS, link.id1);
         starttime = System.nanoTime();
         countLinks(link);
         endtime = System.nanoTime();
@@ -354,7 +295,7 @@ public class LinkBenchRequest implements Runnable {
         type = LinkBenchOp.GET_LINK;
 
 
-        link.id1 = chooseRequestID1(false, link.id1);
+        link.id1 = chooseRequestID(DistributionType.READS, link.id1);
 
         long nlinks = linkDist.getNlinks(link.id1);
 
@@ -377,7 +318,7 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkBenchOp.GET_LINKS_LIST;
 
-        link.id1 = chooseRequestID1(false, link.id1);
+        link.id1 = chooseRequestID(DistributionType.READS, link.id1);
         starttime = System.nanoTime();
         Link links[] = getLinkList(link);
         endtime = System.nanoTime();
@@ -391,7 +332,7 @@ public class LinkBenchRequest implements Runnable {
         type = LinkBenchOp.ADD_NODE;
         Node newNode = createNode();
         starttime = System.nanoTime();
-        long newId = nodeStore.addNode(dbid, newNode);
+        lastNodeId = nodeStore.addNode(dbid, newNode);
         endtime = System.nanoTime();
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("addNode " + newNode);
@@ -402,29 +343,35 @@ public class LinkBenchRequest implements Runnable {
         Node newNode = createNode();
         // Choose an id that has previously been created (but might have
         // been since deleted
-        newNode.id = chooseRequestNodeID();
+        newNode.id = chooseRequestID(DistributionType.NODE_ACCESSES, 
+                                     lastNodeId);
         starttime = System.nanoTime();
         boolean changed = nodeStore.updateNode(dbid, newNode);
         endtime = System.nanoTime();
+        lastNodeId = newNode.id;
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("updateNode " + newNode + " changed=" + changed);
         }
       } else if (r <= pc_deletenode) {
         type = LinkBenchOp.DELETE_NODE;
-        long idToDelete = chooseRequestNodeID();
+        long idToDelete = chooseRequestID(DistributionType.NODE_ACCESSES, 
+                                          lastNodeId);
         starttime = System.nanoTime();
         boolean deleted = nodeStore.deleteNode(dbid, LinkStore.ID1_TYPE,
                                                      idToDelete);
         endtime = System.nanoTime();
+        lastNodeId = idToDelete;
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("deleteNode " + idToDelete + " deleted=" + deleted);
         }
       } else if (r <= pc_getnode) {
         type = LinkBenchOp.GET_NODE;
         starttime = System.nanoTime();
-        long idToFetch = chooseRequestNodeID();
+        long idToFetch = chooseRequestID(DistributionType.NODE_ACCESSES, 
+                                         lastNodeId);
         Node fetched = nodeStore.getNode(dbid, LinkStore.ID1_TYPE, idToFetch);
         endtime = System.nanoTime();
+        lastNodeId = idToFetch;
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           if (fetched == null) {
             logger.trace("getNode " + idToFetch + " not found");

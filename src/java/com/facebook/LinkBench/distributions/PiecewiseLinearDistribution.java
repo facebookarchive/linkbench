@@ -160,7 +160,7 @@ public abstract class PiecewiseLinearDistribution implements ProbabilityDistribu
      * that a workload cannot be reproduced.
      */
     long result = right_points[idx];
-    right_points[idx] = (right_points[idx] + 1)%maxid1;
+    right_points[idx] = (right_points[idx] + 1)% (maxid1 - startid1);
     long id1 = startid1 + result;
     return id1;
   }

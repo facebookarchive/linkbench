@@ -15,6 +15,8 @@ import org.junit.Test;
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
+import com.facebook.LinkBench.distributions.UniformDistribution;
+import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistMode;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistMode;
 
 /**
@@ -121,9 +123,9 @@ public abstract class LinkStoreTestBase extends TestCase {
     props.setProperty(Config.PR_GET_LINK, Double.toString(p_getlink));
     props.setProperty(Config.PR_GET_LINK_LIST, Double.toString(p_getlinklist));
     
-    props.setProperty(Config.WRITE_FUNCTION, "-1");
-    props.setProperty(Config.WRITE_CONFIG, "0");
-    props.setProperty(Config.READ_FUNCTION, "-1");
+    props.setProperty(Config.WRITE_FUNCTION,
+                                        UniformDistribution.class.getName());
+    props.setProperty(Config.READ_FUNCTION, AccessDistMode.RECIPROCAL.name());
     props.setProperty(Config.READ_CONFIG, "0");
   }
 

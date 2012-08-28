@@ -95,20 +95,20 @@ public class TestRealDistribution extends TestCase {
     Random rng = new Random(randSeed);
     
     double err;
-    err = testGetNextId1(rng, 1000000, 2000001, DistributionType.READS);
+    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.READS);
     System.out.println("testGetNextId1(1000000, 2000001, nreads) err=" + err);
-    err = testGetNextId1(rng, 1000000, 2000001, DistributionType.WRITES);
+    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.WRITES);
     System.out.println("testGetNextId1(1000000, 2000001, nwrites) err=" + err);
 
-    err = testGetNextId1(rng, 1234567, 7654321, DistributionType.READS);
+    err = testGetNextId1(props, rng, 1234567, 7654321, DistributionType.READS);
     System.out.println("testGetNextId1(1234567, 7654321, nreads) err=" + err);
-    err = testGetNextId1(rng, 1234567, 7654321, DistributionType.WRITES);
+    err = testGetNextId1(props, rng, 1234567, 7654321, DistributionType.WRITES);
     System.out.println("testGetNextId1(1234567, 7654321, nwrites) err=" + err);
   
-    err = testGetNextId1(rng, 97, 10000097, DistributionType.READS);
+    err = testGetNextId1(props, rng, 97, 10000097, DistributionType.READS);
     
     System.out.println("testGetNextId1(97, 10000097, nreads) err=" + err);
-    err = testGetNextId1(rng, 97, 10000097, DistributionType.WRITES);
+    err = testGetNextId1(props, rng, 97, 10000097, DistributionType.WRITES);
     System.out.println("testGetNextId1(97, 10000097, nwrites) err=" + err);
     System.out.println();
   }
@@ -174,16 +174,18 @@ public class TestRealDistribution extends TestCase {
   //test RealDistribution.getNextId1
   //type is either "nlinks" or "nwrites"
   //maxid1 is exclusive
-  private static double testGetNextId1(Random rng, int startid1, int maxid1,
+  private static double testGetNextId1(Properties props, Random rng,
+                                       int startid1, int maxid1,
                                        DistributionType type) throws Exception {
     int[] cnt = new int[maxid1];
     
     double nqueries = (maxid1 - startid1)*RealDistribution.getArea(type)
       /100.0;
-
+    
+    RealDistribution dist = new RealDistribution();
+    dist.init(props, startid1, maxid1, DistributionType.WRITES);
     for (int i = 0; i < nqueries; ++i) {
-      long x = RealDistribution.getNextId1(rng, startid1, maxid1, 
-          type.equals("nwrites"));
+      long x = dist.choose(rng);
       if (x < startid1 || x >= maxid1) {
         throw new Exception("Invalid value of id1: " + x);
       }

@@ -11,6 +11,7 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.RealDistribution.DistributionType;
 import com.facebook.LinkBench.distributions.PiecewiseLinearDistribution;
 
 /*
@@ -29,11 +30,13 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   public final static long[] NLINKS_SHUFFLER_PARAMS = {13, 7};
   public final static long[] WRITE_SHUFFLER_PARAMS = {13, 7};
   public final static long[] READ_SHUFFLER_PARAMS = {13, 7};
+  public static final long[] NODE_ACCESS_SHUFFLER_PARAMS = {27, 13};
 
   public static enum DistributionType {
     LINKS,
     READS,
-    WRITES
+    WRITES,
+    NODE_ACCESSES
   }
 
   private DistributionType type = null;
@@ -271,18 +274,19 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     return super.choose(rng);
   }
 
-  static long getNextId1(Random rng, long startid1, long maxid1,
-      boolean write) {
-    double cs[] = write ? nwrites_cs : nreads_cs;//cumulative sum
-    long right_points[] = write ? nwrites_right_points : nreads_right_points;
-    long shuffle[] = write ? WRITE_SHUFFLER_PARAMS : READ_SHUFFLER_PARAMS;
-    long id1 = choose(rng, startid1, maxid1, cs, right_points);
-    
-    if (shuffle != null) {
-      id1 = Shuffler.getPermutationValue(id1, startid1, maxid1, shuffle);
+  public static long[] getShuffleParams(DistributionType type) {
+    switch (type) {
+    case READS:
+      return NLINKS_SHUFFLER_PARAMS;
+    case WRITES:
+      return WRITE_SHUFFLER_PARAMS;
+    case NODE_ACCESSES:
+      return NODE_ACCESS_SHUFFLER_PARAMS;
+    case LINKS:
+      return NLINKS_SHUFFLER_PARAMS;
+    default:
+      return null;
     }
-    
-    return id1;
   }
 }
 

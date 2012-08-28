@@ -40,10 +40,20 @@ public class Config {
   /* Request workload */
   public static final String NUM_REQUESTERS = "requesters";
   public static final String REQUEST_RANDOM_SEED = "request_random_seed";
-  public static final String READ_CONFIG = "read_config";
+  
+  // Distribution of accesses to IDs
+  public static final String READ_CONFIG_PREFIX = "read_";
+  public static final String WRITE_CONFIG_PREFIX = "write_";
+  public static final String NODE_ACCESS_CONFIG_PREFIX = "node_access_";
+  public static final String ACCESS_FUNCTION_SUFFIX = "function";
+  public static final String ACCESS_CONFIG_SUFFIX = "config";
   public static final String READ_FUNCTION = "read_function";
-  public static final String WRITE_CONFIG = "write_config";
+  public static final String READ_CONFIG = "read_config";
   public static final String WRITE_FUNCTION = "write_function";
+  public static final String WRITE_CONFIG = "write_config";
+  
+  
+  // Probability of different operations
   public static final String PR_ADD_LINK = "addlink";
   public static final String PR_DELETE_LINK = "deletelink";
   public static final String PR_UPDATE_LINK = "updatelink";
@@ -59,8 +69,6 @@ public class Config {
   public static final String NUM_REQUESTS = "requests";
   public static final String MAX_FAILED_REQUESTS = "max_failed_requests";
   public static final String ID2GEN_CONFIG = "id2gen_config";
-  public static final String NODE_ACCESS_DIST = "node_access_dist";
-  public static final String NODE_ACCESS_DIST_KEY_PREFIX = "node_access_dist_";
   
   /* Probability distribution parameters */
   public static final String PROB_SCALE = "scale";
