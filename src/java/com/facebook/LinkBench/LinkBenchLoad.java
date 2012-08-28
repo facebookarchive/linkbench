@@ -47,6 +47,7 @@ public class LinkBenchLoad implements Runnable {
   String dbid;
   
   private LinkDistribution linkDist;
+  private InvertibleShuffler linkShuffler;
 
 
   // Counters for load statistics
@@ -123,7 +124,10 @@ public class LinkBenchLoad implements Runnable {
     dbid = props.getProperty(Config.DBID);
     
     linkDist = LinkDistributions.loadLinkDistribution(props, startid1, maxid1);
-
+    linkShuffler = new InvertibleShuffler(RealDistribution.NLINKS_SHUFFLER_SEED,
+                                          RealDistribution.NLINKS_SHUFFLER_GROUPS,
+                                          maxid1 - startid1);   
+        
     /*
      * Initialize statistics
      */
@@ -212,25 +216,26 @@ public class LinkBenchLoad implements Runnable {
     }
     
     long prevPercentPrinted = 0;
-    for (long i = chunk.start; i < chunk.end; i += chunk.step) {
-      long nlinks = linkDist.getNlinks(i);
-      long id1;
+    for (long id1 = chunk.start; id1 < chunk.end; id1 += chunk.step) {
+      long nlinks;
       if (linkDist.doShuffle()) {
-        id1 = Shuffler.getPermutationValue(i, startid1, maxid1, 
-            RealDistribution.NLINKS_SHUFFLER_PARAMS);
-        if (id1 == i) {
+        // Get the rank of the id1 from most to least links
+        long rankid1 = startid1 + linkShuffler.invertPermute(id1 - startid1);
+        assert(rankid1 >= startid1 && rankid1 < maxid1);
+        if (id1 == rankid1) {
           sameShuffle++;
         } else {
           diffShuffle++;
         }
+        nlinks = linkDist.getNlinks(rankid1);
       } else {
-        id1 = i;
+        nlinks = linkDist.getNlinks(id1);
       }
       
       links_in_chunk += nlinks;
  
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-        logger.trace("i = " + i + " id1 = " + id1 +
+        logger.trace("id1 = " + id1 +
                            " nlinks = " + nlinks);
       }
 
@@ -238,7 +243,7 @@ public class LinkBenchLoad implements Runnable {
           id1, nlinks, singleAssoc, bulkLoad, bulkLoadBatchSize);
  
       if (!singleAssoc) {
-        long nloaded = (i - chunk.start) / chunk.step;
+        long nloaded = (id1 - chunk.start) / chunk.step;
         if (bulkLoad) {
           nloaded -= loadBuffer.size();
         }

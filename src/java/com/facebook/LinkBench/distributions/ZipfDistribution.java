@@ -20,6 +20,8 @@ public class ZipfDistribution implements ProbabilityDistribution {
   private double eta = 0.0;
   private double zetan = 0.0;
   private double point5theta = 0.0;
+  
+  
   @Override
   public void init(long min, long max, Properties props, String keyPrefix) {
     if (max <= min) {
@@ -57,10 +59,35 @@ public class ZipfDistribution implements ProbabilityDistribution {
     // Precompute some values to speed up future method calls
     long n = max - min;
     alpha = 1 / (1 - shape);
-    zetan = Harmonic.generalizedHarmonic(n, shape);
+    zetan = calcZetan(n);
     eta = (1 - FastMath.pow(2.0 / n, 1 - shape)) /
           (1 - Harmonic.generalizedHarmonic(2, shape) / zetan);
     point5theta = FastMath.pow(0.5, shape);
+  }
+
+  
+
+  // For large n, calculating zetan takes a long time. This is a simple
+  // but effective caching technique that speeds up startup a lot
+  // when multiple instances of the distribution are initialized in
+  // close succession.
+  private static long lastN = -1;
+  private static double lastShape;
+  private static double lastZetan;
+  
+  private double calcZetan(long n) {
+    synchronized(ZipfDistribution.class) {
+      if (lastN > 0 && lastN == n && lastShape == shape) {
+        return lastZetan;
+      }
+    }
+    double calcZetan = Harmonic.generalizedHarmonic(n, shape);
+    synchronized (ZipfDistribution.class) {
+      lastZetan = calcZetan;
+      lastN = n;
+      lastShape = shape;
+    }
+    return calcZetan;
   }
 
   @Override

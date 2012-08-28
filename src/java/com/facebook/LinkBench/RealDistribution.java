@@ -11,7 +11,6 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
-import com.facebook.LinkBench.RealDistribution.DistributionType;
 import com.facebook.LinkBench.distributions.PiecewiseLinearDistribution;
 
 /*
@@ -28,9 +27,17 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   final static long[] READ_SHUFFLER_PARAMS = {19, 11};
   */
   public final static long[] NLINKS_SHUFFLER_PARAMS = {13, 7};
+  public static final long NLINKS_SHUFFLER_SEED = 20343988438726021L;
+  public static final int NLINKS_SHUFFLER_GROUPS = 1024;
   public final static long[] WRITE_SHUFFLER_PARAMS = {13, 7};
+  public static final long WRITE_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
+  public static final int WRITE_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
   public final static long[] READ_SHUFFLER_PARAMS = {13, 7};
+  public static final long READ_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
+  public static final int READ_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
   public static final long[] NODE_ACCESS_SHUFFLER_PARAMS = {27, 13};
+  public static final long NODE_ACCESS_SHUFFLER_SEED = 4766565305853767165L;
+  public static final int NODE_ACCESS_SHUFFLER_GROUPS = 1024;
 
   public static enum DistributionType {
     LINKS,
@@ -274,16 +281,20 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     return super.choose(rng);
   }
 
-  public static long[] getShuffleParams(DistributionType type) {
+  public static InvertibleShuffler getShuffler(DistributionType type, long n) {
     switch (type) {
     case READS:
-      return NLINKS_SHUFFLER_PARAMS;
+      return new InvertibleShuffler(READ_SHUFFLER_SEED,
+            READ_SHUFFLER_GROUPS, n);
     case WRITES:
-      return WRITE_SHUFFLER_PARAMS;
+      return new InvertibleShuffler(WRITE_SHUFFLER_SEED,
+          WRITE_SHUFFLER_GROUPS, n);
     case NODE_ACCESSES:
-      return NODE_ACCESS_SHUFFLER_PARAMS;
+      return new InvertibleShuffler(NODE_ACCESS_SHUFFLER_SEED,
+          NODE_ACCESS_SHUFFLER_GROUPS, n);
     case LINKS:
-      return NLINKS_SHUFFLER_PARAMS;
+      return new InvertibleShuffler(NLINKS_SHUFFLER_SEED,
+          NLINKS_SHUFFLER_GROUPS, n);
     default:
       return null;
     }

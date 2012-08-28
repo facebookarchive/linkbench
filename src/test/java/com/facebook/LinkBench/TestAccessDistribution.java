@@ -54,7 +54,7 @@ public class TestAccessDistribution extends TestCase {
     testSanityAccessDist(unshuffled, min, max);
     
     ProbAccessDistribution shuffled = new ProbAccessDistribution(u, 
-                                            new long[] {13, 7, 12});
+                        new InvertibleShuffler(13, 25, max - min));
     testSanityAccessDist(shuffled, min, max);
   }
 
@@ -69,7 +69,7 @@ public class TestAccessDistribution extends TestCase {
     testSanityAccessDist(unshuffled, min, max);
     
     ProbAccessDistribution shuffled = new ProbAccessDistribution(z, 
-                                            new long[] {13, 7});
+                        new InvertibleShuffler(13, 25, max - min));
     testSanityAccessDist(shuffled, min, max);
   }
   
@@ -86,7 +86,7 @@ public class TestAccessDistribution extends TestCase {
     testSanityAccessDist(unshuffled, min, max);
     
     ProbAccessDistribution shuffled = new ProbAccessDistribution(r, 
-                                            new long[] {13, 7});
+                        new InvertibleShuffler(13, 25, max - min));
     testSanityAccessDist(shuffled, min, max);
   }
   

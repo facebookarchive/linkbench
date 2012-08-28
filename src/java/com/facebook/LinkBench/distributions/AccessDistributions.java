@@ -7,6 +7,7 @@ import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.Config;
 import com.facebook.LinkBench.ConfigUtil;
+import com.facebook.LinkBench.InvertibleShuffler;
 import com.facebook.LinkBench.LinkBenchConfigError;
 import com.facebook.LinkBench.RealDistribution;
 import com.facebook.LinkBench.RealDistribution.DistributionType;
@@ -30,11 +31,11 @@ public class AccessDistributions {
     public abstract long nextID(Random rng, long previousId);
     
     /**
-     * A set of parameters to use to shuffle the results, or
+     * A shuffler to shuffle the results, or
      * null if the results shouldn't be shuffled
      * @return
      */
-    public abstract long[] getShuffleParams();
+    public abstract InvertibleShuffler getShuffler();
   }
   
   public static class BuiltinAccessDistribution implements AccessDistribution {
@@ -99,7 +100,7 @@ public class AccessDistributions {
     }
 
     @Override
-    public long[] getShuffleParams() {
+    public InvertibleShuffler getShuffler() {
       // Don't shuffle these distributions
       return null;
     }
@@ -107,13 +108,13 @@ public class AccessDistributions {
   
   public static class ProbAccessDistribution implements AccessDistribution {
     private final ProbabilityDistribution dist;
-    private long[] shuffleParams; 
+    private InvertibleShuffler shuffler; 
     
     public ProbAccessDistribution(ProbabilityDistribution dist, 
-                                  long shuffleParams[]) {
+                                  InvertibleShuffler shuffler) {
       super();
       this.dist = dist;
-      this.shuffleParams = shuffleParams;
+      this.shuffler = shuffler;
     }
 
     @Override
@@ -122,8 +123,8 @@ public class AccessDistributions {
     }
 
     @Override
-    public long[] getShuffleParams() {
-      return shuffleParams;
+    public InvertibleShuffler getShuffler() {
+      return shuffler;
     }
 
   }
@@ -169,10 +170,11 @@ public class AccessDistributions {
       if (mode == AccessDistMode.REAL) {
         RealDistribution realDist = new RealDistribution();
         realDist.init(props, minid, maxid, kind);
-        long shuffleParams[] = RealDistribution.getShuffleParams(kind);
+        InvertibleShuffler shuffler = RealDistribution.getShuffler(kind,
+                                                    maxid - minid);
         logger.debug("Using real access distribution" +
                      " for " + kind.toString().toLowerCase());
-        return new ProbAccessDistribution(realDist, shuffleParams);
+        return new ProbAccessDistribution(realDist, shuffler);
       } else  {
         String config_key = keyPrefix + Config.ACCESS_CONFIG_SUFFIX;
         String config_val_str = props.getProperty(config_key);
@@ -209,8 +211,9 @@ public class AccessDistributions {
       ProbabilityDistribution pDist = ClassLoadUtil.newInstance(className,
                                                 ProbabilityDistribution.class);
       pDist.init(minid, maxid, props, keyPrefix);
-      long shuffleParams[] = RealDistribution.getShuffleParams(kind);
-      return new ProbAccessDistribution(pDist, shuffleParams);
+      InvertibleShuffler shuffler = RealDistribution.getShuffler(kind,
+                                                       maxid - minid);
+      return new ProbAccessDistribution(pDist, shuffler);
     } catch (ClassNotFoundException e) {
       throw new LinkBenchConfigError("Access distribution class " + className
           + " not successfully loaded: " + e.getMessage());

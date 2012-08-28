@@ -236,11 +236,11 @@ public class LinkBenchRequest implements Runnable {
          " for access distribution: " + dist.getClass().getName() + ": " +
          dist.toString());
     }
-     
-    // Shuffle in the id space if needed
-    if (dist.getShuffleParams() != null) {
-      Shuffler.getPermutationValue(newid1, startid1, maxid1,
-                                      dist.getShuffleParams());
+    
+    if (dist.getShuffler() != null) {
+      // Shuffle to go from position in space ranked from most to least accessed,
+      // to the real id space
+      newid1 = startid1 + dist.getShuffler().permute(newid1 - startid1);
     }
     return newid1;
   }
