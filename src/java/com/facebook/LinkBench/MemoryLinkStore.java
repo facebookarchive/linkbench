@@ -280,7 +280,7 @@ public class MemoryLinkStore extends GraphStore {
   @Override
   public Link[] getLinkList(String dbid, long id1, long link_type)
       throws Exception {
-    return getLinkList(dbid, id1, link_type, 0, Long.MAX_VALUE, 0, 10000);
+    return getLinkList(dbid, id1, link_type, 0, Long.MAX_VALUE, 0, rangeLimit);
   }
 
   @Override

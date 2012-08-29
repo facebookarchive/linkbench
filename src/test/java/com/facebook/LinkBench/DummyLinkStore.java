@@ -45,6 +45,7 @@ public class DummyLinkStore extends LinkStore {
   public long updates = 0;
   public long getLinks = 0;
   public long getLinkLists = 0;
+  public long getLinkListsHistory = 0;
   public long countLinks = 0;
 
   public int bulkLoadBatchSize;
@@ -147,7 +148,7 @@ public class DummyLinkStore extends LinkStore {
       throws Exception {
     checkInitialized();
     getLinkLists++;
-    // TODO Auto-generated method stub
+    getLinkListsHistory++;
     if (wrappedStore != null) {
       return wrappedStore.getLinkList(dbid, id1, link_type, minTimestamp,
                                       maxTimestamp, offset, limit);
@@ -200,6 +201,24 @@ public class DummyLinkStore extends LinkStore {
     bulkLoadCountRows += a.size();
     if (wrappedStore != null) {
       wrappedStore.addBulkCounts(dbid, a);
+    }
+  }
+
+  @Override
+  public int getRangeLimit() {
+    if (wrappedStore != null) {
+      return wrappedStore.getRangeLimit();
+    } else {
+      return rangeLimit;
+    }
+  }
+
+  @Override
+  public void setRangeLimit(int rangeLimit) {
+    if (wrappedStore != null) {
+      wrappedStore.setRangeLimit(rangeLimit);
+    } else {
+      this.rangeLimit = rangeLimit;
     }
   }
 }

@@ -16,10 +16,22 @@ public abstract class LinkStore {
   public static final byte VISIBILITY_DEFAULT = 1;
   
   public static final int MAX_OPTYPES = LinkBenchOp.values().length;
+  public static final int DEFAULT_LIMIT = 10000;
 
+  /** Controls the current setting for range limit */
+  protected int rangeLimit;
 
   /** The default constructor */
   public LinkStore() {
+    this.rangeLimit = DEFAULT_LIMIT;
+  } 
+  
+  public int getRangeLimit() {
+    return rangeLimit;
+  }
+
+  public void setRangeLimit(int rangeLimit) {
+    this.rangeLimit = rangeLimit;
   }
 
   /** initialize the store object */

@@ -1,5 +1,6 @@
 package com.facebook.LinkBench;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.Random;
@@ -53,6 +54,13 @@ public class LinkBenchRequest implements Runnable {
   double pc_updatenode;
   double pc_getnode;
   
+  // Chance of doing historical range query
+  double p_historical_getlinklist;
+  
+  // Cache of last link in lists where full list wasn't retrieved
+  ArrayList<Link> listTailHistory;
+  // Limit of cache size
+  private int listTailHistoryLimit;
   
   LinkBenchStats stats;
   LinkBenchLatency latencyStats;
@@ -184,7 +192,12 @@ public class LinkBenchRequest implements Runnable {
     }
     int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
     stats = new LinkBenchStats(requesterID, displayfreq, maxsamples);
-    
+   
+    listTailHistoryLimit = 2048;
+    listTailHistory = new ArrayList<Link>(listTailHistoryLimit);
+    p_historical_getlinklist = Double.parseDouble(props.getProperty(
+                    Config.PR_GETLINKLIST_HISTORY, "0.0")) / 100; 
+        
     lastNodeId = startid1;
   }
 
@@ -295,13 +308,19 @@ public class LinkBenchRequest implements Runnable {
       } else if (r <= pc_getlinklist) {
 
         type = LinkBenchOp.GET_LINKS_LIST;
-
-        link.id1 = chooseRequestID(DistributionType.READS, link.id1);
-        starttime = System.nanoTime();
-        Link links[] = getLinkList(link);
-        endtime = System.nanoTime();
+        Link links[];
+        
+        if (rng.nextDouble() < p_historical_getlinklist &&
+                    !this.listTailHistory.isEmpty()) {
+          links = getLinkListTail();
+        } else {
+          link.id1 = chooseRequestID(DistributionType.READS, link.id1);
+          starttime = System.nanoTime();
+          links = getLinkList(link);
+          endtime = System.nanoTime();
+        }
+        
         int count = ((links == null) ? 0 : links.length);
-
         stats.addStats(LinkBenchOp.RANGE_SIZE, count, false);
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("getlinklist count = " + count);
@@ -496,7 +515,53 @@ public class LinkBenchRequest implements Runnable {
   }
 
   Link[] getLinkList(Link link) throws Exception {
-    return linkStore.getLinkList(dbid, link.id1, link.link_type);
+    Link links[] = linkStore.getLinkList(dbid, link.id1, link.link_type);
+    
+    // If there were more links than limit, record
+    if (links != null && links.length >= linkStore.getRangeLimit()) {
+      Link lastLink = links[links.length-1];
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace("Maybe more history for (" + link.id1 +"," + 
+                      link.link_type + " older than " + lastLink.time);
+      }
+      
+      if (listTailHistory.size() < listTailHistoryLimit) {
+        listTailHistory.add(lastLink.clone());
+      } else {
+        int choice = rng.nextInt(listTailHistory.size());
+        listTailHistory.set(choice, lastLink.clone());
+      }
+    }
+    return links;
+  }
+
+  Link[] getLinkListTail() throws Exception {
+    assert(!listTailHistory.isEmpty());
+    int choice = rng.nextInt(listTailHistory.size());
+    Link prevLast = listTailHistory.get(choice);
+    
+    // Get links past the oldest last retrieved
+    Link links[] = linkStore.getLinkList(dbid, prevLast.id1,
+        prevLast.link_type, 0, prevLast.time, 1, linkStore.getRangeLimit());
+    
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("Historical range query for (" + prevLast.id1 +"," +
+                    prevLast.link_type + " older than " + prevLast.time +
+                    ": " + (links == null ? 0 : links.length) + " results");
+    }
+    
+    // There might be yet more history
+    if (links != null && links.length == linkStore.getRangeLimit()) {
+      Link last = links[links.length-1];
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace("might be yet more history for (" + last.id1 +"," +
+                      last.link_type + " older than " + last.time);
+      }
+      // Update in place
+      listTailHistory.set(choice, last.clone());
+    }
+      
+    return links;
   }
 
   long countLinks(Link link) throws Exception {

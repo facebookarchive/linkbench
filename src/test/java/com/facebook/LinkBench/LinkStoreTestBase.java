@@ -265,7 +265,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       assertTrue(links[2].equals(retrieved[0]));
     }
   }
-
+  
   /**
    * Regression test for flaw in MySql where visibility is assumed to
    * be default on add
@@ -530,6 +530,59 @@ public abstract class LinkStoreTestBase extends TestCase {
       deleteIDRange(getStoreHandle(), startId, idCount);
     }
     System.err.println("Done!");
+  }
+  
+  /**
+   * Check that the get link list history requests occur
+   */
+  @Test
+  public void testHistoryRequests() throws Exception {
+    long startId = 1000000;
+    // Few ids with many links
+    long idCount = 10;
+    int rangeLimit = 10;
+    
+    int linksPerId = (int) (rangeLimit * 2.5);
+    
+    Properties props = basicProps();
+    double pHistory = 0.5; // Half history requests
+    int requests = 5000; // enough requests that we should get ~50% history
+    long timeLimit = requests;    
+    
+    fillLoadProps(props, startId, idCount, linksPerId);
+    fillReqProps(props, startId, idCount, requests, timeLimit,
+                 0, 0, 0, 0, 0, 100);
+    props.setProperty(Config.PR_GETLINKLIST_HISTORY, Double.toString(
+                                                      pHistory * 100));
+    
+    try {
+      Random rng = createRNG();
+      
+      serialLoad(rng, logger, props, getStoreHandle());
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
+      
+      DummyLinkStore reqStore = getStoreHandle();
+      reqStore.setRangeLimit(rangeLimit); // Small limit for testing
+      LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
+                      props, new LinkBenchLatency(1), tracker, rng, 0, 1);
+
+      requester.run();
+      
+      assertEquals(requests, reqStore.getLinkLists);
+      
+      double actualPHistory = reqStore.getLinkListsHistory / 
+                              (double) reqStore.getLinkLists;
+      
+      System.err.println("# getLinkLists: " + reqStore.getLinkLists +
+          " # getLinkLists for history: " + reqStore.getLinkListsHistory
+          + " " + (actualPHistory * 100) + "%");
+      if (reqStore.isRealStore()) {
+        assertTrue(actualPHistory <= 1.05 * pHistory);
+        assertTrue(actualPHistory >= 0.95 * pHistory);
+      }
+    } finally {
+      deleteIDRange(getStoreHandle(), startId, idCount);
+    }
   }
 
   private void checkExpectedList(DummyLinkStore store,

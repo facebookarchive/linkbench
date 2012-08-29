@@ -64,6 +64,7 @@ public class Config {
   public static final String PR_UPDATE_NODE = "updatenode";
   public static final String PR_DELETE_NODE = "deletenode";
   public static final String PR_GET_NODE = "getnode";
+  public static final String PR_GETLINKLIST_HISTORY = "getlinklist_history";
   public static final String MAX_TIME = "maxtime";
   public static final String REQUEST_RATE = "requestrate";
   public static final String NUM_REQUESTS = "requests";
@@ -86,4 +87,5 @@ public class Config {
 
   /* External data */
   public static final String DISTRIBUTION_DATA_FILE = "data_file";
+
 }
