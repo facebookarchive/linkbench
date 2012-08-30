@@ -13,7 +13,9 @@ import com.facebook.LinkBench.RealDistribution.DistributionType;
 import com.facebook.LinkBench.distributions.AccessDistributions;
 import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistribution;
 import com.facebook.LinkBench.distributions.ID2Chooser;
+import com.facebook.LinkBench.distributions.ProbabilityDistribution;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
+import com.facebook.LinkBench.util.ClassLoadUtil;
 
 
 public class LinkBenchRequest implements Runnable {
@@ -61,6 +63,9 @@ public class LinkBenchRequest implements Runnable {
   ArrayList<Link> listTailHistory;
   // Limit of cache size
   private int listTailHistoryLimit;
+  
+  // Probability distribution for ids in multiget
+  ProbabilityDistribution multigetDist;
   
   LinkBenchStats stats;
   LinkBenchLatency latencyStats;
@@ -180,6 +185,28 @@ public class LinkBenchRequest implements Runnable {
     id2chooser = new ID2Chooser(props, startid1, maxid1, 
                                 nrequesters, requesterID);
 
+    // Distribution of #id2s per multiget, based on empirical
+    // results.  TODO: make configurable
+    String multigetDistClass = props.getProperty(Config.LINK_MULTIGET_DIST);
+    if (multigetDistClass != null && multigetDistClass.trim().length() != 0) {
+      int multigetMin = Integer.parseInt(props.getProperty(
+                                            Config.LINK_MULTIGET_DIST_MIN));
+      int multigetMax = Integer.parseInt(props.getProperty(
+                                            Config.LINK_MULTIGET_DIST_MAX));
+      try {
+        multigetDist = ClassLoadUtil.newInstance(multigetDistClass,
+                                            ProbabilityDistribution.class);
+        multigetDist.init(multigetMin, multigetMax, props, 
+                                             Config.LINK_MULTIGET_DIST_PREFIX);
+      } catch (ClassNotFoundException e) {
+        logger.error(e);
+        throw new LinkBenchConfigError("Class" + multigetDistClass + 
+            " could not be loaded as ProbabilityDistribution");
+      }
+    } else {
+      multigetDist = null;
+    }
+    
     numfound = 0;
     numnotfound = 0;
 
@@ -290,19 +317,27 @@ public class LinkBenchRequest implements Runnable {
 
       } else if (r <= pc_getlink) {
 
-        type = LinkBenchOp.GET_LINK;
+        type = LinkBenchOp.MULTIGET_LINK;
 
         link.id1 = chooseRequestID(DistributionType.READS, link.id1);
-        link.id2 = id2chooser.chooseForOp(rng, link.id1, 0.5);
+        int nid2s = 1;
+        if (multigetDist != null) { 
+          nid2s = (int)multigetDist.choose(rng);
+        }
+        long id2s[] = new long[nid2s];
+        for (int i = 0; i < nid2s; i++) {
+          id2s[i] = id2chooser.chooseForOp(rng, link.id1, 0.5); 
+        } 
 
         starttime = System.nanoTime();
-        boolean found = getLink(link);
+        int found = getLink(link.id1, link.link_type, id2s);
+        assert(found >= 0 && found <= nid2s);
         endtime = System.nanoTime();
 
-        if (found) {
-          numfound++;
+        if (found > 0) {
+          numfound += found;
         } else {
-          numnotfound++;
+          numnotfound += nid2s - found;
         }
 
       } else if (r <= pc_getlinklist) {
@@ -436,10 +471,11 @@ public class LinkBenchRequest implements Runnable {
         addLink(link);
 
         // read this assoc from the database over and over again
-        type = LinkBenchOp.GET_LINK;
+        type = LinkBenchOp.MULTIGET_LINK;
         for (i = 0; i < nrequests; i++) {
-          boolean found = getLink(link);
-          if (found) {
+          int found = getLink(link.id1, link.link_type,
+                                  new long[]{link.id2});
+          if (found == 1) {
             requestsdone++;
           } else {
             logger.warn("ThreadID = " + requesterID +
@@ -494,7 +530,7 @@ public class LinkBenchRequest implements Runnable {
     progressTracker.update(requestsSinceLastUpdate);
 
     stats.displayStats(Arrays.asList(
-        LinkBenchOp.GET_LINK, LinkBenchOp.GET_LINKS_LIST,
+        LinkBenchOp.MULTIGET_LINK, LinkBenchOp.GET_LINKS_LIST,
         LinkBenchOp.COUNT_LINK,
         LinkBenchOp.UPDATE_LINK, LinkBenchOp.ADD_LINK, 
         LinkBenchOp.RANGE_SIZE, LinkBenchOp.ADD_NODE,
@@ -508,10 +544,9 @@ public class LinkBenchRequest implements Runnable {
 
   }
 
-  boolean getLink(Link link) throws Exception {
-    return (linkStore.getLink(dbid, link.id1, link.link_type, link.id2) != null ?
-            true :
-            false);
+  int getLink(long id1, long link_type, long id2s[]) throws Exception {
+    Link links[] = linkStore.multigetLinks(dbid, id1, link_type, id2s);
+    return links == null ? 0 : links.length;
   }
 
   Link[] getLinkList(Link link) throws Exception {

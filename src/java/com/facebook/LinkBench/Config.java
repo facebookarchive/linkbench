@@ -70,6 +70,10 @@ public class Config {
   public static final String NUM_REQUESTS = "requests";
   public static final String MAX_FAILED_REQUESTS = "max_failed_requests";
   public static final String ID2GEN_CONFIG = "id2gen_config";
+  public static final String LINK_MULTIGET_DIST = "link_multiget_dist";
+  public static final String LINK_MULTIGET_DIST_MIN = "link_multiget_dist_min";
+  public static final String LINK_MULTIGET_DIST_MAX = "link_multiget_dist_max";
+  public static final String LINK_MULTIGET_DIST_PREFIX = "link_multiget_dist_";
   
   /* Probability distribution parameters */
   public static final String PROB_SCALE = "scale";

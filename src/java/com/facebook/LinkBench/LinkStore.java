@@ -1,6 +1,7 @@
 package com.facebook.LinkBench;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
@@ -65,6 +66,25 @@ public abstract class LinkStore {
    */
   public abstract Link getLink(String dbid, long id1, long link_type, long id2) 
     throws Exception;
+  
+  /**
+   * Lookup multiple links: same as getlink but retrieve
+   * multiple ids 
+   * @return list of matching links found, in any order
+   */
+  public Link[] multigetLinks(String dbid, long id1, long link_type,
+                                                      long id2s[]) 
+    throws Exception {
+    // Default implementation
+    ArrayList<Link> res = new ArrayList<Link>(id2s.length);
+    for (int i = 0; i < id2s.length; i++) {
+      Link l = getLink(dbid, id1, link_type, id2s[i]);
+      if (l != null) {
+        res.add(l);
+      }
+    }
+    return res.toArray(new Link[res.size()]);
+  }
 
   /**
    * lookup using just id1, type

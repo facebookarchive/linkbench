@@ -466,36 +466,59 @@ public class LinkStoreMysql extends GraphStore {
   // lookup using id1, type, id2
   public Link getLink(String dbid, long id1, long link_type, long id2)
     throws Exception {
-    String query = " select id1, id2, link_type, id1_type, id2_type," +
-    		           " visibility, data, time, " +
-                   " version from " + dbid + "." + linktable +
-                   " where id1 = " + id1 + " and id2 = " + id2 +
-                   " and link_type = " + link_type + "; commit;";
+    Link res[] = multigetLinks(dbid, id1, link_type, new long[] {id2});
+    if (res == null) return null;
+    assert(res.length <= 1);
+    return res.length == 0 ? null : res[0];
+  }
 
+
+  @Override
+  public Link[] multigetLinks(String dbid, long id1, long link_type, 
+                              long[] id2s) throws Exception {
+    StringBuilder querySB = new StringBuilder();
+    querySB.append(" select id1, id2, link_type, id1_type, id2_type," +
+        " visibility, data, time, " +
+        " version from " + dbid + "." + linktable +
+        " where id1 = " + id1 + " and link_type = " + link_type +
+        " and id2 in (");
+    boolean first = true;
+    for (long id2: id2s) {
+      if (first) {
+        first = false;
+      } else {
+        querySB.append(",");
+      }
+      querySB.append(id2);
+    }
+    
+    querySB.append("); commit;");
+    String query = querySB.toString();
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Query is " + query);
     }
-
+    
     ResultSet rs = stmt.executeQuery(query);
-    boolean found = rs.next();
-
-    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-      logger.trace("Lookup result: " + id1 + "," + link_type + "," + id2 +
-                         " is " + found);
-    }
-
-    if (found) {
+    
+    // Get the row count to allocate result array
+    assert(rs.getType() != ResultSet.TYPE_FORWARD_ONLY);
+    rs.last();
+    int count = rs.getRow();
+    rs.beforeFirst();
+    
+    Link results[] = new Link[count];
+    int i = 0;
+    while (rs.next()) {
       Link l = createLinkFromRow(rs);
-      if (rs.next()) {
-        throw new Exception("Error: multiple rows returned for point query");
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace("Lookup result: " + id1 + "," + link_type + "," +
+                  l.id2 + " found");
       }
-      return l;
-    } else {
-      return null;
+      results[i++] = l;
     }
+    return results;
   }
-
 
   // lookup using just id1, type
   public Link[] getLinkList(String dbid, long id1, long link_type)

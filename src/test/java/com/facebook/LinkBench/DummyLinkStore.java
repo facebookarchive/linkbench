@@ -43,6 +43,7 @@ public class DummyLinkStore extends LinkStore {
   public long adds = 0;
   public long deletes = 0;
   public long updates = 0;
+  public long multigetLinks = 0;
   public long getLinks = 0;
   public long getLinkLists = 0;
   public long getLinkListsHistory = 0;
@@ -113,6 +114,18 @@ public class DummyLinkStore extends LinkStore {
 
     if (wrappedStore != null) {
       wrappedStore.updateLink(dbid, a, noinverse);
+    }
+  }
+
+  @Override
+  public Link[] multigetLinks(String dbid, long id1, long link_type, long[] id2s)
+      throws Exception {
+    checkInitialized();
+    multigetLinks++;
+    if (wrappedStore != null) {
+      return wrappedStore.multigetLinks(dbid, id1, link_type, id2s);
+    } else {
+      return null;
     }
   }
 

@@ -218,6 +218,7 @@ public abstract class DistributionTestBase extends TestCase {
     long last = dist.quantile(0.0);
     for (double q = 0.0; q <= 1.0; q += 0.125) {
       long id = dist.quantile(q);
+      System.err.format("quantile(%f) = %d\n", q, id);
       assertTrue(id >= min);
       assertTrue(id < max);
       assertTrue(id >= last);

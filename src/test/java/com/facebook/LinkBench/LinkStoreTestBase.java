@@ -15,6 +15,7 @@ import org.junit.Test;
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
+import com.facebook.LinkBench.distributions.GeometricDistribution;
 import com.facebook.LinkBench.distributions.UniformDistribution;
 import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistMode;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistMode;
@@ -107,7 +108,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   private void fillReqProps(Properties props, long startId, long idCount,
       int requests, long timeLimit, double p_addlink, double p_deletelink,
       double p_updatelink, double p_countlink, double p_getlink,
-      double p_getlinklist) {
+      double p_getlinklist, boolean enableMultiget) {
     props.setProperty(Config.MIN_ID,Long.toString(startId));
     props.setProperty(Config.MAX_ID, Long.toString(startId + idCount));
     props.setProperty(Config.NUM_REQUESTS, Long.toString(requests));
@@ -127,6 +128,15 @@ public abstract class LinkStoreTestBase extends TestCase {
                                         UniformDistribution.class.getName());
     props.setProperty(Config.READ_FUNCTION, AccessDistMode.RECIPROCAL.name());
     props.setProperty(Config.READ_CONFIG, "0");
+    
+    if (enableMultiget) {
+      props.setProperty(Config.LINK_MULTIGET_DIST, 
+                                        GeometricDistribution.class.getName());
+      props.setProperty(Config.LINK_MULTIGET_DIST_MIN, "0");
+      props.setProperty(Config.LINK_MULTIGET_DIST_MAX, "10");
+      props.setProperty(Config.LINK_MULTIGET_DIST_PREFIX +
+                        GeometricDistribution.PROB_PARAM_KEY, "0.8");
+    }
   }
 
   /** 
@@ -263,6 +273,37 @@ public abstract class LinkStoreTestBase extends TestCase {
           t + 1, t + 2, 0, Integer.MAX_VALUE);
       assertEquals(1, retrieved.length);
       assertTrue(links[2].equals(retrieved[0]));
+    }
+  }
+  
+  /**
+   * Simple test to make sure multiget works
+   * @throws IOException
+   * @throws Exception
+   */
+  @Test
+  public void testMultiget() throws IOException, Exception {
+    DummyLinkStore store = getStoreHandle();
+    long id1 = 99999999999L;
+    Link a = new Link(id1, LinkStore.LINK_TYPE, 42, 0, 0,
+                      LinkStore.VISIBILITY_DEFAULT, new byte[0], 1,
+                      System.currentTimeMillis());
+    Link b = a.clone();
+    b.id2 = 43;
+    store.addLink(testDB, a, true);
+    store.addLink(testDB, b, true);
+    // Retrieve the two added links
+    Link l[] = store.multigetLinks(testDB, a.id1, a.link_type, 
+          new long[] {a.id2, b.id2, 1234});
+    if (store.isRealStore()) {
+      assertEquals(2, l.length);
+      // Could be returned in either order
+      if (a.equals(l[0])) {
+        assertTrue(b.equals(l[1]));
+      } else {
+        assertTrue(b.equals(l[0]));
+        assertTrue(a.equals(l[1]));
+      }
     }
   }
   
@@ -440,10 +481,10 @@ public abstract class LinkStoreTestBase extends TestCase {
     fillLoadProps(props, startId, idCount, linksPerId);
     
     double p_add = 0.2, p_del = 0.2, p_up = 0.1, p_count = 0.1, 
-           p_get = 0.2, p_getlinks = 0.2;
+           p_multiget = 0.2, p_getlinks = 0.2;
     fillReqProps(props, startId, idCount, requests, timeLimit,
-        p_add * 100, p_del * 100, p_up * 100, p_count * 100, p_get * 100,
-        p_getlinks * 100);
+        p_add * 100, p_del * 100, p_up * 100, p_count * 100, p_multiget * 100,
+        p_getlinks * 100, true);
     
     try {
       Random rng = createRNG();
@@ -459,9 +500,8 @@ public abstract class LinkStoreTestBase extends TestCase {
       
       requester.run();
       
-      assertTrue(reqStore.adds + reqStore.updates + reqStore.deletes +
-          reqStore.countLinks + reqStore.getLinks + reqStore.getLinkLists
-          == requests);
+      assertEquals(requests, reqStore.adds + reqStore.updates + reqStore.deletes +
+          reqStore.countLinks + reqStore.multigetLinks + reqStore.getLinkLists);
       // Check that the proportion of operations is roughly right - within 1%
       // For now, updates are actually implemented as add operations
       assertTrue(Math.abs(reqStore.adds / (double)requests - 
@@ -472,8 +512,8 @@ public abstract class LinkStoreTestBase extends TestCase {
                        (double)requests - p_del) < 0.01);
       assertTrue(Math.abs(reqStore.countLinks / 
                        (double)requests - p_count) < 0.01);
-      assertTrue(Math.abs(reqStore.getLinks /
-                       (double)requests - p_get) < 0.01);
+      assertTrue(Math.abs(reqStore.multigetLinks /
+                       (double)requests - p_multiget) < 0.01);
       assertTrue(Math.abs(reqStore.getLinkLists / 
                        (double)requests - p_getlinks) < 0.01);
       assertEquals(0, reqStore.bulkLoadCountOps);
@@ -502,7 +542,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     int requestsPerSec = 500; // Limit to fairly low rate
     fillLoadProps(props, startId, idCount, linksPerId);
     fillReqProps(props, startId, idCount, requests, timeLimit,
-                 20, 20, 10, 10, 20, 20);
+                 20, 20, 10, 10, 20, 20, false);
     props.setProperty("requestrate", Integer.toString(requestsPerSec));
     
     try {
@@ -520,7 +560,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       long endTime = System.currentTimeMillis();
       
       assertEquals(requests, reqStore.adds + reqStore.updates + reqStore.deletes +
-          reqStore.countLinks + reqStore.getLinks + reqStore.getLinkLists);
+          reqStore.countLinks + reqStore.multigetLinks + reqStore.getLinkLists);
       double actualArrivalRate = 1000 * requests / (double)(endTime - startTime);
       System.err.println("Expected request rate: " + requestsPerSec
           + " actual request rate: " + actualArrivalRate);
@@ -551,7 +591,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     
     fillLoadProps(props, startId, idCount, linksPerId);
     fillReqProps(props, startId, idCount, requests, timeLimit,
-                 0, 0, 0, 0, 0, 100);
+                 0, 0, 0, 0, 0, 100, false);
     props.setProperty(Config.PR_GETLINKLIST_HISTORY, Double.toString(
                                                       pHistory * 100));
     
