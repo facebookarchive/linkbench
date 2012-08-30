@@ -1,5 +1,6 @@
 package com.facebook.LinkBench.distributions;
 
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.Random;
 
@@ -71,21 +72,43 @@ public class ZipfDistribution implements ProbabilityDistribution {
   // but effective caching technique that speeds up startup a lot
   // when multiple instances of the distribution are initialized in
   // close succession.
-  private static long lastN = -1;
-  private static double lastShape;
-  private static double lastZetan;
+  private static class CacheEntry {
+    long n;
+    double shape;
+    double zetan;
+  }
+  
+  /** Min value of n to cache */
+  private static final long MIN_CACHE_VALUE = 1000;
+  private static final int MAX_CACHE_ENTRIES = 1024;
+  
+  private static ArrayList<CacheEntry> zetanCache = 
+                new ArrayList<CacheEntry>(MAX_CACHE_ENTRIES);
   
   private double calcZetan(long n) {
+    if (n < MIN_CACHE_VALUE) {
+      return Harmonic.generalizedHarmonic(n, shape);
+    }
+    
     synchronized(ZipfDistribution.class) {
-      if (lastN > 0 && lastN == n && lastShape == shape) {
-        return lastZetan;
+      for (int i = 0; i < zetanCache.size(); i++) {
+        CacheEntry ce = zetanCache.get(i);
+        if (ce.n == n && ce.shape == shape) {
+          return ce.zetan;
+        }
       }
     }
     double calcZetan = Harmonic.generalizedHarmonic(n, shape);
+    
     synchronized (ZipfDistribution.class) {
-      lastZetan = calcZetan;
-      lastN = n;
-      lastShape = shape;
+      CacheEntry ce = new CacheEntry();
+      ce.zetan = calcZetan;
+      ce.n = n;
+      ce.shape = shape;
+      if (zetanCache.size() >= MAX_CACHE_ENTRIES) {
+        zetanCache.remove(0);
+      }
+      zetanCache.add(ce);
     }
     return calcZetan;
   }
