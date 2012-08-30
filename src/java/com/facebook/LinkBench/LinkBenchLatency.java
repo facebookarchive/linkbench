@@ -1,5 +1,8 @@
 package com.facebook.LinkBench;
 
+import java.io.PrintStream;
+import java.text.DecimalFormat;
+
 import org.apache.log4j.Logger;
 
 
@@ -12,60 +15,153 @@ import org.apache.log4j.Logger;
 public class LinkBenchLatency {
 
   public static int MAX_MILLIS = 100;
-
-  // Number of operations that took less than 2 milliseconds
-  // The first index is the threadidm the second index is the type of
-  // call and the third index is the 'number of milliseconds'
-  // Number of operations between 0 - 100 milliseconds
-  private long latencyms[][][];
-
-  // Number of operations between 100ms - 1 sec
-  private long latency1s[][];
   
-  // Number of operations between 1 - 10 sec
-  private long latency10s[][];
+  /** 
+   * Keep track of mean in numerically stable way
+   *
+   */
+  private static class RunningMean {
+    /** Number of samples */
+    private long n;
 
-  // Number of operations bove 10 seconds
-  private long latencyhigh[][];
+    /** First sample */
+    private final double v1;
+    
+    /** sum of difference */
+    private double running;
+    
+    /** initialize with first sample */
+    public RunningMean(double v1) {
+      super();
+      this.v1 = v1;
+      this.n = 1;
+      this.running = 0.0;
+    }
+
+    public void addSample(double vi) {
+      n++;
+      running += (vi - v1);
+    }
+    
+    public double mean() {
+      return v1 + running / n;
+    }
+
+    public long samples() {
+      return n;
+    }
+  }
+  
+  /**
+   * Keep track of running mean per thread and op type
+   */
+  private RunningMean means[][];
+
+  /** Final means per op type */
+  double finalMeans[];
 
   // Displayed along with stats
   private int maxThreads;
 
-  // lassort values across threads. The first index is the type of
-  // call the second index is the latency in millis.
-  long[][] lassort;
-
-  // lassort values across threads. The index is the type of call.
-  long[] l1sec;
-  long[] l10sec;
-  long[] lhigh;
-
   public LinkBenchLatency(int maxThreads) {
     this.maxThreads = maxThreads;
-    latencyms = new long[maxThreads][LinkStore.MAX_OPTYPES][MAX_MILLIS];
-
-    latency1s = new long[maxThreads][LinkStore.MAX_OPTYPES];
-    latency10s = new long[maxThreads][LinkStore.MAX_OPTYPES];
-    latencyhigh = new long[maxThreads][LinkStore.MAX_OPTYPES];
+    means = new RunningMean[maxThreads][LinkStore.MAX_OPTYPES];
+    bucketCounts = new long[maxThreads][LinkStore.MAX_OPTYPES][NUM_BUCKETS];
+    maxLatency = new long[maxThreads][LinkStore.MAX_OPTYPES];
   }
+  
+  
+  private static final int SUB_MS_BUCKETS = 10; // Sub-ms granularity
+  private static final int MS_BUCKETS = 99; // ms-granularity buckets
+  private static final int HUNDREDMS_BUCKETS = 9; // 100ms-granularity buckets
+  private static final int SEC_BUCKETS = 9; // 1s-granularity buckets
+   static final int NUM_BUCKETS = SUB_MS_BUCKETS + MS_BUCKETS +
+          HUNDREDMS_BUCKETS + SEC_BUCKETS + 1;
+  
+  /** Counts of operations falling into each bucket */
+  private final long bucketCounts[][][]; 
+  
+  /** Counts of samples per type */
+  private long sampleCounts[];
+  
+  /** Cumulative bucket counts keyed by type, bucket# (calculated at end) */
+  private long bucketCountsCumulative[][]; 
+  
+  /** Maximum latency by thread and type */
+  private long maxLatency[][];
+  
+  static int latencyToBucket(long microTime) {
+    long ms = 1000;
+    long msTime = microTime / ms; // Floored
+    if (msTime == 0) {
+      // Bucket per 0.1 ms 
+      return (int) (microTime / 100);
+    } else if (msTime < 100) {
+      // msBucket = 0 means 1-2 ms
+      int msBucket = (int) msTime - 1;
+      // Bucket per ms
+      return SUB_MS_BUCKETS + msBucket;
+    } else if (msTime < 1000){
+      int hundredMSBucket = (int) ( msTime / 100 ) - 1;
+      return SUB_MS_BUCKETS + MS_BUCKETS + hundredMSBucket;
+    } else if (msTime < 10000) {
+      int secBucket = (int) (msTime / 1000) - 1;
+      return SUB_MS_BUCKETS + MS_BUCKETS + HUNDREDMS_BUCKETS + secBucket;
+    } else {
+      return NUM_BUCKETS - 1;
+    }
+  }
+  
+  /**
+   * 
+   * @param bucket
+   * @return inclusive min and exclusive max time in microsecs for bucket
+   */
+  static long[] bucketBound(int bucket) {
+    int ms = 1000;
+    long s = ms * 1000;
+    long res[] = new long[2];
+    if (bucket < SUB_MS_BUCKETS) {
+      res[0] = bucket * 100;
+      res[1] = (bucket+1) * 100;
+    } else if (bucket < SUB_MS_BUCKETS + MS_BUCKETS) {
+      res[0] = (bucket - SUB_MS_BUCKETS + 1) * ms;
+      res[1] = (bucket - SUB_MS_BUCKETS + 2) * ms;
+    } else if (bucket < SUB_MS_BUCKETS + MS_BUCKETS + HUNDREDMS_BUCKETS) {
+      int hundredMS = bucket - SUB_MS_BUCKETS - MS_BUCKETS + 1;
+      res[0] = hundredMS * 100 * ms;
+      res[1] = (hundredMS + 1) * 100 * ms;
+    } else if (bucket < SUB_MS_BUCKETS + MS_BUCKETS + HUNDREDMS_BUCKETS + SEC_BUCKETS) {
+      int secBucket = bucket - SUB_MS_BUCKETS - MS_BUCKETS - SEC_BUCKETS + 1;
+      res[0] = secBucket * s;
+      res[1] = (secBucket + 1) * s;
+    } else {
+      res[0] = (SEC_BUCKETS + 1)* s;
+      res[1] = 100 * s;
+    }
+    return res;
+  }
+  
 
   /** 
    * Used by the linkbench driver to record latency of each 
    * individual call
    */
   public void recordLatency(int threadid, LinkBenchOp type,
-        long nanotimetaken) {
-
-    long timetaken = nanotimetaken/1000; // in milli seconds
-
-    if (timetaken < 100) {
-      latencyms[threadid][type.ordinal()][(int)timetaken]++;
-    } else if (timetaken < 100000) {
-      latency1s[threadid][type.ordinal()]++;
-    } else if (timetaken < 1000000) {
-      latency10s[threadid][type.ordinal()]++;
+        long microtimetaken) {
+    long opBuckets[] = bucketCounts[threadid][type.ordinal()];
+    int bucket = latencyToBucket(microtimetaken);
+    opBuckets[bucket]++;
+    
+    double time_ms = microtimetaken / 1000.0;
+    if (means[threadid][type.ordinal()] == null) {
+      means[threadid][type.ordinal()] = new RunningMean(time_ms);
     } else {
-      latencyhigh[threadid][type.ordinal()]++;
+      means[threadid][type.ordinal()].addSample(time_ms);
+    }
+    
+    if (maxLatency[threadid][type.ordinal()] < microtimetaken) {
+      maxLatency[threadid][type.ordinal()] = microtimetaken;
     }
   }
 
@@ -73,76 +169,162 @@ public class LinkBenchLatency {
    * Print out percentile values
    */
   public void displayLatencyStats() {
-
-    l1sec = new long[LinkStore.MAX_OPTYPES];
-    l10sec = new long[LinkStore.MAX_OPTYPES];
-    lhigh = new long[LinkStore.MAX_OPTYPES];
-    lassort = new long[LinkStore.MAX_OPTYPES][MAX_MILLIS];
-
-    // lassort values across threads
-    for (int type = 0; type < LinkStore.MAX_OPTYPES; type++) {
-      for (int ms = 0; ms < MAX_MILLIS; ms++) {
-        for (int i = 0; i < maxThreads; i++) {
-          lassort[type][ms] += latencyms[i][type][ms];
-        }
-      }
-    }
-
-    for (int type = 0; type < LinkStore.MAX_OPTYPES; type++) {
-      for (int i = 0; i < maxThreads; i++) {
-        l1sec[type] += latency1s[i][type];
-        l10sec[type] += latency10s[i][type];
-        lhigh[type] += latencyhigh[i][type];
-      }
-    }
-
-    // convert to cumulative sums
-    for (int type = 0; type < LinkStore.MAX_OPTYPES; type++) {
-      for (int ms = 1; ms < MAX_MILLIS; ms++) {
-        lassort[type][ms] += lassort[type][ms-1];
-      }
-      l1sec[type] += lassort[type][MAX_MILLIS-1];
-      l10sec[type] += l1sec[type];
-      lhigh[type] += l10sec[type];
-    }
+    calcMeans();
+    calcCumulativeBuckets();
 
     Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
     // print percentiles
     for (LinkBenchOp type: LinkBenchOp.values()) {
-      if (lhigh[type.ordinal()] == 0) { // no samples of this type
+      if (sampleCounts[type.ordinal()] == 0) { // no samples of this type
         continue;
       }
-
+      
+      DecimalFormat df = new DecimalFormat("#.###"); // Format to max 3 decimal place
       logger.info(type.displayName() +
-                       " p25 = " + getPercentile(type, 25)  + "ms " +
-                       " p50 = " + getPercentile(type, 50)  + "ms " +
-                       " p75 = " + getPercentile(type, 75)  + "ms " +
-                       " p95 = " + getPercentile(type, 95)  + "ms " +
-                       " p99 = " + getPercentile(type, 99)  + "ms ");
+                     " count = " + sampleCounts[type.ordinal()] + " " +
+                     " p25 = " + percentileString(type, 25)  + "ms " +
+                     " p50 = " + percentileString(type, 50)  + "ms " +
+                     " p75 = " + percentileString(type, 75)  + "ms " +
+                     " p95 = " + percentileString(type, 95)  + "ms " +
+                     " p99 = " + percentileString(type, 99)  + "ms " +
+                     " max = " + df.format(getMax(type)) + "ms " +
+                     " mean = " + df.format(getMean(type))+ "ms");
+    }
+  }
 
+  public void printCSVStats(PrintStream out, boolean header) {
+    printCSVStats(out, header, LinkBenchOp.values());
+  }
+  
+  public void printCSVStats(PrintStream out, boolean header, LinkBenchOp... ops) {
+    int percentiles[] = new int[] {25, 50, 75, 95, 99};
+    
+    // Write out the header
+    if (header) {
+      out.print("op,count");
+      for (int percentile: percentiles) {
+        out.print(String.format(",p%d_low,p%d_high", percentile, percentile));
+      }
+      out.print(",max,mean");
+      out.println();
+    }
+    
+    // Print in milliseconds down to 10us granularity
+    DecimalFormat df = new DecimalFormat("#.##");
+    
+    for (LinkBenchOp op: ops) {
+      long samples = sampleCounts[op.ordinal()];
+      if (samples == 0) {
+        continue;
+      }
+      out.print(op.name());
+      out.print(",");
+      out.print(samples);
+      
+      for (int percentile: percentiles) {
+        long bounds[] = getBucketBounds(op, percentile);
+        out.print(",");
+        out.print(df.format(bounds[0] / 1000.0));
+        out.print(",");
+        out.print(df.format(bounds[1] / 1000.0));
+      }
+      
+      out.print(",");
+      out.print(df.format(getMax(op)));
+      out.print(",");
+      out.print(df.format(getMean(op)));
+      out.println();
     }
   }
    
-  private long getPercentile(LinkBenchOp type, long percentile) {
-    int type_ix = type.ordinal();
-    long p = (lhigh[type_ix] * percentile)/100;
+  /**
+   * Fill in the counts and means arrays
+   */
+  private void calcMeans() {
+    sampleCounts = new long[LinkStore.MAX_OPTYPES];
+    finalMeans = new double[LinkStore.MAX_OPTYPES];
+    for (int i = 0; i < LinkStore.MAX_OPTYPES; i++) {
+      long samples = 0;
+      for (int thread = 0; thread < maxThreads; thread++) {
+        if (means[thread][i] != null) {
+          samples += means[thread][i].samples();
+        }
+      }
+      sampleCounts[i] = samples;
+      
+      double weightedMean = 0.0;
+      for (int thread = 0; thread < maxThreads; thread++) {
+        if (means[thread][i] != null) {
+          weightedMean += (means[thread][i].samples() / (double) samples) *
+                           means[thread][i].mean();
+        }
+      }
+      finalMeans[i] = weightedMean;
+    }
+    
+  }
 
-    // does this value fall in the millisecond range?
-    int ms = 0;
-    for (ms = 0; ms < MAX_MILLIS; ms++) {
-      if (lassort[type_ix][ms] > p) {
-        return ms;
+  private void calcCumulativeBuckets() {
+    // Calculate the cumulative operation counts by bucket for each type
+    bucketCountsCumulative = new long[LinkStore.MAX_OPTYPES][NUM_BUCKETS];
+    
+    for (int type = 0; type < LinkStore.MAX_OPTYPES; type++) {
+      long count = 0;
+      for (int bucket = 0; bucket < NUM_BUCKETS; bucket++) {
+        for (int thread = 0; thread < maxThreads; thread++) {
+          count += bucketCounts[thread][type][bucket];
+        }
+        bucketCountsCumulative[type][bucket] = count;
       }
     }
+  }
 
-    // The latency is greater than 100 milliseconds.
-    if (p < l1sec[type_ix]) {
-      ms = 1000;
-    } else if (p < l10sec[type_ix]) {
-      ms = 10000;
-    } else  {
-      ms = 100000;
+  private long[] getBucketBounds(LinkBenchOp type, long percentile) {
+    long n = sampleCounts[type.ordinal()];
+    // neededRank is the rank of the sample at the desired percentile
+    long neededRank = (long) ((percentile / 100.0) * n);   
+    
+    int bucketNum = -1;
+    for (int i = 0; i < NUM_BUCKETS; i++) {
+      long rank = bucketCountsCumulative[type.ordinal()][i];
+      if (neededRank <= rank) {
+        // We have found the right bucket
+        bucketNum = i;
+        break;
+      }
     }
-    return ms;
+    assert(bucketNum >= 0); // Should definitely be found;
+    
+    
+    return bucketBound(bucketNum);
+  }
+  
+  
+  /**
+   * 
+   * @return A human-readable string for the bucket bounds
+   */
+  private String percentileString(LinkBenchOp type, long percentile) {
+    return boundsToString(getBucketBounds(type, percentile));
+  }
+
+  static String boundsToString(long[] bucketBounds) {
+    double minMs = bucketBounds[0] / 1000.0;
+    double maxMs = bucketBounds[1] / 1000.0;
+    
+    DecimalFormat df = new DecimalFormat("#.##"); // Format to max 1 decimal place
+    return "["+ df.format(minMs) + "," + df.format(maxMs) + "]";
+  }
+
+  private double getMean(LinkBenchOp type) {
+    return finalMeans[type.ordinal()];
+  }
+
+  private double getMax(LinkBenchOp type) {
+    long max_us = 0;
+    for (int thread = 0; thread < maxThreads; thread++) {
+      max_us = Math.max(max_us, maxLatency[thread][type.ordinal()]);
+    }
+    return max_us / 1000.0;
   }
 }

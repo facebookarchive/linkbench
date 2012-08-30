@@ -2,7 +2,10 @@ package com.facebook.LinkBench;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -47,6 +50,7 @@ public class LinkBenchDriver {
   private static String configFile = null;
   private static Properties cmdLineProps = null;
   private static String logFile = null;
+  private static PrintStream csvStatsFile = null;
   private static boolean doLoad = false;
   private static boolean doRequest = false;
   
@@ -347,6 +351,11 @@ public class LinkBenchDriver {
     }
 
     latencyStats.displayLatencyStats();
+    
+    if (csvStatsFile != null) {
+      latencyStats.printCSVStats(csvStatsFile, true);
+    }
+    
     logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
                        " requests done in " + (requesttime/1000) + " seconds." +
                        "Requests/second = " + (1000*requestsdone)/requesttime);
@@ -427,6 +436,11 @@ public class LinkBenchDriver {
     log.setArgName("file");
     options.addOption(log);
     
+    Option csvStats = new Option("csvstats", "csvstats", true, 
+                                 "CSV stats output");
+    csvStats.setArgName("file");
+    options.addOption(csvStats);
+    
     options.addOption("l", false,
                "Execute loading stage of benchmark");
     options.addOption("r", false,
@@ -485,6 +499,7 @@ public class LinkBenchDriver {
     doRequest = cmd.hasOption('r');
     
     logFile = cmd.getOptionValue('L'); // May be null
+    
     configFile = cmd.getOptionValue('c');
     if (configFile == null) {
       // Try to find in usual location
@@ -496,6 +511,18 @@ public class LinkBenchDriver {
         System.err.println("Config file not specified through command "
             + "line argument and " + ConfigUtil.linkbenchHomeEnvVar
             + " environment variable not set to valid directory");
+        printUsage(options);
+        System.exit(EXIT_BADARGS);
+      }
+    }
+    
+    String csvStatsFileName = cmd.getOptionValue("csvstats"); // May be null
+    if (csvStatsFileName != null) {
+      try {
+        csvStatsFile = new PrintStream(new FileOutputStream(csvStatsFileName));
+      } catch (FileNotFoundException e) {
+        System.err.println("Could not open file " + csvStatsFileName +
+                           " for writing");
         printUsage(options);
         System.exit(EXIT_BADARGS);
       }

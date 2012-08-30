@@ -499,6 +499,8 @@ public abstract class LinkStoreTestBase extends TestCase {
                       null, props, latencyStats, tracker, rng, 0, 1);
       
       requester.run();
+      latencyStats.displayLatencyStats();
+      latencyStats.printCSVStats(System.out, true);
       
       assertEquals(requests, reqStore.adds + reqStore.updates + reqStore.deletes +
           reqStore.countLinks + reqStore.multigetLinks + reqStore.getLinkLists);
@@ -603,10 +605,12 @@ public abstract class LinkStoreTestBase extends TestCase {
       
       DummyLinkStore reqStore = getStoreHandle();
       reqStore.setRangeLimit(rangeLimit); // Small limit for testing
+      LinkBenchLatency latencyStats = new LinkBenchLatency(1);
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
-                      props, new LinkBenchLatency(1), tracker, rng, 0, 1);
+                      props, latencyStats, tracker, rng, 0, 1);
 
       requester.run();
+      latencyStats.displayLatencyStats();
       
       assertEquals(requests, reqStore.getLinkLists);
       
