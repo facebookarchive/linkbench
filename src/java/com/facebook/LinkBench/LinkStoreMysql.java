@@ -712,12 +712,12 @@ public class LinkStoreMysql extends GraphStore {
       sql.append("(" + node.type + "," + node.version + 
           "," + node.time + "," + stringLiteral(node.data) + ")");
     }
+    sql.append("; commit;");
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(sql);
     }
     stmt.executeUpdate(sql.toString(), Statement.RETURN_GENERATED_KEYS);
     ResultSet rs = stmt.getGeneratedKeys();
-    conn.commit();
     
     long newIds[] = new long[nodes.size()];
     // Find the generated id
@@ -743,7 +743,7 @@ public class LinkStoreMysql extends GraphStore {
     ResultSet rs = stmt.executeQuery(
       "SELECT id, type, version, time, data " +
       "FROM `" + dbid + "`.`" + nodetable + "` " +
-      "WHERE id=" + id + ";");
+      "WHERE id=" + id + "; commit;");
     if (rs.next()) {
       Node res = new Node(rs.getLong(1), rs.getInt(2),
            rs.getLong(3), rs.getInt(4), rs.getBytes(5));
@@ -766,7 +766,7 @@ public class LinkStoreMysql extends GraphStore {
     String sql = "UPDATE `" + dbid + "`.`" + nodetable + "`" +
             " SET " + "version=" + node.version + ", time=" + node.time
                    + ", data=" + stringLiteral(node.data) + 
-            " WHERE id=" + node.id + " AND type=" + node.type;
+            " WHERE id=" + node.id + " AND type=" + node.type + "; commit;";
     
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(sql);
@@ -774,7 +774,6 @@ public class LinkStoreMysql extends GraphStore {
     
     int rows = stmt.executeUpdate(sql);
     
-    conn.commit();
     if (rows == 1) return true;
     else if (rows == 0) return false;
     else throw new Exception("Did not expect " + rows +  "affected rows: only "
@@ -786,9 +785,8 @@ public class LinkStoreMysql extends GraphStore {
     checkNodeTableConfigured();
     int rows = stmt.executeUpdate(
         "DELETE FROM `" + dbid + "`.`" + nodetable + "` " +
-        "WHERE id=" + id + " and type =" + type + ";");
+        "WHERE id=" + id + " and type =" + type + "; commit;");
     
-    conn.commit();
     if (rows == 0) {
       return false;
     } else if (rows == 1) {
