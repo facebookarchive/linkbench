@@ -74,6 +74,13 @@ public class NodeLoader implements Runnable {
   @Override
   public void run() {
     logger.info("Starting loader thread  #" + loaderId + " loading nodes");
+    
+    try {
+      this.nodeStore.initialize(props, Phase.LOAD, loaderId);
+    } catch (Exception e) {
+      logger.error("Error while initializing store", e);
+      throw new RuntimeException(e);
+    }
 
     try {
       // Set up ids to start at desired range

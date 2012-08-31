@@ -71,6 +71,8 @@ public class LinkBenchLoad implements Runnable {
 
   private LoadProgress prog_tracker;
 
+  private Properties props;
+
   
   /**
    * Convenience constructor
@@ -105,6 +107,7 @@ public class LinkBenchLoad implements Runnable {
      * Initialize fields from arguments
      */
     this.store = linkStore;
+    this.props = props;
     this.latencyStats = latencyStats;
     this.loaderID = loaderID;
     this.singleAssoc = singleAssoc;
@@ -153,7 +156,13 @@ public class LinkBenchLoad implements Runnable {
 
   @Override
   public void run() {
-
+    try {
+      this.store.initialize(props, Phase.LOAD, loaderID);
+    } catch (Exception e) {
+      logger.error("Error while initializing store", e);
+      throw new RuntimeException(e);
+    }
+    
     int bulkLoadBatchSize = store.bulkLoadBatchSize();
     boolean bulkLoad = bulkLoadBatchSize > 0;
     ArrayList<Link> loadBuffer = null;

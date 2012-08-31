@@ -87,16 +87,15 @@ public class LinkBenchDriver {
   }
 
   // generate instances of LinkStore and NodeStore
-  private Stores initStores(Phase currentphase, int threadid)
+  private Stores initStores()
     throws Exception {
-    LinkStore linkStore = createLinkStore(currentphase, threadid);
-    NodeStore nodeStore = createNodeStore(currentphase, threadid, linkStore);
+    LinkStore linkStore = createLinkStore();
+    NodeStore nodeStore = createNodeStore(linkStore);
     
     return new Stores(linkStore, nodeStore);
   }
 
-  private LinkStore createLinkStore(Phase currentphase, int threadid)
-      throws Exception, IOException {
+  private LinkStore createLinkStore() throws Exception, IOException {
     // The property "linkstore" defines the class name that will be used to
     // store data in a database. The folowing class names are pre-packaged
     // for easy access:
@@ -118,13 +117,6 @@ public class LinkBenchDriver {
       throw new IOException("Cound not find class for " + linkStoreClassName);
     }
   
-    try {
-      linkStore.initialize(props, currentphase, threadid);
-    } catch (Exception e) {
-      System.err.println("Error while initializing data store:");
-      e.printStackTrace();
-      System.exit(1);
-    }
     return linkStore;
   }
 
@@ -135,8 +127,7 @@ public class LinkBenchDriver {
    * @throws Exception
    * @throws IOException
    */
-  private NodeStore createNodeStore(Phase currentPhase, int threadId, 
-                                        LinkStore linkStore) throws Exception,
+  private NodeStore createNodeStore(LinkStore linkStore) throws Exception,
       IOException {
     String nodeStoreClassName = props.getProperty(Config.NODESTORE_CLASS);
     if (nodeStoreClassName == null) {
@@ -158,7 +149,6 @@ public class LinkBenchDriver {
       try {
         nodeStore = ClassLoadUtil.newInstance(nodeStoreClassName,
                                                             NodeStore.class);
-        nodeStore.initialize(props, currentPhase, threadId);
         return nodeStore;
       } catch (java.lang.ClassNotFoundException nfe) {
         throw new IOException("Cound not find class for " + nodeStoreClassName);
@@ -201,7 +191,7 @@ public class LinkBenchDriver {
     
     LoadProgress loadTracker = new LoadProgress(logger, maxid1 - startid1); 
     for (int i = 0; i < nLinkLoaders; i++) {
-      LinkStore linkStore = createLinkStore(Phase.LOAD, i);
+      LinkStore linkStore = createLinkStore();
       
       bulkLoad = bulkLoad && linkStore.bulkLoadBatchSize() > 0;
       LinkBenchLoad l = new LinkBenchLoad(linkStore, props, latencyStats, 
@@ -212,7 +202,7 @@ public class LinkBenchDriver {
     if (genNodes) {
       logger.info("Will generate graph nodes during loading");
       int loaderId = nTotalLoaders - 1;
-      NodeStore nodeStore = createNodeStore(Phase.LOAD, loaderId, null);
+      NodeStore nodeStore = createNodeStore(null);
       Random rng = new Random(masterRandom.nextLong());
       loaders.add(new NodeLoader(props, logger, nodeStore, rng,
           latencyStats, csvStreamFile, loaderId));
@@ -339,7 +329,7 @@ public class LinkBenchDriver {
     
     // create requesters
     for (int i = 0; i < nrequesters; i++) {
-      Stores stores = initStores(Phase.REQUEST, i);
+      Stores stores = initStores();
       LinkBenchRequest l = new LinkBenchRequest(stores.linkStore,
               stores.nodeStore, props, latencyStats, csvStreamFile, 
               progress, new Random(masterRandom.nextLong()), i, nrequesters);

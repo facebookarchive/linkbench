@@ -12,7 +12,7 @@ public class MemoryNodeStoreTest extends NodeStoreTestBase {
   }
 
   @Override
-  protected NodeStore getNodeStoreHandle() throws Exception, IOException {
+  protected NodeStore getNodeStoreHandle(boolean initialized) throws Exception, IOException {
     return store.newHandle();
   }
 

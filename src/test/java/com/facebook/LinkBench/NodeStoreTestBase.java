@@ -26,7 +26,8 @@ public abstract class NodeStoreTestBase extends TestCase {
   
   protected abstract void initNodeStore(Properties props)
           throws Exception, IOException;
-  protected abstract NodeStore getNodeStoreHandle() 
+  
+  protected abstract NodeStore getNodeStoreHandle(boolean initialized) 
           throws Exception, IOException;
  
   protected Properties basicProps() {
@@ -42,13 +43,13 @@ public abstract class NodeStoreTestBase extends TestCase {
     
     // Set up db
     initNodeStore(props);
-    getNodeStoreHandle().resetNodeStore(testDB, 0);
+    getNodeStoreHandle(true).resetNodeStore(testDB, 0);
   }
   
   @Test
   public void testIDAlloc() throws IOException, Exception {
     int now = (int)(System.currentTimeMillis()/1000L);
-    NodeStore store = getNodeStoreHandle();
+    NodeStore store = getNodeStoreHandle(true);
     
     Node test = new Node(-1, 2048, 1, now,  new byte[] {0xb, 0xe, 0xa, 0x5, 0x7});
     store.resetNodeStore(testDB, 4); // We always start counting from 4 at Facebook
@@ -87,7 +88,7 @@ public abstract class NodeStoreTestBase extends TestCase {
   
   @Test
   public void testUpdate() throws IOException, Exception {
-    NodeStore store = getNodeStoreHandle();
+    NodeStore store = getNodeStoreHandle(true);
     store.resetNodeStore(testDB, 0);
     
     Node test = new Node(-1, 1234, 3, 3, "the quick brown fox".getBytes());
@@ -108,7 +109,7 @@ public abstract class NodeStoreTestBase extends TestCase {
       data[i] = (byte)(i % 256);
     }
     
-    NodeStore store = getNodeStoreHandle();
+    NodeStore store = getNodeStoreHandle(true);
     store.resetNodeStore(testDB, 0);
     
     Node test = new Node(-1, 1234, 3, 3, data);

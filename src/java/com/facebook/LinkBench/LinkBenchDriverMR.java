@@ -99,12 +99,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     if (clazz == null) {
       throw new IOException("Unknown data store " + store);
     }
-    
-    try { 
-      newstore.initialize(props, currentphase, mapperid);
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
+
     return newstore;
   }
 

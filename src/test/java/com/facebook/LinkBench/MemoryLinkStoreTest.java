@@ -26,8 +26,10 @@ public class MemoryLinkStoreTest extends LinkStoreTestBase {
   }
 
   @Override
-  protected DummyLinkStore getStoreHandle() {
-    return new DummyLinkStore(store.newHandle(), true);
+  protected DummyLinkStore getStoreHandle(boolean initialized) {
+    // Return a new memory link store handle. The underlying link store doesn't need to be 
+    // initialized, so just set wrapper to correct init status
+    return new DummyLinkStore(store.newHandle(), initialized);
   }
 
 }

@@ -73,7 +73,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    * DummyLinkStore
    * @return new handle to linkstore
    */
-  protected abstract DummyLinkStore getStoreHandle() 
+  protected abstract DummyLinkStore getStoreHandle(boolean initialized) 
                                     throws IOException, Exception;
   
   @Override
@@ -155,7 +155,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   /** Simple test with multiple operations on single link */
   @Test
   public void testOneLink() throws IOException, Exception {
-    DummyLinkStore store = getStoreHandle();
+    DummyLinkStore store = getStoreHandle(true);
 
     long id1 = 1123, id2 = 1124, ltype = 321;
     Link writtenLink = new Link(id1, ltype, id2, 1, 1, 
@@ -211,7 +211,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   
   @Test
   public void testMultipleLinks() throws Exception, IOException {
-    DummyLinkStore store = getStoreHandle();
+    DummyLinkStore store = getStoreHandle(true);
     long ida = 5434, idb = 5435, idc = 9999, idd = 9998;
     long ltypea = 1, ltypeb = 2;
     int otype = 35342; 
@@ -284,7 +284,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    */
   @Test
   public void testMultiget() throws IOException, Exception {
-    DummyLinkStore store = getStoreHandle();
+    DummyLinkStore store = getStoreHandle(true);
     long id1 = 99999999999L;
     Link a = new Link(id1, LinkStore.LINK_TYPE, 42, 0, 0,
                       LinkStore.VISIBILITY_DEFAULT, new byte[0], 1,
@@ -314,7 +314,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    */
   @Test
   public void testHiding() throws Exception {
-    DummyLinkStore store = getStoreHandle();
+    DummyLinkStore store = getStoreHandle(true);
     Link l = new Link(1, 1, 1, 1, 1, 
           LinkStore.VISIBILITY_HIDDEN, new byte[] {0x1}, 1,
           System.currentTimeMillis());
@@ -349,7 +349,7 @@ public abstract class LinkStoreTestBase extends TestCase {
 
   private void testAddThenUpdate(Link l, byte[] updateData) throws IOException,
       Exception {
-    DummyLinkStore ls = getStoreHandle();
+    DummyLinkStore ls = getStoreHandle(true);
     ls.addLink(testDB, l, true);
     
     Link l2 = ls.getLink(testDB, 1, 1, 1);
@@ -428,7 +428,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     fillLoadProps(props, startId, idCount, linksPerId);
     
     initStore(props);
-    DummyLinkStore store = getStoreHandle();
+    DummyLinkStore store = getStoreHandle(false);
     
     try {
       Random rng = createRNG();
@@ -490,9 +490,9 @@ public abstract class LinkStoreTestBase extends TestCase {
     try {
       Random rng = createRNG();
       
-      serialLoad(rng, logger, props, getStoreHandle());
+      serialLoad(rng, logger, props, getStoreHandle(false));
   
-      DummyLinkStore reqStore = getStoreHandle();
+      DummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
       
@@ -523,7 +523,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       assertEquals(0, reqStore.bulkLoadCountOps);
       assertEquals(0, reqStore.bulkLoadLinkOps);
     } finally {
-      deleteIDRange(getStoreHandle(), startId, idCount);
+      deleteIDRange(getStoreHandle(true), startId, idCount);
     }
     System.err.println("Done!");
   }
@@ -552,10 +552,10 @@ public abstract class LinkStoreTestBase extends TestCase {
     try {
       Random rng = createRNG();
       
-      serialLoad(rng, logger, props, getStoreHandle());
+      serialLoad(rng, logger, props, getStoreHandle(false));
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
       
-      DummyLinkStore reqStore = getStoreHandle();
+      DummyLinkStore reqStore = getStoreHandle(false);
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
                       props, new LatencyStats(1), System.out, tracker,
                       rng, 0, 1);
@@ -572,7 +572,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       // Check that it isn't more that 5% faster than expected average
       assertTrue(actualArrivalRate <= 1.05 * requestsPerSec);
     } finally {
-      deleteIDRange(getStoreHandle(), startId, idCount);
+      deleteIDRange(getStoreHandle(true), startId, idCount);
     }
     System.err.println("Done!");
   }
@@ -603,10 +603,10 @@ public abstract class LinkStoreTestBase extends TestCase {
     try {
       Random rng = createRNG();
       
-      serialLoad(rng, logger, props, getStoreHandle());
+      serialLoad(rng, logger, props, getStoreHandle(false));
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
       
-      DummyLinkStore reqStore = getStoreHandle();
+      DummyLinkStore reqStore = getStoreHandle(false);
       reqStore.setRangeLimit(rangeLimit); // Small limit for testing
       LatencyStats latencyStats = new LatencyStats(1);
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
@@ -628,7 +628,7 @@ public abstract class LinkStoreTestBase extends TestCase {
         assertTrue(actualPHistory >= 0.95 * pHistory);
       }
     } finally {
-      deleteIDRange(getStoreHandle(), startId, idCount);
+      deleteIDRange(getStoreHandle(true), startId, idCount);
     }
   }
 

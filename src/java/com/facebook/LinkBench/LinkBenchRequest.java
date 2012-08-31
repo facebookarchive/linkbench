@@ -164,8 +164,8 @@ public class LinkBenchRequest implements Runnable {
     }
     
     if (Math.abs(pc_getnode - 100.0) > 1e-5) {//compare real numbers
-      logger.error("Percentages of request types do not add to 100!");
-      System.exit(1);
+      throw new LinkBenchConfigError("Percentages of request types do not " + 
+                  "add to 100, only " + pc_getnode + "!");
     }
     
     writeDist = AccessDistributions.loadAccessDistribution(props, 
@@ -458,6 +458,17 @@ public class LinkBenchRequest implements Runnable {
         + nrequests + " ops.");
     logger.debug("Requester thread #" + requesterID + " first random number "
                   + rng.nextLong());
+    
+    try {
+      this.linkStore.initialize(props, Phase.REQUEST, requesterID);
+      if (this.nodeStore != null && this.nodeStore != this.linkStore) {
+        this.nodeStore.initialize(props, Phase.REQUEST, requesterID);
+      }
+    } catch (Exception e) {
+      logger.error("Error while initializing store", e);
+      throw new RuntimeException(e);
+    }
+    
     long starttime = System.currentTimeMillis();
     long endtime = starttime + maxtime * 1000;
     long lastupdate = starttime;

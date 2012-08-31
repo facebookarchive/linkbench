@@ -48,10 +48,12 @@ public class MySqlNodeStoreTest extends NodeStoreTestBase {
   }
 
   @Override
-  protected NodeStore getNodeStoreHandle() throws Exception, IOException {
-    LinkStoreMysql store = new LinkStoreMysql();
-    store.initialize(currProps, Phase.REQUEST, 0);
-    return store;
+  protected NodeStore getNodeStoreHandle(boolean initialize) throws Exception, IOException {
+    LinkStoreMysql result = new LinkStoreMysql();
+    if (initialize) {
+      result.initialize(currProps, Phase.REQUEST, 0);
+    }
+    return result;
   }
 
 }

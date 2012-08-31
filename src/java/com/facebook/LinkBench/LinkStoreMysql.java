@@ -39,6 +39,8 @@ public class LinkStoreMysql extends GraphStore {
   String user;
   String pwd;
   String port;
+  String defaultDB;
+
   Level debuglevel;
   Connection conn;
   Statement stmt;
@@ -83,6 +85,8 @@ public class LinkStoreMysql extends GraphStore {
     user = props.getProperty(CONFIG_USER);
     pwd = props.getProperty(CONFIG_PASSWORD);
     port = props.getProperty(CONFIG_PORT);
+    defaultDB = props.getProperty(Config.DBID);
+    
     if (port == null || port.equals("")) port = "3306"; //use default port
     debuglevel = ConfigUtil.getDebugLevel(props);
     phase = currentPhase;
@@ -99,13 +103,9 @@ public class LinkStoreMysql extends GraphStore {
     // connect
     try {
       openConnection();
-    } catch (SQLException e) {
-      logger.error("error connecting to database:"
-                  + e.getMessage());
-      System.exit(1);
     } catch (Exception e) {
-      logger.error(e);
-      System.exit(1);
+      logger.error("error connecting to database:", e);
+      throw e;
     }
 
     linktable = props.getProperty(Config.LINK_TABLE);
@@ -116,9 +116,14 @@ public class LinkStoreMysql extends GraphStore {
     conn = null;
     stmt = null;
     
+    String jdbcUrl = "jdbc:mysql://"+ host + ":" + port + "/";
+    if (defaultDB != null) {
+      jdbcUrl += defaultDB;
+    }
+
     Class.forName("com.mysql.jdbc.Driver").newInstance();
     conn = DriverManager.getConnection(
-                        "jdbc:mysql://"+ host + ":" + port + "/" + "test" +
+                        jdbcUrl +
                         "?elideSetAutoCommits=true" +
                         "&useLocalTransactionState=true" +
                         "&allowMultiQueries=true" +

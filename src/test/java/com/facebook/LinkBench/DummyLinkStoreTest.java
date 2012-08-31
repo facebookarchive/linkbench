@@ -14,9 +14,11 @@ public class DummyLinkStoreTest extends LinkStoreTestBase {
   }
 
   @Override
-  protected DummyLinkStore getStoreHandle() throws IOException, Exception {
+  protected DummyLinkStore getStoreHandle(boolean initialized) throws IOException, Exception {
     DummyLinkStore store = new DummyLinkStore();
-    store.initialize(props, Phase.REQUEST, 0);
+    if (initialized) {
+      store.initialize(props, Phase.REQUEST, 0);
+    }
     return store;
   }
 }

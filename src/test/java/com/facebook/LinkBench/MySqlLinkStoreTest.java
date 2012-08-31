@@ -53,10 +53,11 @@ public class MySqlLinkStoreTest extends LinkStoreTestBase {
   
 
   @Override
-  public DummyLinkStore getStoreHandle() throws IOException, Exception {
-    LinkStoreMysql store = new LinkStoreMysql();
-    DummyLinkStore result = new DummyLinkStore(store);
-    result.initialize(currProps, Phase.REQUEST, 0);
+  public DummyLinkStore getStoreHandle(boolean initialize) throws IOException, Exception {
+    DummyLinkStore result = new DummyLinkStore(new LinkStoreMysql());
+    if (initialize) {
+      result.initialize(currProps, Phase.REQUEST, 0);
+    }
     return result;
   }
 
