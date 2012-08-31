@@ -1,56 +1,26 @@
-package com.facebook.LinkBench;
+package com.facebook.LinkBench.stats;
 
 import java.io.PrintStream;
 import java.text.DecimalFormat;
 
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.ConfigUtil;
+import com.facebook.LinkBench.LinkBenchOp;
+import com.facebook.LinkBench.LinkStore;
+
 
 /**
- * Compute percentile latencies.
- * we record latencies in ms units, upto 100 milliseconds. Any calls
- * that are larger than 100 milliseconds get rolled into 1s and 10 sec
- * latency array.
+ * Class used to track and compute latency statistics, particularly 
+ * percentiles. Times are divided into buckets, with counts maintained 
+ * per bucket.  The division into buckets is based on typical latencies
+ * for database operations: most are in the range of 0.1ms to 100ms.
+ * we have 0.1ms-granularity buckets up to 1ms, then 1ms-granularity from
+ * 1-100ms, then 100ms-granularity, and then 1s-granularity. 
  */
-public class LinkBenchLatency {
+public class LatencyStats {
 
   public static int MAX_MILLIS = 100;
-  
-  /** 
-   * Keep track of mean in numerically stable way
-   *
-   */
-  private static class RunningMean {
-    /** Number of samples */
-    private long n;
-
-    /** First sample */
-    private final double v1;
-    
-    /** sum of difference */
-    private double running;
-    
-    /** initialize with first sample */
-    public RunningMean(double v1) {
-      super();
-      this.v1 = v1;
-      this.n = 1;
-      this.running = 0.0;
-    }
-
-    public void addSample(double vi) {
-      n++;
-      running += (vi - v1);
-    }
-    
-    public double mean() {
-      return v1 + running / n;
-    }
-
-    public long samples() {
-      return n;
-    }
-  }
   
   /**
    * Keep track of running mean per thread and op type
@@ -63,7 +33,7 @@ public class LinkBenchLatency {
   // Displayed along with stats
   private int maxThreads;
 
-  public LinkBenchLatency(int maxThreads) {
+  public LatencyStats(int maxThreads) {
     this.maxThreads = maxThreads;
     means = new RunningMean[maxThreads][LinkStore.MAX_OPTYPES];
     bucketCounts = new long[maxThreads][LinkStore.MAX_OPTYPES][NUM_BUCKETS];
@@ -75,7 +45,7 @@ public class LinkBenchLatency {
   private static final int MS_BUCKETS = 99; // ms-granularity buckets
   private static final int HUNDREDMS_BUCKETS = 9; // 100ms-granularity buckets
   private static final int SEC_BUCKETS = 9; // 1s-granularity buckets
-   static final int NUM_BUCKETS = SUB_MS_BUCKETS + MS_BUCKETS +
+  public static final int NUM_BUCKETS = SUB_MS_BUCKETS + MS_BUCKETS +
           HUNDREDMS_BUCKETS + SEC_BUCKETS + 1;
   
   /** Counts of operations falling into each bucket */
@@ -90,7 +60,7 @@ public class LinkBenchLatency {
   /** Maximum latency by thread and type */
   private long maxLatency[][];
   
-  static int latencyToBucket(long microTime) {
+  public static int latencyToBucket(long microTime) {
     long ms = 1000;
     long msTime = microTime / ms; // Floored
     if (msTime == 0) {
@@ -117,7 +87,7 @@ public class LinkBenchLatency {
    * @param bucket
    * @return inclusive min and exclusive max time in microsecs for bucket
    */
-  static long[] bucketBound(int bucket) {
+  public static long[] bucketBound(int bucket) {
     int ms = 1000;
     long s = ms * 1000;
     long res[] = new long[2];

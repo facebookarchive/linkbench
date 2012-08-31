@@ -15,10 +15,11 @@ import org.junit.Test;
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
-import com.facebook.LinkBench.distributions.GeometricDistribution;
-import com.facebook.LinkBench.distributions.UniformDistribution;
 import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistMode;
+import com.facebook.LinkBench.distributions.GeometricDistribution;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistMode;
+import com.facebook.LinkBench.distributions.UniformDistribution;
+import com.facebook.LinkBench.stats.LatencyStats;
 
 /**
  * This test implements unit tests that *all* implementations of LinkStore 
@@ -101,7 +102,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     props.setProperty(Config.NLINKS_FUNC, LinkDistMode.CONST.name()); 
     props.setProperty(Config.NLINKS_CONFIG, "0"); // ignored
     props.setProperty(Config.NLINKS_DEFAULT, Integer.toString(linksPerId));
-    props.setProperty(Config.DISPLAY_FREQ, "1800");
+    props.setProperty(Config.DISPLAY_FREQ, "10"); // Show stats frequently
     props.setProperty(Config.MAX_STAT_SAMPLES, "10000");
   }
 
@@ -492,11 +493,12 @@ public abstract class LinkStoreTestBase extends TestCase {
       serialLoad(rng, logger, props, getStoreHandle());
   
       DummyLinkStore reqStore = getStoreHandle();
-      LinkBenchLatency latencyStats = new LinkBenchLatency(1);
+      LatencyStats latencyStats = new LatencyStats(1);
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
       
       LinkBenchRequest requester = new LinkBenchRequest(reqStore,
-                      null, props, latencyStats, tracker, rng, 0, 1);
+                      null, props, latencyStats, System.out, tracker, rng,
+                      0, 1);
       
       requester.run();
       latencyStats.displayLatencyStats();
@@ -555,7 +557,8 @@ public abstract class LinkStoreTestBase extends TestCase {
       
       DummyLinkStore reqStore = getStoreHandle();
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
-                      props, new LinkBenchLatency(1), tracker, rng, 0, 1);
+                      props, new LatencyStats(1), System.out, tracker,
+                      rng, 0, 1);
       
       long startTime = System.currentTimeMillis();
       requester.run();
@@ -605,9 +608,9 @@ public abstract class LinkStoreTestBase extends TestCase {
       
       DummyLinkStore reqStore = getStoreHandle();
       reqStore.setRangeLimit(rangeLimit); // Small limit for testing
-      LinkBenchLatency latencyStats = new LinkBenchLatency(1);
+      LatencyStats latencyStats = new LatencyStats(1);
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
-                      props, latencyStats, tracker, rng, 0, 1);
+                      props, latencyStats, System.out, tracker, rng, 0, 1);
 
       requester.run();
       latencyStats.displayLatencyStats();
@@ -658,7 +661,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    */
   private void serialLoad(Random rng, Logger logger, Properties props,
       DummyLinkStore store) throws IOException, Exception {
-    LinkBenchLatency latencyStats = new LinkBenchLatency(1);
+    LatencyStats latencyStats = new LatencyStats(1);
     
     /* Load up queue with work */
     BlockingQueue<LoadChunk>  chunk_q = new LinkedBlockingQueue<LoadChunk>();
@@ -679,7 +682,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     LoadProgress tracker = new LoadProgress(logger, idCount);
     tracker.startTimer();
     LinkBenchLoad loader = new LinkBenchLoad(store, 
-        props, latencyStats, 0, false, chunk_q, tracker);
+        props, latencyStats, System.out, 0, false, chunk_q, tracker);
     /* Run the loading process */
     loader.run();
     

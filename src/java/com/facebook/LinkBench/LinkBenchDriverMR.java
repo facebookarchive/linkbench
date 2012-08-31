@@ -37,6 +37,7 @@ import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
+import com.facebook.LinkBench.stats.LatencyStats;
 
 /**
  * LinkBenchDriverMR class.
@@ -310,7 +311,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
                     Reporter reporter) throws IOException {
       ConfigUtil.setupLogging(props, null);
       LinkStore store = initStore(Phase.LOAD, loaderid.get());
-      LinkBenchLatency latencyStats = new LinkBenchLatency(nloaders.get());
+      LatencyStats latencyStats = new LatencyStats(nloaders.get());
 
       long maxid1 = Long.parseLong(Config.MAX_ID);
       long startid1 = Long.parseLong(Config.MIN_ID);
@@ -318,7 +319,8 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       LoadProgress prog_tracker = new LoadProgress(
           Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER), maxid1 - startid1);
       
-      LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats,
+      LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats, 
+                               null,
                                loaderid.get(), maxid1 == startid1 + 1,
                                nloaders.get(), prog_tracker, new Random());
       
@@ -353,13 +355,13 @@ public class LinkBenchDriverMR extends Configured implements Tool {
                     Reporter reporter) throws IOException {
       ConfigUtil.setupLogging(props, null);
       LinkStore store = initStore(Phase.REQUEST, requesterid.get());
-      LinkBenchLatency latencyStats = new LinkBenchLatency(nrequesters.get());
+      LatencyStats latencyStats = new LatencyStats(nrequesters.get());
       RequestProgress progress =
                               LinkBenchRequest.createProgress(logger, props);
       progress.startTimer();    
       // TODO: Don't support NodeStore yet
       final LinkBenchRequest requester =
-        new LinkBenchRequest(store, null, props, latencyStats, progress,
+        new LinkBenchRequest(store, null, props, latencyStats, null, progress,
                 new Random(), requesterid.get(), nrequesters.get());
       
       

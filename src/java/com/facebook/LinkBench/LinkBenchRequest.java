@@ -1,5 +1,6 @@
 package com.facebook.LinkBench;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Properties;
@@ -15,6 +16,8 @@ import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistributi
 import com.facebook.LinkBench.distributions.ID2Chooser;
 import com.facebook.LinkBench.distributions.ProbabilityDistribution;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
+import com.facebook.LinkBench.stats.LatencyStats;
+import com.facebook.LinkBench.stats.SampledStats;
 import com.facebook.LinkBench.util.ClassLoadUtil;
 
 
@@ -67,8 +70,8 @@ public class LinkBenchRequest implements Runnable {
   // Probability distribution for ids in multiget
   ProbabilityDistribution multigetDist;
   
-  LinkBenchStats stats;
-  LinkBenchLatency latencyStats;
+  SampledStats stats;
+  LatencyStats latencyStats;
 
   long numfound;
   long numnotfound;
@@ -97,7 +100,8 @@ public class LinkBenchRequest implements Runnable {
   public LinkBenchRequest(LinkStore linkStore,
                           NodeStore nodeStore,
                           Properties props,
-                          LinkBenchLatency latencyStats,
+                          LatencyStats latencyStats,
+                          PrintStream csvStreamOut,
                           RequestProgress progressTracker,
                           Random rng,
                           int requesterID,
@@ -218,7 +222,7 @@ public class LinkBenchRequest implements Runnable {
       progressfreq_ms = Long.parseLong(progressfreq) * 1000L;
     }
     int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
-    stats = new LinkBenchStats(requesterID, displayfreq, maxsamples);
+    stats = new SampledStats(requesterID, displayfreq, maxsamples, csvStreamOut);
    
     listTailHistoryLimit = 2048;
     listTailHistory = new ArrayList<Link>(listTailHistoryLimit);
@@ -529,7 +533,7 @@ public class LinkBenchRequest implements Runnable {
     
     progressTracker.update(requestsSinceLastUpdate);
 
-    stats.displayStats(Arrays.asList(
+    stats.displayStats(System.currentTimeMillis(), Arrays.asList(
         LinkBenchOp.MULTIGET_LINK, LinkBenchOp.GET_LINKS_LIST,
         LinkBenchOp.COUNT_LINK,
         LinkBenchOp.UPDATE_LINK, LinkBenchOp.ADD_LINK, 

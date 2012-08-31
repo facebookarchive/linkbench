@@ -1,5 +1,6 @@
 package com.facebook.LinkBench;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -16,7 +17,12 @@ import org.apache.log4j.Logger;
 import com.facebook.LinkBench.distributions.ID2Chooser;
 import com.facebook.LinkBench.distributions.LinkDistributions;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
+
 import com.facebook.LinkBench.generators.UniformDataGenerator;
+import com.facebook.LinkBench.generators.DataGenerator;
+import com.facebook.LinkBench.stats.LatencyStats;
+import com.facebook.LinkBench.stats.SampledStats;
+import com.facebook.LinkBench.util.ClassLoadUtil;
 
 
 /*
@@ -39,8 +45,8 @@ public class LinkBenchLoad implements Runnable {
   private LinkStore store;// store interface (several possible implementations
                           // like mysql, hbase etc)
   private int datasize; // 'data' column size for one (id1, type, id2)
-  private LinkBenchStats stats;
-  private LinkBenchLatency latencyStats;
+  private SampledStats stats;
+  private LatencyStats latencyStats;
 
   Level debuglevel;
   String dbid;
@@ -75,9 +81,10 @@ public class LinkBenchLoad implements Runnable {
    * @param nloaders
    */
   public LinkBenchLoad(LinkStore store, Properties props,
-      LinkBenchLatency latencyStats, int loaderID, boolean singleAssoc,
+      LatencyStats latencyStats, PrintStream csvStreamOut,
+      int loaderID, boolean singleAssoc,
       int nloaders, LoadProgress prog_tracker, Random rng) {
-    this(store, props, latencyStats, loaderID, singleAssoc,
+    this(store, props, latencyStats, csvStreamOut, loaderID, singleAssoc,
               new ArrayBlockingQueue<LoadChunk>(2), prog_tracker);
     
     // Just add a single chunk to the queue
@@ -88,7 +95,8 @@ public class LinkBenchLoad implements Runnable {
   
   public LinkBenchLoad(LinkStore linkStore,
                        Properties props,
-                       LinkBenchLatency latencyStats,
+                       LatencyStats latencyStats,
+                       PrintStream csvStreamOut,
                        int loaderID,
                        boolean singleAssoc,
                        BlockingQueue<LoadChunk> chunk_q,
@@ -134,7 +142,7 @@ public class LinkBenchLoad implements Runnable {
     linksloaded = 0;
     sameShuffle = 0;
     diffShuffle = 0;
-    stats = new LinkBenchStats(loaderID, displayfreq, maxsamples);
+    stats = new SampledStats(loaderID, displayfreq, maxsamples, csvStreamOut);
     
     id2chooser = new ID2Chooser(props, startid1, maxid1, 1, 1);
   }
@@ -186,11 +194,12 @@ public class LinkBenchLoad implements Runnable {
       logger.info(" Same shuffle = " + sameShuffle +
                          " Different shuffle = " + diffShuffle);
       if (bulkLoad) {
-        stats.displayStats(Arrays.asList(LinkBenchOp.LOAD_LINKS_BULK,
+        stats.displayStats(System.currentTimeMillis(), 
+            Arrays.asList(LinkBenchOp.LOAD_LINKS_BULK,
             LinkBenchOp.LOAD_COUNTS_BULK, LinkBenchOp.LOAD_LINKS_BULK_NLINKS,
             LinkBenchOp.LOAD_COUNTS_BULK_NLINKS));
       } else {
-        stats.displayStats(Arrays.asList(LinkBenchOp.LOAD_LINK));
+        stats.displayStats(System.currentTimeMillis(), Arrays.asList(LinkBenchOp.LOAD_LINK));
       }
     }
     

@@ -31,6 +31,8 @@ import org.apache.log4j.Logger;
 import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
+import com.facebook.LinkBench.stats.LatencyStats;
+import com.facebook.LinkBench.stats.SampledStats;
 import com.facebook.LinkBench.util.ClassLoadUtil;
 
 /*
@@ -50,7 +52,10 @@ public class LinkBenchDriver {
   private static String configFile = null;
   private static Properties cmdLineProps = null;
   private static String logFile = null;
+  /** File for final statistics */
   private static PrintStream csvStatsFile = null;
+  /** File for output of incremental csv data */
+  private static PrintStream csvStreamFile = null;
   private static boolean doLoad = false;
   private static boolean doRequest = false;
   
@@ -191,7 +196,7 @@ public class LinkBenchDriver {
                                             Config.GENERATE_NODES));
     int nTotalLoaders = genNodes ? nLinkLoaders + 1 : nLinkLoaders;
     
-    LinkBenchLatency latencyStats = new LinkBenchLatency(nTotalLoaders);
+    LatencyStats latencyStats = new LatencyStats(nTotalLoaders);
     List<Runnable> loaders = new ArrayList<Runnable>(nTotalLoaders);
     
     LoadProgress loadTracker = new LoadProgress(logger, maxid1 - startid1); 
@@ -199,8 +204,8 @@ public class LinkBenchDriver {
       LinkStore linkStore = createLinkStore(Phase.LOAD, i);
       
       bulkLoad = bulkLoad && linkStore.bulkLoadBatchSize() > 0;
-      LinkBenchLoad l = new LinkBenchLoad(linkStore, props, latencyStats, i,
-                          maxid1 == startid1 + 1, chunk_q, loadTracker);
+      LinkBenchLoad l = new LinkBenchLoad(linkStore, props, latencyStats, 
+              csvStreamFile, i, maxid1 == startid1 + 1, chunk_q, loadTracker);
       loaders.add(l);
     }
     
@@ -210,7 +215,7 @@ public class LinkBenchDriver {
       NodeStore nodeStore = createNodeStore(Phase.LOAD, loaderId, null);
       Random rng = new Random(masterRandom.nextLong());
       loaders.add(new NodeLoader(props, logger, nodeStore, rng,
-          latencyStats, loaderId));
+          latencyStats, csvStreamFile, loaderId));
     }
     
     enqueueLoadWork(chunk_q, startid1, maxid1, nLinkLoaders, 
@@ -238,6 +243,11 @@ public class LinkBenchDriver {
     }
 
     latencyStats.displayLatencyStats();
+    
+    if (csvStatsFile != null) {
+      latencyStats.printCSVStats(csvStatsFile, true);
+    }
+    
     logger.info("LOAD PHASE COMPLETED. Loaded " + actualNodes + "/" + 
           expectedNodes + " nodes. " +
           "Expected to load " + expectedlinks + " links. " +
@@ -320,7 +330,7 @@ public class LinkBenchDriver {
       logger.info("NO REQUEST PHASE CONFIGURED. ");
       return;
     }
-    LinkBenchLatency latencyStats = new LinkBenchLatency(nrequesters);
+    LatencyStats latencyStats = new LatencyStats(nrequesters);
     List<LinkBenchRequest> requesters = new LinkedList<LinkBenchRequest>();
 
     RequestProgress progress = LinkBenchRequest.createProgress(logger, props);
@@ -331,8 +341,8 @@ public class LinkBenchDriver {
     for (int i = 0; i < nrequesters; i++) {
       Stores stores = initStores(Phase.REQUEST, i);
       LinkBenchRequest l = new LinkBenchRequest(stores.linkStore,
-              stores.nodeStore, props, latencyStats, progress, 
-              new Random(masterRandom.nextLong()), i, nrequesters);
+              stores.nodeStore, props, latencyStats, csvStreamFile, 
+              progress, new Random(masterRandom.nextLong()), i, nrequesters);
       requesters.add(l);
     }
 
@@ -441,6 +451,11 @@ public class LinkBenchDriver {
     csvStats.setArgName("file");
     options.addOption(csvStats);
     
+    Option csvStream = new Option("csvstream", "csvstream", true, 
+        "CSV streaming stats output");
+    csvStream.setArgName("file");
+    options.addOption(csvStream);
+    
     options.addOption("l", false,
                "Execute loading stage of benchmark");
     options.addOption("r", false,
@@ -522,6 +537,21 @@ public class LinkBenchDriver {
         csvStatsFile = new PrintStream(new FileOutputStream(csvStatsFileName));
       } catch (FileNotFoundException e) {
         System.err.println("Could not open file " + csvStatsFileName +
+                           " for writing");
+        printUsage(options);
+        System.exit(EXIT_BADARGS);
+      }
+    }
+    
+    String csvStreamFileName = cmd.getOptionValue("csvstream"); // May be null
+    if (csvStreamFileName != null) {
+      try {
+        csvStreamFile = new PrintStream(
+                        new FileOutputStream(csvStreamFileName));
+        // File is written to by multiple threads, first write header
+        SampledStats.writeCSVHeader(csvStreamFile);
+      } catch (FileNotFoundException e) {
+        System.err.println("Could not open file " + csvStreamFileName +
                            " for writing");
         printUsage(options);
         System.exit(EXIT_BADARGS);

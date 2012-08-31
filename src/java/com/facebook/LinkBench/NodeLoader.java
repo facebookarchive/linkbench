@@ -1,5 +1,6 @@
 package com.facebook.LinkBench;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Properties;
@@ -10,6 +11,8 @@ import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.generators.DataGenerator;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
+import com.facebook.LinkBench.stats.LatencyStats;
+import com.facebook.LinkBench.stats.SampledStats;
 
 /**
  * Load class for generating node data
@@ -32,8 +35,8 @@ public class NodeLoader implements Runnable {
   
   private final Level debuglevel;
   private final int loaderId;
-  private final LinkBenchStats stats;
-  private final LinkBenchLatency latencyStats;
+  private final SampledStats stats;
+  private final LatencyStats latencyStats;
   
   private long startTime_ms;
   
@@ -45,7 +48,7 @@ public class NodeLoader implements Runnable {
   
   public NodeLoader(Properties props, Logger logger,
       NodeStore nodeStore, Random rng,
-      LinkBenchLatency latencyStats, int loaderId) {
+      LatencyStats latencyStats, PrintStream csvStreamOut, int loaderId) {
     super();
     this.props = props;
     this.logger = logger;
@@ -65,7 +68,7 @@ public class NodeLoader implements Runnable {
     long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
     int maxsamples = Integer.parseInt(props.getProperty(
                                                     Config.MAX_STAT_SAMPLES));
-    this.stats = new LinkBenchStats(loaderId, displayfreq, maxsamples);
+    this.stats = new SampledStats(loaderId, displayfreq, maxsamples, csvStreamOut);
   }
 
   @Override
@@ -98,7 +101,8 @@ public class NodeLoader implements Runnable {
     loadNodes(nodeLoadBuffer);
     
     logger.info("Loading of nodes [" + startId + "," + maxId + ") done");
-    stats.displayStats(Arrays.asList(LinkBenchOp.LOAD_NODE_BULK));
+    stats.displayStats(System.currentTimeMillis(), 
+                       Arrays.asList(LinkBenchOp.LOAD_NODE_BULK));
   }
 
   /**
