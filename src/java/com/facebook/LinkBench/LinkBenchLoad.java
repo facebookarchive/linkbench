@@ -15,8 +15,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.distributions.ID2Chooser;
-import com.facebook.LinkBench.distributions.LinkDistributions;
-import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
 import com.facebook.LinkBench.distributions.LogNormalDistribution;
 import com.facebook.LinkBench.generators.DataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
@@ -51,9 +49,6 @@ public class LinkBenchLoad implements Runnable {
 
   Level debuglevel;
   String dbid;
-  
-  private LinkDistribution linkDist;
-  private InvertibleShuffler linkShuffler;
   
   private ID2Chooser id2chooser;
 
@@ -124,7 +119,7 @@ public class LinkBenchLoad implements Runnable {
     
     // math functions may cause problems for id1 = 0. Start at 1.
     if (startid1 <= 0) {
-      startid1 = 1;
+      throw new LinkBenchConfigError("startid1 must be >= 1");
     }
 
     debuglevel = ConfigUtil.getDebugLevel(props);
@@ -149,11 +144,6 @@ public class LinkBenchLoad implements Runnable {
     int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
     
     dbid = props.getProperty(Config.DBID);
-    
-    linkDist = LinkDistributions.loadLinkDistribution(props, startid1, maxid1);
-    linkShuffler = new InvertibleShuffler(RealDistribution.NLINKS_SHUFFLER_SEED,
-                                          RealDistribution.NLINKS_SHUFFLER_GROUPS,
-                                          maxid1 - startid1);   
         
     /*
      * Initialize statistics
@@ -251,19 +241,11 @@ public class LinkBenchLoad implements Runnable {
     
     long prevPercentPrinted = 0;
     for (long id1 = chunk.start; id1 < chunk.end; id1 += chunk.step) {
-      long nlinks;
-      if (linkDist.doShuffle()) {
-        // Get the rank of the id1 from most to least links
-        long rankid1 = startid1 + linkShuffler.invertPermute(id1 - startid1);
-        assert(rankid1 >= startid1 && rankid1 < maxid1);
-        if (id1 == rankid1) {
-          sameShuffle++;
-        } else {
-          diffShuffle++;
-        }
-        nlinks = linkDist.getNlinks(rankid1);
+      long nlinks = id2chooser.calcLinkCount(id1);
+      if (id2chooser.sameShuffle) {
+        sameShuffle++;
       } else {
-        nlinks = linkDist.getNlinks(id1);
+        diffShuffle++;
       }
       
       links_in_chunk += nlinks;

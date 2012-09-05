@@ -709,7 +709,7 @@ public class LinkBenchRequest implements Runnable {
     link.id1_type = LinkStore.ID1_TYPE;
     link.id2_type = LinkStore.ID2_TYPE;
 
-    link.id2 = id2chooser.chooseForOp(rng, link.id1, 0.5);
+    link.id2 = id2chooser.chooseForOp(rng, link.id1, 0.1);
 
     link.visibility = LinkStore.VISIBILITY_DEFAULT;
     link.version = 0;

@@ -1,6 +1,7 @@
 package com.facebook.LinkBench;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Properties;
 import java.util.Random;
 
@@ -66,6 +67,48 @@ public class ID2ChooserTest extends TestCase {
       
       id2 = c.chooseForOp(rng, i + min, 0.5);
       assert(id2 >= min);
+    }
+  }
+  
+  /**
+   * Check that the choosing mechanism is generating id2s with the
+   * right probability of a loaded link matching
+   */
+  @Test
+  public void testMatchPercent() {
+    long seed = 15325435L;
+    Random rng = new Random(seed);
+    
+    int minid = 500, maxid=1000000;
+    ID2Chooser chooser = new ID2Chooser(props, minid, maxid, 1, 0);
+    for (int id1 = minid; id1 < maxid; id1 += 3763) {
+      HashSet<Long> existing = new HashSet<Long>();
+      long nlinks = chooser.calcLinkCount(id1);
+      for (long i = 0; i < nlinks; i++) {
+        long id2 = chooser.chooseForLoad(rng, id1, i);
+        existing.add(id2);
+      }
+      
+      int trials = 10000;
+      
+      int hit = 0; // hit for prob = 50%
+      
+      for (int i = 0; i < trials; i++) {
+        // Test with 100% prob of hit
+        long id2 = chooser.chooseForOp(rng, id1, 1.0);
+        assertTrue(existing.contains(id2) || existing.size() == 0);
+        
+        // Test with 50% prob of hit
+        id2 = chooser.chooseForOp(rng, id1, 0.5);
+        if (existing.contains(id2)) {
+          hit++;
+        }
+      }
+      
+      double hitPercent = hit / (double)trials;
+      if (existing.size() > 0 && Math.abs(0.5 - hitPercent) > 0.05) {
+        fail(hitPercent * 100 + "% of ids2 were hits for id1 " + id1);
+      }
     }
   }
 }

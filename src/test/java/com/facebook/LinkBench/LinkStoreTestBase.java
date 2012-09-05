@@ -488,7 +488,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    */
   @Test
   public void testLoader() throws IOException, Exception {
-    long startId = 0;
+    long startId = 1;
     long idCount = getIDCount();
     int linksPerId = 3;
 

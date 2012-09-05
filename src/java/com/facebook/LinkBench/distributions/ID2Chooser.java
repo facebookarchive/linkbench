@@ -55,7 +55,7 @@ public class ID2Chooser {
 
   public long chooseForLoad(Random rng, long id1, long outlink_ix) {
     if (randomid2max == 0) {
-      return (maxid1 + id1 + outlink_ix);
+      return id1 + outlink_ix;
     } else {
       return rng.nextInt((int)randomid2max);
     }
@@ -69,18 +69,18 @@ public class ID2Chooser {
    * @return
    */
   public long chooseForOp(Random rng, long id1, double pExisting) {
-    long nlinks = calcOriginalLinkCount(id1);
+    long nlinks = calcLinkCount(id1);
   
     // We want to sometimes add a link that already exists and sometimes
-    // add a new link. So generate id2 between startid1 and startid1 + x * links,
-    // where x is chosen based on pExisting.
+    // add a new link. So generate id2 such that it has roughly pExisting 
+    // chance of already existing.
     // This happens unless randomid2max is non-zero (in which case just pick a 
     // random id2 upto randomid2max). 
     long range = (long) Math.round((1/pExisting) * nlinks);
     range = Math.max(range, 1); // Ensure non-empty range
     long id2; 
     if (randomid2max == 0) {
-      id2 = startid1 + rng.nextInt((int)range);
+      id2 = id1 + rng.nextInt((int)range);
     } else {
       id2 = rng.nextInt((int)randomid2max);
     }
@@ -92,10 +92,25 @@ public class ID2Chooser {
     }
   }
 
-  /** Find the original number of links for this id1 **/
-  private long calcOriginalLinkCount(long id1) {
-    long nlinks = linkDist.getNlinks(startid1 + 
-              nLinksShuffler.invertPermute(id1 - startid1));
+  public boolean sameShuffle;
+  /** 
+   * Calculates the original number of outlinks for a given id1 (i.e. the
+   * number that would have been loaded)
+   * Sets sameShuffle field to true if shuffled was same as original
+   * @return number of links for this id1
+   */
+  public long calcLinkCount(long id1) {
+    assert(id1 >= startid1 && id1 < maxid1);
+    // Shuffle.  A low id after shuffling means many links, a high means few
+    long shuffled;
+    if (linkDist.doShuffle()) { 
+      shuffled = startid1 + nLinksShuffler.invertPermute(id1 - startid1);
+    } else {
+      shuffled = id1;
+    }
+    assert(shuffled >= startid1 && shuffled < maxid1);
+    sameShuffle = shuffled == id1;
+    long nlinks = linkDist.getNlinks(shuffled);
     return nlinks;
   }
 
