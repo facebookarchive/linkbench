@@ -30,7 +30,7 @@ public class Config {
   public static final String NLINKS_FUNC = "nlinks_func";
   public static final String NLINKS_CONFIG = "nlinks_config";
   public static final String NLINKS_DEFAULT = "nlinks_default";
-  public static final String LINK_DATASIZE = "datasize";
+  public static final String LINK_DATASIZE = "link_datasize";
   
 
   /* Loading performance tuning */
@@ -44,7 +44,8 @@ public class Config {
   // Distribution of accesses to IDs
   public static final String READ_CONFIG_PREFIX = "read_";
   public static final String WRITE_CONFIG_PREFIX = "write_";
-  public static final String NODE_ACCESS_CONFIG_PREFIX = "node_access_";
+  public static final String NODE_READ_CONFIG_PREFIX = "node_read_";
+  public static final String NODE_WRITE_CONFIG_PREFIX = "node_write_";
   public static final String ACCESS_FUNCTION_SUFFIX = "function";
   public static final String ACCESS_CONFIG_SUFFIX = "config";
   public static final String READ_FUNCTION = "read_function";

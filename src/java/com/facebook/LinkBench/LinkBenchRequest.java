@@ -93,7 +93,8 @@ public class LinkBenchRequest implements Runnable {
   // Access distributions
   private AccessDistribution writeDist; // link writes
   private AccessDistribution readDist; // link reads
-  private AccessDistribution nodeAccessDist; // node reads and writes
+  private AccessDistribution nodeReadDist; // node reads
+  private AccessDistribution nodeWriteDist; // node writes
   
   private ID2Chooser id2chooser;
   
@@ -174,16 +175,31 @@ public class LinkBenchRequest implements Runnable {
         startid1, maxid1, DistributionType.READS);
 
     try {
-      nodeAccessDist  = AccessDistributions.loadAccessDistribution(props, 
-        startid1, maxid1, DistributionType.NODE_ACCESSES);
+      nodeReadDist  = AccessDistributions.loadAccessDistribution(props, 
+        startid1, maxid1, DistributionType.NODE_READS);
     } catch (LinkBenchConfigError e) {
       // Not defined
-      logger.info("Node access distribution not configured");
-      if (pc_getnode > pc_getlinklist) {
-        throw new LinkBenchConfigError("Node access distribution not " +
-        		"configured but node operations have non-zero probability");
+      logger.info("Node access distribution not configured: " +
+          e.getMessage());
+      if (pc_getnode > pc_deletenode) {
+        throw new LinkBenchConfigError("Node read distribution not " +
+        		"configured but node read operations have non-zero probability");
       }
-      nodeAccessDist = null;
+      nodeReadDist = null;
+    }
+    
+    try {
+      nodeWriteDist  = AccessDistributions.loadAccessDistribution(props, 
+        startid1, maxid1, DistributionType.NODE_WRITES);
+    } catch (LinkBenchConfigError e) {
+      // Not defined
+      logger.info("Node access distribution not configured: " +
+              e.getMessage());
+      if (pc_deletenode > pc_getlinklist) {
+        throw new LinkBenchConfigError("Node write distribution not " +
+            "configured but node write operations have non-zero probability");
+      }
+      nodeWriteDist = null;
     }
     
     id2chooser = new ID2Chooser(props, startid1, maxid1, 
@@ -251,8 +267,11 @@ public class LinkBenchRequest implements Runnable {
     case WRITES:
       dist = writeDist;
       break;
-    case NODE_ACCESSES:
-      dist = nodeAccessDist;
+    case NODE_READS:
+      dist = nodeReadDist;
+      break;
+    case NODE_WRITES:
+      dist = nodeWriteDist;
       break;
     default:
       throw new RuntimeException("Unknown value for type: " + type);
@@ -379,7 +398,7 @@ public class LinkBenchRequest implements Runnable {
         Node newNode = createNode();
         // Choose an id that has previously been created (but might have
         // been since deleted
-        newNode.id = chooseRequestID(DistributionType.NODE_ACCESSES, 
+        newNode.id = chooseRequestID(DistributionType.NODE_WRITES, 
                                      lastNodeId);
         starttime = System.nanoTime();
         boolean changed = nodeStore.updateNode(dbid, newNode);
@@ -390,7 +409,7 @@ public class LinkBenchRequest implements Runnable {
         }
       } else if (r <= pc_deletenode) {
         type = LinkBenchOp.DELETE_NODE;
-        long idToDelete = chooseRequestID(DistributionType.NODE_ACCESSES, 
+        long idToDelete = chooseRequestID(DistributionType.NODE_WRITES, 
                                           lastNodeId);
         starttime = System.nanoTime();
         boolean deleted = nodeStore.deleteNode(dbid, LinkStore.ID1_TYPE,
@@ -403,7 +422,7 @@ public class LinkBenchRequest implements Runnable {
       } else if (r <= pc_getnode) {
         type = LinkBenchOp.GET_NODE;
         starttime = System.nanoTime();
-        long idToFetch = chooseRequestID(DistributionType.NODE_ACCESSES, 
+        long idToFetch = chooseRequestID(DistributionType.NODE_READS, 
                                          lastNodeId);
         Node fetched = nodeStore.getNode(dbid, LinkStore.ID1_TYPE, idToFetch);
         endtime = System.nanoTime();

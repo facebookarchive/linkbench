@@ -14,9 +14,10 @@ import com.facebook.LinkBench.Phase;
  * logs operations, or as a dummy linkstore instance that does nothing
  *
  */
-public class DummyLinkStore extends LinkStore {
+public class DummyLinkStore extends GraphStore {
 
   public LinkStore wrappedStore;
+  public GraphStore wrappedGraphStore; 
   
   public DummyLinkStore() {
     this(null);
@@ -28,14 +29,24 @@ public class DummyLinkStore extends LinkStore {
   
   public DummyLinkStore(LinkStore wrappedStore, boolean alreadyInitialized) {
     this.wrappedStore = wrappedStore;
+    if (wrappedStore instanceof GraphStore) {
+      wrappedGraphStore = (GraphStore) wrappedStore;
+    }
     this.initialized = alreadyInitialized;
   }
   
   /**
    * @return true if real data is written and can be queried
    */
-  public boolean isRealStore() {
+  public boolean isRealLinkStore() {
     return wrappedStore != null;
+  }
+  
+  /**
+   * @return true if real node data is written and can be queried
+   */
+  public boolean isRealGraphStore() {
+    return wrappedGraphStore != null;
   }
   
   public boolean initialized = false;
@@ -48,6 +59,11 @@ public class DummyLinkStore extends LinkStore {
   public long getLinkLists = 0;
   public long getLinkListsHistory = 0;
   public long countLinks = 0;
+  
+  public long addNodes = 0;
+  public long updateNodes = 0;
+  public long deleteNodes = 0;
+  public long getNodes = 0;
 
   public int bulkLoadBatchSize;
   public long bulkLoadLinkOps;
@@ -233,5 +249,48 @@ public class DummyLinkStore extends LinkStore {
     } else {
       this.rangeLimit = rangeLimit;
     }
+  }
+
+  @Override
+  public void resetNodeStore(String dbid, long startID) throws Exception {
+    if (wrappedGraphStore != null) {
+      wrappedGraphStore.resetNodeStore(dbid, startID);
+    }
+  }
+
+  @Override
+  public long addNode(String dbid, Node node) throws Exception {
+    addNodes++;
+    if (wrappedGraphStore != null) {
+      return wrappedGraphStore.addNode(dbid, node);
+    }
+    return 0;
+  }
+
+  @Override
+  public Node getNode(String dbid, int type, long id) throws Exception {
+    getNodes++;
+    if (wrappedGraphStore != null) {
+      return wrappedGraphStore.getNode(dbid, type, id);
+    }
+    return null;
+  }
+
+  @Override
+  public boolean updateNode(String dbid, Node node) throws Exception {
+    updateNodes++;
+    if (wrappedGraphStore != null) {
+      return wrappedGraphStore.updateNode(dbid, node);
+    }
+    return false;
+  }
+
+  @Override
+  public boolean deleteNode(String dbid, int type, long id) throws Exception {
+    deleteNodes++;
+    if (wrappedGraphStore != null) {
+      return wrappedGraphStore.deleteNode(dbid, type, id);
+    }
+    return false;
   }
 }

@@ -157,7 +157,7 @@ public class NodeLoader implements Runnable {
         logger.debug(String.format(
             "Loader #%d: %d/%d nodes loaded at %f nodes/sec", 
             loaderId, nodesLoaded, totalNodes, 
-        		nodesLoaded / timetaken));
+        		nodesLoaded / totalTimeTaken));
         nextReport += REPORT_INTERVAL;
       }
     } catch (Throwable e){//Catch exception if any

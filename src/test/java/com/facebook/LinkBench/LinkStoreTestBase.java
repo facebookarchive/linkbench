@@ -92,7 +92,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     return props;
   }
   
-  private void fillLoadProps(Properties props, long startId, long idCount,
+  public static void fillLoadProps(Properties props, long startId, long idCount,
       int linksPerId) {
     props.setProperty(Config.MIN_ID,Long.toString(startId));
     props.setProperty(Config.MAX_ID, Long.toString(startId + idCount));
@@ -106,7 +106,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     props.setProperty(Config.MAX_STAT_SAMPLES, "10000");
   }
 
-  private void fillReqProps(Properties props, long startId, long idCount,
+  public static void fillReqProps(Properties props, long startId, long idCount,
       int requests, long timeLimit, double p_addlink, double p_deletelink,
       double p_updatelink, double p_countlink, double p_getlink,
       double p_getlinklist, boolean enableMultiget) {
@@ -145,7 +145,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    * the seed for later reproducibility of test failures
    * @return
    */
-  private Random createRNG() {
+  static Random createRNG() {
     long randSeed = System.currentTimeMillis();
     System.out.println("Random seed: " + randSeed);
     Random rng = new Random(randSeed);
@@ -161,7 +161,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     Link writtenLink = new Link(id1, ltype, id2, 1, 1, 
         LinkStore.VISIBILITY_DEFAULT, new byte[] {0x1}, 1, 1994);
     store.addLink(testDB, writtenLink, true);
-    if (store.isRealStore()) {
+    if (store.isRealLinkStore()) {
       Link readBack = store.getLink(testDB, id1, ltype, id2);
       assertNotNull(readBack);
       if (!writtenLink.equals(readBack)) {
@@ -178,13 +178,13 @@ public abstract class LinkStoreTestBase extends TestCase {
     assertEquals(0, store.countLinks(testDB, id1, ltype));
     
     store.addLink(testDB, writtenLink, true);
-    if (store.isRealStore()) {
+    if (store.isRealLinkStore()) {
       assertNotNull(store.getLink(testDB, id1, ltype, id2));
       assertEquals(1, store.countLinks(testDB, id1, ltype));
     }
     // try hiding
     store.deleteLink(testDB, id1, ltype, id2, true, false);
-    if (store.isRealStore()) {
+    if (store.isRealLinkStore()) {
       Link hidden = store.getLink(testDB, id1, ltype, id2);
       assertNotNull(hidden);
       assertEquals(LinkStore.VISIBILITY_HIDDEN, hidden.visibility);
@@ -198,7 +198,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     
     // Update link: check it is unhidden
     store.updateLink(testDB, writtenLink, true);
-    if (store.isRealStore()) {
+    if (store.isRealLinkStore()) {
       assertTrue(writtenLink.equals(store.getLink(testDB, id1, ltype, id2)));
       assertEquals(1, store.countLinks(testDB, id1, ltype));
       Link links[] = store.getLinkList(testDB, id1, ltype);
@@ -235,7 +235,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     for (Link l: links) {
       store.addLink(testDB, l, true);
     }
-    if (store.isRealStore()) {
+    if (store.isRealLinkStore()) {
       // Check counts
       assertEquals(1, store.countLinks(testDB, ida, ltypea));
       assertEquals(1, store.countLinks(testDB, ida, ltypeb));
@@ -296,7 +296,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     // Retrieve the two added links
     Link l[] = store.multigetLinks(testDB, a.id1, a.link_type, 
           new long[] {a.id2, b.id2, 1234});
-    if (store.isRealStore()) {
+    if (store.isRealLinkStore()) {
       assertEquals(2, l.length);
       // Could be returned in either order
       if (a.equals(l[0])) {
@@ -397,7 +397,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     ls.addLink(testDB, l, true);
     
     Link l2 = ls.getLink(testDB, 1, 1, 1);
-    if (ls.isRealStore()) {
+    if (ls.isRealLinkStore()) {
       assertNotNull(l2);
       assertTrue(l.equals(l2));
     }
@@ -405,7 +405,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     l.data = updateData;
     ls.updateLink(testDB, l, true);
     l2 = ls.getLink(testDB, 1, 1, 1);
-    if (ls.isRealStore()) {
+    if (ls.isRealLinkStore()) {
       assertNotNull(l2);
       assertTrue(l.equals(l2));
     }
@@ -489,7 +489,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       }
       assertEquals(idCount * linksPerId, store.bulkLoadLinkRows + store.adds);
       
-      if (store.isRealStore()) {
+      if (store.isRealLinkStore()) {
         // old store was closed by loader
         store.initialize(props, Phase.REQUEST, 0);
         // read back data and sanity check
@@ -500,7 +500,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       if (!store.initialized) {
         store.initialize(props, Phase.REQUEST, 0);
       }
-      deleteIDRange(store, startId, idCount);
+      deleteIDRange(testDB, store, startId, idCount);
     }
   }
 
@@ -567,7 +567,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       assertEquals(0, reqStore.bulkLoadCountOps);
       assertEquals(0, reqStore.bulkLoadLinkOps);
     } finally {
-      deleteIDRange(getStoreHandle(true), startId, idCount);
+      deleteIDRange(testDB, getStoreHandle(true), startId, idCount);
     }
     System.err.println("Done!");
   }
@@ -616,7 +616,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       // Check that it isn't more that 5% faster than expected average
       assertTrue(actualArrivalRate <= 1.05 * requestsPerSec);
     } finally {
-      deleteIDRange(getStoreHandle(true), startId, idCount);
+      deleteIDRange(testDB, getStoreHandle(true), startId, idCount);
     }
     System.err.println("Done!");
   }
@@ -667,18 +667,18 @@ public abstract class LinkStoreTestBase extends TestCase {
       System.err.println("# getLinkLists: " + reqStore.getLinkLists +
           " # getLinkLists for history: " + reqStore.getLinkListsHistory
           + " " + (actualPHistory * 100) + "%");
-      if (reqStore.isRealStore()) {
+      if (reqStore.isRealLinkStore()) {
         assertTrue(actualPHistory <= 1.05 * pHistory);
         assertTrue(actualPHistory >= 0.95 * pHistory);
       }
     } finally {
-      deleteIDRange(getStoreHandle(true), startId, idCount);
+      deleteIDRange(testDB, getStoreHandle(true), startId, idCount);
     }
   }
 
   private void checkExpectedList(DummyLinkStore store,
             long id1, long ltype, Link... expected) throws Exception {
-    if (!store.isRealStore()) return;
+    if (!store.isRealLinkStore()) return;
     assertEquals(expected.length, store.countLinks(testDB, id1, ltype));
     Link actual[] = store.getLinkList(testDB, id1, ltype);
     if (expected.length == 0) {
@@ -703,7 +703,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    * @throws IOException
    * @throws Exception
    */
-  private void serialLoad(Random rng, Logger logger, Properties props,
+  static void serialLoad(Random rng, Logger logger, Properties props,
       DummyLinkStore store) throws IOException, Exception {
     LatencyStats latencyStats = new LatencyStats(1);
     
@@ -768,7 +768,8 @@ public abstract class LinkStoreTestBase extends TestCase {
     logger.info("Successfully sanity checked data for " + idCount + " ids");
   }
 
-  private void deleteIDRange(DummyLinkStore store, long startId, long idCount)
+  static void deleteIDRange(String testDB,
+        DummyLinkStore store, long startId, long idCount)
       throws Exception {
     // attempt to delete data
     for (long i = startId; i < startId + idCount; i++) {

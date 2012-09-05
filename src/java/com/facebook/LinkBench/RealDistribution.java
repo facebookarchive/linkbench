@@ -36,14 +36,18 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   public static final long READ_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
   public static final int READ_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
   public static final long[] NODE_ACCESS_SHUFFLER_PARAMS = {27, 13};
-  public static final long NODE_ACCESS_SHUFFLER_SEED = 4766565305853767165L;
-  public static final int NODE_ACCESS_SHUFFLER_GROUPS = 1024;
+  public static final long NODE_READ_SHUFFLER_SEED = 4766565305853767165L;
+  public static final int NODE_READ_SHUFFLER_GROUPS = 1024;
+  public static final long NODE_WRITE_SHUFFLER_SEED = NODE_READ_SHUFFLER_SEED;
+  public static final int NODE_WRITE_SHUFFLER_GROUPS = 
+                                                    NODE_READ_SHUFFLER_GROUPS;
 
   public static enum DistributionType {
     LINKS,
     READS,
     WRITES,
-    NODE_ACCESSES
+    NODE_READS,
+    NODE_WRITES,
   }
 
   private DistributionType type = null;
@@ -289,9 +293,12 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     case WRITES:
       return new InvertibleShuffler(WRITE_SHUFFLER_SEED,
           WRITE_SHUFFLER_GROUPS, n);
-    case NODE_ACCESSES:
-      return new InvertibleShuffler(NODE_ACCESS_SHUFFLER_SEED,
-          NODE_ACCESS_SHUFFLER_GROUPS, n);
+    case NODE_READS:
+      return new InvertibleShuffler(NODE_READ_SHUFFLER_SEED,
+          NODE_READ_SHUFFLER_GROUPS, n);
+    case NODE_WRITES:
+      return new InvertibleShuffler(NODE_WRITE_SHUFFLER_SEED,
+          NODE_WRITE_SHUFFLER_GROUPS, n);
     case LINKS:
       return new InvertibleShuffler(NLINKS_SHUFFLER_SEED,
           NLINKS_SHUFFLER_GROUPS, n);

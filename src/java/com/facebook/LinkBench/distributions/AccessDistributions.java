@@ -68,7 +68,7 @@ public class AccessDistributions {
           newid = minid;
         } else {
           newid = previousid+1;
-          if (newid > maxid) {
+          if (newid >= maxid) {
             newid = minid;
           }
         }
@@ -150,8 +150,11 @@ public class AccessDistributions {
     case WRITES:
       keyPrefix = Config.WRITE_CONFIG_PREFIX;
       break;
-    case NODE_ACCESSES:
-      keyPrefix = Config.NODE_ACCESS_CONFIG_PREFIX;
+    case NODE_READS:
+      keyPrefix = Config.NODE_READ_CONFIG_PREFIX;
+      break;
+    case NODE_WRITES:
+      keyPrefix = Config.NODE_WRITE_CONFIG_PREFIX;
       break;
     default:
       throw new RuntimeException("Bad kind " + kind);

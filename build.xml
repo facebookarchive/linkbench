@@ -76,8 +76,7 @@
         <fileset dir="${build}"> 
           <include name="**/*Test*.class"/>
           <exclude name="**/LinkStoreHBaseGeneralAtomicityTesting.class"/>
-          <exclude name="**/LinkStoreTestBase.class"/>
-          <exclude name="**/NodeStoreTestBase.class"/>
+          <exclude name="**/*TestBase.class"/>
           <exclude name="**/MySqlTestConfig.class"/>
           <exclude name="**/DistributionTestBase.class"/>
           <exclude name="**/*$*.class"/> <!-- ignore nested classes -->
