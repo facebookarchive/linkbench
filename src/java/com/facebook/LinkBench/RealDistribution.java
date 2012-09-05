@@ -44,8 +44,8 @@ public class RealDistribution extends PiecewiseLinearDistribution {
 
   public static enum DistributionType {
     LINKS,
-    READS,
-    WRITES,
+    LINK_READS,
+    LINK_WRITES,
     NODE_READS,
     NODE_WRITES,
   }
@@ -67,10 +67,14 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     }
     
     DistributionType configuredType;
-    if (dist.equals("reads")) {
-      configuredType = DistributionType.READS;
-    } else if (dist.equals("writes")) {
-      configuredType = DistributionType.WRITES;
+    if (dist.equals("link_reads")) {
+      configuredType = DistributionType.LINK_READS;
+    } else if (dist.equals("link_writes")) {
+      configuredType = DistributionType.LINK_WRITES;
+    } else if (dist.equals("node_reads")) {
+      configuredType = DistributionType.NODE_READS;
+    } else if (dist.equals("node_writes")) {
+      configuredType = DistributionType.NODE_WRITES;
     } else if (dist.equals("links")) {
       configuredType = DistributionType.LINKS;
     } else {
@@ -92,21 +96,30 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     case LINKS:
       init(min, max, nlinks_cdf, null, null, nlinks_expected_val);
       break;
-    case WRITES:
-      init(min, max, nwrites_cdf, nwrites_cs, nwrites_right_points,
-                                              nwrites_expected_val);
+    case LINK_WRITES:
+      init(min, max, link_nwrites_cdf, nwrites_cs, nwrites_right_points,
+                                              link_nwrites_expected_val);
       break;
-    case READS:
-      init(min, max, nreads_cdf, nreads_cs, nreads_right_points,
-                                              nreads_expected_val);
+    case LINK_READS:
+      init(min, max, link_nreads_cdf, link_nreads_cs, link_nreads_right_points,
+                                              link_nreads_expected_val);
+      break;
+    case NODE_WRITES:
+      init(min, max, node_nwrites_cdf, nwrites_cs, nwrites_right_points,
+                                              node_nwrites_expected_val);
+      break;
+    case NODE_READS:
+      init(min, max, node_nreads_cdf, node_nreads_cs, node_nreads_right_points,
+                                              node_nreads_expected_val);
       break;
     default:
       throw new RuntimeException("Unknown distribution type: " + type);
     }
   }
   
-  private static ArrayList<Point> nlinks_cdf, nreads_cdf, nwrites_cdf;
-  private static double[] nreads_cs, nwrites_cs;
+  private static ArrayList<Point> nlinks_cdf, link_nreads_cdf, link_nwrites_cdf,
+                  node_nreads_cdf, node_nwrites_cdf;
+  private static double[] link_nreads_cs, nwrites_cs, node_nreads_cs, node_nwrites_cs;
   /**
    * These right_points arrays are used to keep track of state of
    * the id1 generation, with each cell holding the next id to
@@ -117,8 +130,10 @@ public class RealDistribution extends PiecewiseLinearDistribution {
    * certainly is non-deterministic when multiple threads are
    * involved.
    */
-  private static long[] nreads_right_points, nwrites_right_points;
-  private static double nlinks_expected_val, nreads_expected_val, nwrites_expected_val;
+  private static long[] link_nreads_right_points, nwrites_right_points,
+                        node_nreads_right_points, node_nwrites_right_points;
+  private static double nlinks_expected_val, link_nreads_expected_val, link_nwrites_expected_val,
+                        node_nreads_expected_val, node_nwrites_expected_val;
 
   /*
    * This method loads data from data file into memory;
@@ -167,9 +182,9 @@ public class RealDistribution extends PiecewiseLinearDistribution {
    * return the last cumulative sum (80%).
    */
   static double getArea(DistributionType type) {
-    if (type == DistributionType.READS)
-        return nreads_cs[nreads_cs.length - 1];
-    else if (type == DistributionType.WRITES)
+    if (type == DistributionType.LINK_READS)
+        return link_nreads_cs[link_nreads_cs.length - 1];
+    else if (type == DistributionType.LINK_WRITES)
         return nwrites_cs[nwrites_cs.length - 1];
     else return 0;
   }
@@ -193,8 +208,8 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   static NavigableMap<Integer, Double> getCDF(DistributionType dist) {
     ArrayList<Point> points = 
       dist == DistributionType.LINKS ? nlinks_cdf :
-      dist == DistributionType.READS? nreads_cdf :
-      dist == DistributionType.WRITES ? nwrites_cdf : null;
+      dist == DistributionType.LINK_READS? link_nreads_cdf :
+      dist == DistributionType.LINK_WRITES ? link_nwrites_cdf : null;
     if (points == null) return null;
 
     TreeMap<Integer, Double> map = new TreeMap<Integer, Double>();
@@ -242,21 +257,21 @@ public class RealDistribution extends PiecewiseLinearDistribution {
         nlinks_cdf = readCDF(scanner);
         nlinks_expected_val = expectedValue(nlinks_cdf);
       }
-      else if (type.equals("nreads")) {
-        nreads_cdf = readCDF(scanner);
-        double[] nreads_pdf = getPDF(nreads_cdf);
+      else if (type.equals("link_nreads")) {
+        link_nreads_cdf = readCDF(scanner);
+        double[] nreads_pdf = getPDF(link_nreads_cdf);
         double[] nreads_ccdf = getCCDF(nreads_pdf);
-        nreads_cs = getCumulativeSum(nreads_ccdf);
+        link_nreads_cs = getCumulativeSum(nreads_ccdf);
 
-        nreads_right_points = new long[nreads_cs.length];
-        for (int i = 0; i < nreads_right_points.length; ++i) {
-          nreads_right_points[i] = 0;
+        link_nreads_right_points = new long[link_nreads_cs.length];
+        for (int i = 0; i < link_nreads_right_points.length; ++i) {
+          link_nreads_right_points[i] = 0;
         }
-        nreads_expected_val = expectedValue(nreads_cdf);
+        link_nreads_expected_val = expectedValue(link_nreads_cdf);
       }
-      else if (type.equals("nwrites")) {
-        nwrites_cdf = readCDF(scanner);
-        double[] nwrites_pdf = getPDF(nwrites_cdf);
+      else if (type.equals("link_nwrites")) {
+        link_nwrites_cdf = readCDF(scanner);
+        double[] nwrites_pdf = getPDF(link_nwrites_cdf);
         double[] nwrites_ccdf = getCCDF(nwrites_pdf);
         nwrites_cs = getCumulativeSum(nwrites_ccdf);
 
@@ -264,9 +279,31 @@ public class RealDistribution extends PiecewiseLinearDistribution {
         for (int i = 0; i < nwrites_right_points.length; ++i) {
           nwrites_right_points[i] = 0;
         }
-        nwrites_expected_val = expectedValue(nwrites_cdf);
+        link_nwrites_expected_val = expectedValue(link_nwrites_cdf);
+      } else if (type.equals("node_nreads")) {
+        node_nreads_cdf = readCDF(scanner);
+        double[] node_nreads_pdf = getPDF(node_nreads_cdf);
+        double[] node_nreads_ccdf = getCCDF(node_nreads_pdf);
+        node_nreads_cs = getCumulativeSum(node_nreads_ccdf);
+
+        node_nreads_right_points = new long[node_nreads_cs.length];
+        for (int i = 0; i < node_nreads_right_points.length; ++i) {
+          node_nreads_right_points[i] = 0;
+        }
+        node_nreads_expected_val = expectedValue(node_nreads_cdf);
       }
-      else {
+      else if (type.equals("node_nwrites")) {
+        node_nwrites_cdf = readCDF(scanner);
+        double[] node_nwrites_pdf = getPDF(node_nwrites_cdf);
+        double[] node_nwrites_ccdf = getCCDF(node_nwrites_pdf);
+        node_nwrites_cs = getCumulativeSum(node_nwrites_ccdf);
+
+        node_nwrites_right_points = new long[node_nwrites_cs.length];
+        for (int i = 0; i < node_nwrites_right_points.length; ++i) {
+          node_nwrites_right_points[i] = 0;
+        }
+        node_nwrites_expected_val = expectedValue(node_nwrites_cdf);
+      } else {
         throw new RuntimeException("Invalid file content: " + type);
       }
     }
@@ -287,10 +324,10 @@ public class RealDistribution extends PiecewiseLinearDistribution {
 
   public static InvertibleShuffler getShuffler(DistributionType type, long n) {
     switch (type) {
-    case READS:
+    case LINK_READS:
       return new InvertibleShuffler(READ_SHUFFLER_SEED,
             READ_SHUFFLER_GROUPS, n);
-    case WRITES:
+    case LINK_WRITES:
       return new InvertibleShuffler(WRITE_SHUFFLER_SEED,
           WRITE_SHUFFLER_GROUPS, n);
     case NODE_READS:

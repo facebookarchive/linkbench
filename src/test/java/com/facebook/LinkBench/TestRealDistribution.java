@@ -95,20 +95,24 @@ public class TestRealDistribution extends TestCase {
     Random rng = new Random(randSeed);
     
     double err;
-    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.READS);
+    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.LINK_READS);
     System.out.println("testGetNextId1(1000000, 2000001, nreads) err=" + err);
-    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.WRITES);
+    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.LINK_WRITES);
     System.out.println("testGetNextId1(1000000, 2000001, nwrites) err=" + err);
+    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.NODE_READS);
+    System.out.println("testGetNextId1(1000000, 2000001, node_nreads) err=" + err);
+    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.NODE_WRITES);
+    System.out.println("testGetNextId1(1000000, 2000001, node_nwrites) err=" + err);
 
-    err = testGetNextId1(props, rng, 1234567, 7654321, DistributionType.READS);
+    err = testGetNextId1(props, rng, 1234567, 7654321, DistributionType.LINK_READS);
     System.out.println("testGetNextId1(1234567, 7654321, nreads) err=" + err);
-    err = testGetNextId1(props, rng, 1234567, 7654321, DistributionType.WRITES);
+    err = testGetNextId1(props, rng, 1234567, 7654321, DistributionType.LINK_WRITES);
     System.out.println("testGetNextId1(1234567, 7654321, nwrites) err=" + err);
   
-    err = testGetNextId1(props, rng, 97, 10000097, DistributionType.READS);
+    err = testGetNextId1(props, rng, 97, 10000097, DistributionType.LINK_READS);
     
     System.out.println("testGetNextId1(97, 10000097, nreads) err=" + err);
-    err = testGetNextId1(props, rng, 97, 10000097, DistributionType.WRITES);
+    err = testGetNextId1(props, rng, 97, 10000097, DistributionType.LINK_WRITES);
     System.out.println("testGetNextId1(97, 10000097, nwrites) err=" + err);
     System.out.println();
   }
@@ -183,7 +187,7 @@ public class TestRealDistribution extends TestCase {
       /100.0;
     
     RealDistribution dist = new RealDistribution();
-    dist.init(props, startid1, maxid1, DistributionType.WRITES);
+    dist.init(props, startid1, maxid1, DistributionType.LINK_WRITES);
     for (int i = 0; i < nqueries; ++i) {
       long x = dist.choose(rng);
       if (x < startid1 || x >= maxid1) {

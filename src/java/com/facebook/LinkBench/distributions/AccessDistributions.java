@@ -144,10 +144,10 @@ public class AccessDistributions {
     Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
     String keyPrefix;
     switch(kind) {
-    case READS:
+    case LINK_READS:
       keyPrefix = Config.READ_CONFIG_PREFIX;
       break;
-    case WRITES:
+    case LINK_WRITES:
       keyPrefix = Config.WRITE_CONFIG_PREFIX;
       break;
     case NODE_READS:

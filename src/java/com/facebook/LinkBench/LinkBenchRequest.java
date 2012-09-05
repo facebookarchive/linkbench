@@ -203,9 +203,9 @@ public class LinkBenchRequest implements Runnable {
   private void initLinkRequestDistributions(Properties props, int requesterID,
       int nrequesters) {
     writeDist = AccessDistributions.loadAccessDistribution(props, 
-            startid1, maxid1, DistributionType.WRITES);
+            startid1, maxid1, DistributionType.LINK_WRITES);
     readDist = AccessDistributions.loadAccessDistribution(props, 
-        startid1, maxid1, DistributionType.READS);
+        startid1, maxid1, DistributionType.LINK_READS);
     
     id2chooser = new ID2Chooser(props, startid1, maxid1, 
                                 nrequesters, requesterID);
@@ -314,10 +314,10 @@ public class LinkBenchRequest implements Runnable {
                                         long previousId1) {
     AccessDistribution dist;
     switch (type) {
-    case READS:
+    case LINK_READS:
       dist = readDist;
       break;
-    case WRITES:
+    case LINK_WRITES:
       dist = writeDist;
       break;
     case NODE_READS:
@@ -366,19 +366,19 @@ public class LinkBenchRequest implements Runnable {
       if (r <= pc_addlink) {
         // generate add request
         type = LinkBenchOp.ADD_LINK;
-        link.id1 = chooseRequestID(DistributionType.WRITES, link.id1);
+        link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
         starttime = System.nanoTime();
         addLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_deletelink) {
         type = LinkBenchOp.DELETE_LINK;
-        link.id1 = chooseRequestID(DistributionType.WRITES, link.id1);
+        link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
         starttime = System.nanoTime();
         deleteLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_updatelink) {
         type = LinkBenchOp.UPDATE_LINK;
-        link.id1 = chooseRequestID(DistributionType.WRITES, link.id1);
+        link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
         starttime = System.nanoTime();
         updateLink(link);
         endtime = System.nanoTime();
@@ -386,7 +386,7 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkBenchOp.COUNT_LINK;
 
-        link.id1 = chooseRequestID(DistributionType.READS, link.id1);
+        link.id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
         starttime = System.nanoTime();
         countLinks(link);
         endtime = System.nanoTime();
@@ -395,7 +395,7 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkBenchOp.MULTIGET_LINK;
 
-        link.id1 = chooseRequestID(DistributionType.READS, link.id1);
+        link.id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
         int nid2s = 1;
         if (multigetDist != null) { 
           nid2s = (int)multigetDist.choose(rng);
@@ -425,7 +425,7 @@ public class LinkBenchRequest implements Runnable {
                     !this.listTailHistory.isEmpty()) {
           links = getLinkListTail();
         } else {
-          link.id1 = chooseRequestID(DistributionType.READS, link.id1);
+          link.id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
           starttime = System.nanoTime();
           links = getLinkList(link);
           endtime = System.nanoTime();

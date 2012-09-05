@@ -81,7 +81,7 @@ public class TestAccessDistribution extends TestCase {
     props.setProperty(Config.DISTRIBUTION_DATA_FILE, 
         new File("config/Distribution.dat").getAbsolutePath());
     int min = 100, max = 200;
-    r.init(props, min, max, DistributionType.READS);
+    r.init(props, min, max, DistributionType.LINK_READS);
     ProbAccessDistribution unshuffled = new ProbAccessDistribution(r, null);
     testSanityAccessDist(unshuffled, min, max);
     
