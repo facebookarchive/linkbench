@@ -19,6 +19,7 @@ import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistMode;
 import com.facebook.LinkBench.distributions.GeometricDistribution;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistMode;
 import com.facebook.LinkBench.distributions.UniformDistribution;
+import com.facebook.LinkBench.generators.UniformDataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
 
 /**
@@ -97,13 +98,21 @@ public abstract class LinkStoreTestBase extends TestCase {
     props.setProperty(Config.MIN_ID,Long.toString(startId));
     props.setProperty(Config.MAX_ID, Long.toString(startId + idCount));
     props.setProperty(Config.RANDOM_ID2_MAX, "0");
-    props.setProperty(Config.LINK_DATASIZE, "100");
     // Fixed number of rows
     props.setProperty(Config.NLINKS_FUNC, LinkDistMode.CONST.name()); 
     props.setProperty(Config.NLINKS_CONFIG, "0"); // ignored
     props.setProperty(Config.NLINKS_DEFAULT, Integer.toString(linksPerId));
     props.setProperty(Config.DISPLAY_FREQ, "10"); // Show stats frequently
     props.setProperty(Config.MAX_STAT_SAMPLES, "10000");
+    
+
+    props.setProperty(Config.LINK_DATASIZE, "100.0");
+    props.setProperty(Config.LINK_ADD_DATAGEN,
+                      UniformDataGenerator.class.getName());
+    props.setProperty(Config.LINK_ADD_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_STARTBYTE, "0");
+    props.setProperty(Config.LINK_ADD_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_ENDBYTE, "255");
   }
 
   public static void fillReqProps(Properties props, long startId, long idCount,
@@ -138,6 +147,21 @@ public abstract class LinkStoreTestBase extends TestCase {
       props.setProperty(Config.LINK_MULTIGET_DIST_PREFIX +
                         GeometricDistribution.PROB_PARAM_KEY, "0.8");
     }
+    
+    props.setProperty(Config.LINK_DATASIZE, "200");
+    props.setProperty(Config.LINK_ADD_DATAGEN,
+                      UniformDataGenerator.class.getName());
+    props.setProperty(Config.LINK_ADD_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_STARTBYTE, "0");
+    props.setProperty(Config.LINK_ADD_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_ENDBYTE, "255");
+    
+    props.setProperty(Config.LINK_UP_DATAGEN,
+                      UniformDataGenerator.class.getName());
+    props.setProperty(Config.LINK_UP_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_STARTBYTE, "0");
+    props.setProperty(Config.LINK_UP_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_ENDBYTE, "255");
   }
 
   /** 

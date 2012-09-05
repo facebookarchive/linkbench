@@ -18,6 +18,8 @@ public abstract class LinkStore {
   
   public static final int MAX_OPTYPES = LinkBenchOp.values().length;
   public static final int DEFAULT_LIMIT = 10000;
+  
+  public static final long MAX_LINK_DATA = 255;
 
   /** Controls the current setting for range limit */
   protected int rangeLimit;

@@ -30,8 +30,23 @@ public class Config {
   public static final String NLINKS_FUNC = "nlinks_func";
   public static final String NLINKS_CONFIG = "nlinks_config";
   public static final String NLINKS_DEFAULT = "nlinks_default";
-  public static final String LINK_DATASIZE = "link_datasize";
   
+  /* Data generation */
+  public static final String LINK_DATASIZE = "link_datasize";
+  public static final String NODE_DATASIZE = "node_datasize";
+  public static final String UNIFORM_GEN_STARTBYTE = "startbyte";
+  public static final String UNIFORM_GEN_ENDBYTE = "endbyte";
+  public static final String LINK_ADD_DATAGEN = "link_add_datagen";
+  public static final String LINK_ADD_DATAGEN_PREFIX = "link_add_datagen_";
+  public static final String LINK_UP_DATAGEN = "link_up_datagen";
+  public static final String LINK_UP_DATAGEN_PREFIX = "link_up_datagen_";
+  public static final String NODE_ADD_DATAGEN = "node_add_datagen";
+  public static final String NODE_ADD_DATAGEN_PREFIX = "node_add_datagen_";
+  public static final String NODE_UP_DATAGEN = "node_up_datagen";
+  public static final String NODE_UP_DATAGEN_PREFIX = "node_up_datagen_";
+  // Sigma values control variance of data size log normal distribution
+  public static final double LINK_DATASIZE_SIGMA = 1.0;
+  public static final double NODE_DATASIZE_SIGMA = 1.0;
 
   /* Loading performance tuning */
   public static final String NUM_LOADERS = "loaders";

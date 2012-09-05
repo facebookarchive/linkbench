@@ -10,7 +10,9 @@ import java.util.Properties;
  * ensure that the starting id is actually specified.
  */
 public interface NodeStore {
-
+  // Limit data to 1MB
+  public static final long MAX_NODE_DATA = 1024 * 1024;
+  
   /** initialize the store object */
   public void initialize(Properties p,
       Phase currentPhase, int threadId) throws IOException, Exception;

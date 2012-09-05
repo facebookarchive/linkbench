@@ -14,7 +14,9 @@ import com.facebook.LinkBench.RealDistribution.DistributionType;
 import com.facebook.LinkBench.distributions.AccessDistributions;
 import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistribution;
 import com.facebook.LinkBench.distributions.ID2Chooser;
+import com.facebook.LinkBench.distributions.LogNormalDistribution;
 import com.facebook.LinkBench.distributions.ProbabilityDistribution;
+import com.facebook.LinkBench.generators.DataGenerator;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
 import com.facebook.LinkBench.stats.SampledStats;
@@ -41,12 +43,19 @@ public class LinkBenchRequest implements Runnable {
   int requesterID;
   long maxid1;
   long startid1;
-  int datasize;
   Level debuglevel;
   long progressfreq_ms;
   String dbid;
   boolean singleAssoc = false;
 
+  // Control data generation settings
+  private LogNormalDistribution linkDataSize;
+  private DataGenerator linkAddDataGen;
+  private DataGenerator linkUpDataGen;
+  private LogNormalDistribution nodeDataSize;
+  private DataGenerator nodeAddDataGen;
+  private DataGenerator nodeUpDataGen;
+  
   // cummulative percentages
   double pc_addlink;
   double pc_deletelink;
@@ -73,8 +82,8 @@ public class LinkBenchRequest implements Runnable {
   SampledStats stats;
   LatencyStats latencyStats;
 
-  long numfound;
-  long numnotfound;
+  long numfound = 0;
+  long numnotfound = 0;
 
   /** 
    * Random number generator use for generating workload.  If
@@ -97,7 +106,6 @@ public class LinkBenchRequest implements Runnable {
   private AccessDistribution nodeWriteDist; // node writes
   
   private ID2Chooser id2chooser;
-  
   public LinkBenchRequest(LinkStore linkStore,
                           NodeStore nodeStore,
                           Properties props,
@@ -108,6 +116,10 @@ public class LinkBenchRequest implements Runnable {
                           int requesterID,
                           int nrequesters) {
     assert(linkStore != null);
+    if (requesterID < 0 ||  requesterID >= nrequesters) {
+      throw new IllegalArgumentException("Bad requester id " 
+          + requesterID + "/" + nrequesters);
+    }
     
     this.linkStore = linkStore;
     this.nodeStore = nodeStore;
@@ -115,27 +127,25 @@ public class LinkBenchRequest implements Runnable {
     this.latencyStats = latencyStats;
     this.progressTracker = progressTracker;
     this.rng = rng;
-
     this.nrequesters = nrequesters;
     this.requesterID = requesterID;
-    if (requesterID < 0 ||  requesterID >= nrequesters) {
-      throw new IllegalArgumentException("Bad requester id " 
-          + requesterID + "/" + nrequesters);
-    }
-    
+
+    debuglevel = ConfigUtil.getDebugLevel(props);
+    dbid = props.getProperty(Config.DBID);
     nrequests = Long.parseLong(props.getProperty(Config.NUM_REQUESTS));
     requestrate = Long.parseLong(props.getProperty(Config.REQUEST_RATE, "0"));
-   
     maxFailedRequests = Long.parseLong(props.getProperty(
                                                 Config.MAX_FAILED_REQUESTS, "0"));
-    
     maxtime = Long.parseLong(props.getProperty(Config.MAX_TIME));
     maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
     startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
 
-    // math functions may cause problems for id1 = 0. Start at 1.
+    // math functions may cause problems for id1 < 1
     if (startid1 <= 0) {
-      startid1 = 1;
+      throw new LinkBenchConfigError("startid1 must be >= 1");
+    }
+    if (maxid1 <= startid1) {
+      throw new LinkBenchConfigError("maxid1 must be > startid1");
     }
 
     // is this a single assoc test?
@@ -144,10 +154,34 @@ public class LinkBenchRequest implements Runnable {
       logger.info("Testing single row assoc read.");
     }
 
-    datasize = Integer.parseInt(props.getProperty(Config.LINK_DATASIZE));
-    debuglevel = ConfigUtil.getDebugLevel(props);
-    dbid = props.getProperty(Config.DBID);
+    initRequestProbabilities(props);
+    initLinkDataGeneration(props);
+    initLinkRequestDistributions(props, requesterID, nrequesters);
+    if (pc_getnode > pc_getlinklist) {
+      // Load stuff for node workload if needed
+      if (nodeStore == null) {
+        throw new IllegalArgumentException("nodeStore not provided but non-zero " +
+                                         "probability of node operation");
+      }
+      initNodeDataGeneration(props);
+      initNodeRequestDistributions(props);
+    }
 
+    long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
+    progressfreq_ms = Long.parseLong(props.getProperty(Config.PROGRESS_FREQ, "6")) 
+                                                                          * 1000;
+    int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
+    stats = new SampledStats(requesterID, displayfreq, maxsamples, csvStreamOut);
+   
+    listTailHistoryLimit = 2048; // Hardcoded limit for now
+    listTailHistory = new ArrayList<Link>(listTailHistoryLimit);
+    p_historical_getlinklist = Double.parseDouble(props.getProperty(
+                    Config.PR_GETLINKLIST_HISTORY, "0.0")) / 100; 
+        
+    lastNodeId = startid1;
+  }
+
+  private void initRequestProbabilities(Properties props) {
     pc_addlink = Double.parseDouble(props.getProperty(Config.PR_ADD_LINK));
     pc_deletelink = pc_addlink + Double.parseDouble(props.getProperty(Config.PR_DELETE_LINK));
     pc_updatelink = pc_deletelink + Double.parseDouble(props.getProperty(Config.PR_UPDATE_LINK));
@@ -159,54 +193,24 @@ public class LinkBenchRequest implements Runnable {
     pc_updatenode = pc_addnode + Double.parseDouble(props.getProperty(Config.PR_UPDATE_NODE, "0.0"));
     pc_deletenode = pc_updatenode + Double.parseDouble(props.getProperty(Config.PR_DELETE_NODE, "0.0"));
     pc_getnode = pc_deletenode + Double.parseDouble(props.getProperty(Config.PR_GET_NODE, "0.0"));
-    if (pc_getnode > pc_getlinklist && nodeStore == null) {
-      throw new IllegalArgumentException("nodeStore not provided but non-zero " +
-      		                               "probability of node operation");
-    }
     
     if (Math.abs(pc_getnode - 100.0) > 1e-5) {//compare real numbers
       throw new LinkBenchConfigError("Percentages of request types do not " + 
                   "add to 100, only " + pc_getnode + "!");
     }
-    
+  }
+
+  private void initLinkRequestDistributions(Properties props, int requesterID,
+      int nrequesters) {
     writeDist = AccessDistributions.loadAccessDistribution(props, 
             startid1, maxid1, DistributionType.WRITES);
     readDist = AccessDistributions.loadAccessDistribution(props, 
         startid1, maxid1, DistributionType.READS);
-
-    try {
-      nodeReadDist  = AccessDistributions.loadAccessDistribution(props, 
-        startid1, maxid1, DistributionType.NODE_READS);
-    } catch (LinkBenchConfigError e) {
-      // Not defined
-      logger.info("Node access distribution not configured: " +
-          e.getMessage());
-      if (pc_getnode > pc_deletenode) {
-        throw new LinkBenchConfigError("Node read distribution not " +
-        		"configured but node read operations have non-zero probability");
-      }
-      nodeReadDist = null;
-    }
-    
-    try {
-      nodeWriteDist  = AccessDistributions.loadAccessDistribution(props, 
-        startid1, maxid1, DistributionType.NODE_WRITES);
-    } catch (LinkBenchConfigError e) {
-      // Not defined
-      logger.info("Node access distribution not configured: " +
-              e.getMessage());
-      if (pc_deletenode > pc_getlinklist) {
-        throw new LinkBenchConfigError("Node write distribution not " +
-            "configured but node write operations have non-zero probability");
-      }
-      nodeWriteDist = null;
-    }
     
     id2chooser = new ID2Chooser(props, startid1, maxid1, 
                                 nrequesters, requesterID);
 
-    // Distribution of #id2s per multiget, based on empirical
-    // results.  TODO: make configurable
+    // Distribution of #id2s per multiget
     String multigetDistClass = props.getProperty(Config.LINK_MULTIGET_DIST);
     if (multigetDistClass != null && multigetDistClass.trim().length() != 0) {
       int multigetMin = Integer.parseInt(props.getProperty(
@@ -226,26 +230,75 @@ public class LinkBenchRequest implements Runnable {
     } else {
       multigetDist = null;
     }
-    
-    numfound = 0;
-    numnotfound = 0;
+  }
 
-    long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
-    String progressfreq = props.getProperty(Config.PROGRESS_FREQ);
-    if (progressfreq == null) {
-      progressfreq_ms = 6000L;
-    } else {
-      progressfreq_ms = Long.parseLong(progressfreq) * 1000L;
+  private void initLinkDataGeneration(Properties props) {
+    try {
+      double medLinkDataSize = Double.parseDouble(props.getProperty(
+                                                      Config.LINK_DATASIZE));
+      linkDataSize = new LogNormalDistribution();
+      linkDataSize.init(0, LinkStore.MAX_LINK_DATA, medLinkDataSize,
+                           Config.LINK_DATASIZE_SIGMA);
+      linkAddDataGen = ClassLoadUtil.newInstance(
+          props.getProperty(Config.LINK_ADD_DATAGEN), DataGenerator.class);
+      linkAddDataGen.init(props, Config.LINK_ADD_DATAGEN_PREFIX);
+      
+      linkUpDataGen = ClassLoadUtil.newInstance(
+          props.getProperty(Config.LINK_UP_DATAGEN), DataGenerator.class);
+      linkUpDataGen.init(props, Config.LINK_UP_DATAGEN_PREFIX);
+    } catch (ClassNotFoundException ex) {
+      logger.error(ex);
+      throw new LinkBenchConfigError("Error loading data generator class: " 
+            + ex.getMessage());
     }
-    int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
-    stats = new SampledStats(requesterID, displayfreq, maxsamples, csvStreamOut);
-   
-    listTailHistoryLimit = 2048;
-    listTailHistory = new ArrayList<Link>(listTailHistoryLimit);
-    p_historical_getlinklist = Double.parseDouble(props.getProperty(
-                    Config.PR_GETLINKLIST_HISTORY, "0.0")) / 100; 
-        
-    lastNodeId = startid1;
+  }
+
+  private void initNodeRequestDistributions(Properties props) {
+    try {
+      nodeReadDist  = AccessDistributions.loadAccessDistribution(props, 
+        startid1, maxid1, DistributionType.NODE_READS);
+    } catch (LinkBenchConfigError e) {
+      // Not defined
+      logger.info("Node access distribution not configured: " +
+          e.getMessage());
+      throw new LinkBenchConfigError("Node read distribution not " +
+            "configured but node read operations have non-zero probability");
+    }
+    
+    try {
+      nodeWriteDist  = AccessDistributions.loadAccessDistribution(props, 
+        startid1, maxid1, DistributionType.NODE_WRITES);
+    } catch (LinkBenchConfigError e) {
+      // Not defined
+      logger.info("Node access distribution not configured: " +
+              e.getMessage());
+      throw new LinkBenchConfigError("Node write distribution not " +
+            "configured but node write operations have non-zero probability");
+    }
+  }
+
+  private void initNodeDataGeneration(Properties props) {
+    try {  
+      double medNodeDataSize = Double.parseDouble(props.getProperty(
+                                              Config.NODE_DATASIZE));
+      nodeDataSize = new LogNormalDistribution();
+      nodeDataSize.init(0, NodeStore.MAX_NODE_DATA, medNodeDataSize,
+                        Config.NODE_DATASIZE_SIGMA);
+
+      String dataGenClass = props.getProperty(Config.NODE_ADD_DATAGEN);
+      nodeAddDataGen = ClassLoadUtil.newInstance(dataGenClass,
+                                                 DataGenerator.class);
+      nodeAddDataGen.init(props, Config.NODE_ADD_DATAGEN_PREFIX);
+      
+      dataGenClass = props.getProperty(Config.NODE_UP_DATAGEN);
+      nodeUpDataGen = ClassLoadUtil.newInstance(dataGenClass,
+                                                 DataGenerator.class);
+      nodeUpDataGen.init(props, Config.NODE_UP_DATAGEN_PREFIX);
+    } catch (ClassNotFoundException ex) {
+      logger.error(ex);
+      throw new LinkBenchConfigError("Error loading data generator class: " 
+            + ex.getMessage());
+    }
   }
 
   public long getRequestsDone() {
@@ -385,7 +438,7 @@ public class LinkBenchRequest implements Runnable {
         }
       } else if (r <= pc_addnode) {
         type = LinkBenchOp.ADD_NODE;
-        Node newNode = createNode();
+        Node newNode = createAddNode();
         starttime = System.nanoTime();
         lastNodeId = nodeStore.addNode(dbid, newNode);
         endtime = System.nanoTime();
@@ -394,16 +447,17 @@ public class LinkBenchRequest implements Runnable {
         }
       } else if (r <= pc_updatenode) {
         type = LinkBenchOp.UPDATE_NODE;
-        // Generate new data randomly
-        Node newNode = createNode();
         // Choose an id that has previously been created (but might have
         // been since deleted
-        newNode.id = chooseRequestID(DistributionType.NODE_WRITES, 
+        long upId = chooseRequestID(DistributionType.NODE_WRITES, 
                                      lastNodeId);
+        // Generate new data randomly
+        Node newNode = createUpdateNode(upId);
+        
         starttime = System.nanoTime();
         boolean changed = nodeStore.updateNode(dbid, newNode);
         endtime = System.nanoTime();
-        lastNodeId = newNode.id;
+        lastNodeId = upId;
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("updateNode " + newNode + " changed=" + changed);
         }
@@ -465,10 +519,23 @@ public class LinkBenchRequest implements Runnable {
 
   }
 
-  private Node createNode() {
-    // TODO put in some real data
-    return new Node(-1, LinkStore.ID1_TYPE, 1, 1, 
-        UniformDataGenerator.gen(rng, new byte[512], (byte)0, 256));
+  /**
+   * Create a new node for adding to database
+   * @return
+   */
+  private Node createAddNode() {
+    byte data[] = nodeAddDataGen.fill(rng, new byte[(int)nodeDataSize.choose(rng)]);
+    return new Node(-1, LinkStore.ID1_TYPE, 1, 
+                    (int)(System.currentTimeMillis()/1000), data);
+  }
+  
+  /**
+   * Create new node for updating in database
+   */
+  private Node createUpdateNode(long id) {
+    byte data[] = nodeUpDataGen.fill(rng, new byte[(int)nodeDataSize.choose(rng)]);
+    return new Node(id, LinkStore.ID1_TYPE, 2, 
+                    (int)(System.currentTimeMillis()/1000), data);
   }
 
   @Override
@@ -649,8 +716,7 @@ public class LinkBenchRequest implements Runnable {
     link.time = System.currentTimeMillis();
 
     // generate data as a sequence of random characters from 'a' to 'd'
-    link.data = UniformDataGenerator.gen(rng, new byte[datasize],
-                                          (byte)'a', 4);
+    link.data = linkAddDataGen.fill(rng, new byte[(int)linkDataSize.choose(rng)]);
 
     // no inverses for now
     linkStore.addLink(dbid, link, true);
@@ -669,10 +735,8 @@ public class LinkBenchRequest implements Runnable {
     link.version = 0;
     link.time = System.currentTimeMillis();
 
-    // generate data as a sequence of random characters from 'e' to 'h'
-    link.data = UniformDataGenerator.gen(rng, new byte[datasize],
-                                               (byte)'e', 4);
-   
+    link.data = linkUpDataGen.fill(rng, 
+                        new byte[(int)linkDataSize.choose(rng)]);   
 
     // no inverses for now
     linkStore.addLink(dbid, link, true);

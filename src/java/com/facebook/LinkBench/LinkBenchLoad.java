@@ -17,8 +17,7 @@ import org.apache.log4j.Logger;
 import com.facebook.LinkBench.distributions.ID2Chooser;
 import com.facebook.LinkBench.distributions.LinkDistributions;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
-
-import com.facebook.LinkBench.generators.UniformDataGenerator;
+import com.facebook.LinkBench.distributions.LogNormalDistribution;
 import com.facebook.LinkBench.generators.DataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
 import com.facebook.LinkBench.stats.SampledStats;
@@ -44,7 +43,9 @@ public class LinkBenchLoad implements Runnable {
   private int  loaderID; // ID for this loader
   private LinkStore store;// store interface (several possible implementations
                           // like mysql, hbase etc)
-  private int datasize; // 'data' column size for one (id1, type, id2)
+
+  private final LogNormalDistribution linkDataSize;
+  private final DataGenerator linkDataGen; // Generate link data
   private SampledStats stats;
   private LatencyStats latencyStats;
 
@@ -127,7 +128,22 @@ public class LinkBenchLoad implements Runnable {
     }
 
     debuglevel = ConfigUtil.getDebugLevel(props);
-    datasize = Integer.parseInt(props.getProperty(Config.LINK_DATASIZE));
+    
+    double medianLinkDataSize = Double.parseDouble(props.getProperty(
+                                                      Config.LINK_DATASIZE));
+    linkDataSize = new LogNormalDistribution();
+    linkDataSize.init(0, LinkStore.MAX_LINK_DATA, medianLinkDataSize,
+                                         Config.LINK_DATASIZE_SIGMA);
+    
+    try {
+      linkDataGen = ClassLoadUtil.newInstance(
+          props.getProperty(Config.LINK_ADD_DATAGEN), DataGenerator.class);
+      linkDataGen.init(props, Config.LINK_ADD_DATAGEN_PREFIX);
+    } catch (ClassNotFoundException ex) {
+      logger.error(ex);
+      throw new LinkBenchConfigError("Error loading data generator class: " 
+            + ex.getMessage());
+    }
     
     long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
     int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
@@ -344,7 +360,7 @@ public class LinkBenchLoad implements Runnable {
     link.id2_type = LinkStore.ID2_TYPE;
     link.visibility = LinkStore.VISIBILITY_DEFAULT;
     link.version = 0;
-    link.data = new byte[datasize];
+    link.data = new byte[0];
     link.time = System.currentTimeMillis();
     return link;
   }
@@ -369,10 +385,8 @@ public class LinkBenchLoad implements Runnable {
       link.id2 = 45; // some constant
     } else {
       link.id2 = id2chooser.chooseForLoad(rng, id1, outlink_ix);
-      
-      // generate data as a sequence of random characters from 'a' to 'd'
-      link.data = UniformDataGenerator.gen(rng, new byte[datasize],
-                                                       (byte)'a', 4);
+      int datasize = (int)linkDataSize.choose(rng);
+      link.data = linkDataGen.fill(rng, new byte[datasize]);
     }
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {

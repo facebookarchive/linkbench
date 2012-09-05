@@ -9,10 +9,11 @@ import java.util.Random;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.distributions.LogNormalDistribution;
 import com.facebook.LinkBench.generators.DataGenerator;
-import com.facebook.LinkBench.generators.UniformDataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
 import com.facebook.LinkBench.stats.SampledStats;
+import com.facebook.LinkBench.util.ClassLoadUtil;
 
 /**
  * Load class for generating node data
@@ -31,7 +32,7 @@ public class NodeLoader implements Runnable {
 
   // Data generation settings
   private final DataGenerator nodeDataGen;
-  private final int nodeDataLength;
+  private final LogNormalDistribution nodeDataLength;
   
   private final Level debuglevel;
   private final int loaderId;
@@ -57,9 +58,21 @@ public class NodeLoader implements Runnable {
     this.latencyStats = latencyStats;
     this.loaderId = loaderId;
     
-    // TODO: temporary nonsense data
-    nodeDataGen = new UniformDataGenerator(Byte.MIN_VALUE, Byte.MAX_VALUE);
-    nodeDataLength = 1024;
+    double medianDataLength = Double.parseDouble(props.getProperty(
+                                           Config.NODE_DATASIZE));
+    nodeDataLength = new LogNormalDistribution();
+    nodeDataLength.init(0, NodeStore.MAX_NODE_DATA, medianDataLength, 
+                                          Config.NODE_DATASIZE_SIGMA);
+
+    try {
+      nodeDataGen = ClassLoadUtil.newInstance(
+          props.getProperty(Config.NODE_ADD_DATAGEN), DataGenerator.class);
+      nodeDataGen.init(props, Config.NODE_ADD_DATAGEN_PREFIX);
+    } catch (ClassNotFoundException ex) {
+      logger.error(ex);
+      throw new LinkBenchConfigError("Error loading data generator class: " 
+            + ex.getMessage());
+    }
     
     debuglevel = ConfigUtil.getDebugLevel(props);
     dbid = props.getProperty(Config.DBID);
@@ -119,8 +132,9 @@ public class NodeLoader implements Runnable {
    */
   private void genNode(Random rng, long id1, ArrayList<Node> nodeLoadBuffer,
                           int bulkLoadBatchSize) {
+    int dataLength = (int)nodeDataLength.choose(rng);                          
     Node node = new Node(id1, LinkStore.ID1_TYPE, System.currentTimeMillis(),
-                         1, nodeDataGen.fill(rng, new byte[nodeDataLength]));
+                         1, nodeDataGen.fill(rng, new byte[dataLength]));
     nodeLoadBuffer.add(node);
     if (nodeLoadBuffer.size() >= bulkLoadBatchSize) {
       loadNodes(nodeLoadBuffer);

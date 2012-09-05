@@ -12,6 +12,7 @@ import org.junit.Test;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
 import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistMode;
 import com.facebook.LinkBench.distributions.UniformDistribution;
+import com.facebook.LinkBench.generators.UniformDataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
 
 public abstract class GraphStoreTestBase extends TestCase {
@@ -77,6 +78,13 @@ public abstract class GraphStoreTestBase extends TestCase {
   public static void fillLoadProps(Properties props, long startId, long idCount,
       int linksPerId) {
     LinkStoreTestBase.fillLoadProps(props, startId, idCount, linksPerId);
+    props.setProperty(Config.NODE_DATASIZE, "512.0");
+    props.setProperty(Config.NODE_ADD_DATAGEN,
+                      UniformDataGenerator.class.getName());
+    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_STARTBYTE, "0");
+    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_ENDBYTE, "255");
   }
 
   public static void fillReqProps(Properties props, long startId, long idCount,
@@ -99,6 +107,22 @@ public abstract class GraphStoreTestBase extends TestCase {
         Config.ACCESS_FUNCTION_SUFFIX, AccessDistMode.ROUND_ROBIN.name());
     props.setProperty(Config.NODE_WRITE_CONFIG_PREFIX +
         Config.ACCESS_CONFIG_SUFFIX, "0");
+    
+    props.setProperty(Config.NODE_DATASIZE, "1024");
+    props.setProperty(Config.NODE_ADD_DATAGEN,
+                      UniformDataGenerator.class.getName());
+    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_STARTBYTE, "0");
+    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_ENDBYTE, "255");
+    
+    props.setProperty(Config.NODE_DATASIZE, "1024");
+    props.setProperty(Config.NODE_UP_DATAGEN,
+                      UniformDataGenerator.class.getName());
+    props.setProperty(Config.NODE_UP_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_STARTBYTE, "0");
+    props.setProperty(Config.NODE_UP_DATAGEN_PREFIX + 
+                      Config.UNIFORM_GEN_ENDBYTE, "255");
   }
   
   
