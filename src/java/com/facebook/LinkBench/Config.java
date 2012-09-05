@@ -76,7 +76,7 @@ public class Config {
   public static final String LINK_MULTIGET_DIST_PREFIX = "link_multiget_dist_";
   
   /* Probability distribution parameters */
-  public static final String PROB_SCALE = "scale";
+  public static final String PROB_MEAN = "mean";
   
   /* Statistics collection and reporting */
   public static final String MAX_STAT_SAMPLES = "maxsamples";

@@ -50,9 +50,9 @@ public class ZipfDistribution implements ProbabilityDistribution {
           
     }
     
-    if (props != null && props.containsKey(keyPrefix + Config.PROB_SCALE)) {
-      scale = Double.parseDouble(props.getProperty(
-                                  keyPrefix + Config.PROB_SCALE));
+    if (props != null && props.containsKey(keyPrefix + Config.PROB_MEAN)) {
+      scale = (max - min) * Double.parseDouble(props.getProperty(
+                                  keyPrefix + Config.PROB_MEAN));
     } else {
       scale = 1.0;
     }

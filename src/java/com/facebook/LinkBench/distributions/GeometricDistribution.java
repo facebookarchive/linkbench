@@ -36,11 +36,11 @@ public class GeometricDistribution implements ProbabilityDistribution {
     }
     double parsedP = Double.parseDouble(pStr);
     
-    String scaleStr = props.getProperty(keyPrefix + 
-                                  Config.PROB_SCALE);
-    double scaleVal = 1.0;
-    if (scaleStr != null) {
-      scaleVal = Double.parseDouble(scaleStr);
+    String meanStr = props.getProperty(keyPrefix + 
+                                  Config.PROB_MEAN);
+    double scaleVal = 1.0;;
+    if (meanStr != null) {
+      scaleVal = (max - min) * Double.parseDouble(meanStr);
     }
     init(min, max, parsedP, scaleVal);
   }
