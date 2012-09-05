@@ -277,23 +277,26 @@ public class LinkStoreMysql extends GraphStore {
         logger.trace(updatecount);
       }
 
+      // This is the last statement of transaction - append commit to avoid
+      // extra round trip
+      if (!update_data) {
+        updatecount += " commit;";
+      }
       stmt.executeUpdate(updatecount);
     }
 
     if (update_data) {
       // query to update link data (the first query only updates visibility)
-      // TODO: why is this necessary?
       String updatedata = "UPDATE " + dbid + "." + linktable +
                   " SET id1_type = " + l.id1_type +
                   ", id2_type = " + l.id2_type +
-                  ", visibility = " + LinkStore.VISIBILITY_DEFAULT +
+                  ", visibility = " + l.visibility +
                   ", data = " +  stringLiteral(l.data)+
                   ", time = " + l.time +
                   ", version = " + l.version +
                   " WHERE id1 = " + l.id1 +
                   " AND id2 = " + l.id2 +
-                  " AND link_type = " + l.link_type + ";";
-
+                  " AND link_type = " + l.link_type + "; commit;";
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
         logger.trace(updatedata);
       }
@@ -304,9 +307,6 @@ public class LinkStoreMysql extends GraphStore {
     if (INTERNAL_TESTING) {
       testCount(stmt, dbid, linktable, counttable, l.id1, l.link_type);
     }
-
-    conn.commit();
-    // conn.setAutoCommit(true);
   }
 
   /**

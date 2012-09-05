@@ -336,6 +336,50 @@ public abstract class LinkStoreTestBase extends TestCase {
   }
   
   /**
+   * Test that all fields are updated correctly on update
+   * @throws Exception 
+   * @throws IOException 
+   */
+  @Test
+  public void testOverwrite() throws IOException, Exception {
+    long id1 = 314214212421L;
+    Link orig = new Link(id1, 1, 1, 0, 0, LinkStore.VISIBILITY_DEFAULT,
+                      new byte[] {'1','1','1'}, 0, 1);
+    Link changed = orig.clone();
+    changed.data = new byte[] {'2', '2', '2'}; 
+    changed.version = 1;
+    changed.time = 2;
+    DummyLinkStore store = getStoreHandle(true);
+    
+    store.addLink(testDB, orig, true);
+    
+    // Check added ok
+    Link tmp = store.getLink(testDB, orig.id1, orig.link_type, orig.id2);
+    if (store.isRealLinkStore()) {
+      assertTrue(orig.equals(tmp));
+      assertEquals(1, store.countLinks(testDB, orig.id1, orig.link_type));
+    }
+    
+    // Overwrite, then check update worked for all fields
+    store.addLink(testDB, changed, true);
+    tmp = store.getLink(testDB, orig.id1, orig.link_type, orig.id2);
+    if (store.isRealLinkStore()) {
+      assertTrue(changed.equals(tmp));
+      assertEquals(1, store.countLinks(testDB, orig.id1, orig.link_type));
+    }
+    
+    // Add hidden link, check update happened
+    Link hidden = orig.clone();
+    hidden.visibility = LinkStore.VISIBILITY_HIDDEN;
+    store.addLink(testDB, hidden, true);
+    tmp = store.getLink(testDB, orig.id1, orig.link_type, orig.id2);
+    if (store.isRealLinkStore()) {
+      assertTrue(hidden.equals(tmp));
+      assertEquals(0, store.countLinks(testDB, orig.id1, orig.link_type));
+    }
+  }
+  
+  /**
    * Regression test for bad handling of string escaping
    */
   @Test
