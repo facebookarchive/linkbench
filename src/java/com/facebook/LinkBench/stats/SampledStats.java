@@ -227,4 +227,11 @@ public class SampledStats {
     }
   }
 
+  /**
+   * @return total operation count so far for type
+   */
+  public long getCount(LinkBenchOp type) {
+    return this.numops[type.ordinal()];
+  }
+
 }

@@ -155,7 +155,7 @@ public class TestRealDistribution extends TestCase {
 
       cumulative += (pa - pe) * (pa - pe);
       // Print errors > 0.1%
-      if (printBigErrors && Math.abs(pa - pe) > 0.1) {
+      if (printBigErrors && Math.abs(pa - pe) > 0.001) {
         System.err.println(String.format("Large divergence %f "
                 + "cdf_exp(%d) = %f, cdf_act(%d) = %f", 
                 Math.abs(pa - pe), k, pe, k, pa));
@@ -187,7 +187,7 @@ public class TestRealDistribution extends TestCase {
       /100.0;
     
     RealDistribution dist = new RealDistribution();
-    dist.init(props, startid1, maxid1, DistributionType.LINK_WRITES);
+    dist.init(props, startid1, maxid1, type);
     for (int i = 0; i < nqueries; ++i) {
       long x = dist.choose(rng);
       if (x < startid1 || x >= maxid1) {

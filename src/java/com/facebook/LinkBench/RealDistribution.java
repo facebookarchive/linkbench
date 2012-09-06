@@ -209,7 +209,10 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     ArrayList<Point> points = 
       dist == DistributionType.LINKS ? nlinks_cdf :
       dist == DistributionType.LINK_READS? link_nreads_cdf :
-      dist == DistributionType.LINK_WRITES ? link_nwrites_cdf : null;
+      dist == DistributionType.LINK_WRITES ? link_nwrites_cdf : 
+      dist == DistributionType.NODE_READS ? node_nreads_cdf :
+      dist == DistributionType.NODE_WRITES ? node_nwrites_cdf :
+                                                          null;
     if (points == null) return null;
 
     TreeMap<Integer, Double> map = new TreeMap<Integer, Double>();

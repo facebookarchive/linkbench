@@ -17,7 +17,6 @@ import com.facebook.LinkBench.distributions.ID2Chooser;
 import com.facebook.LinkBench.distributions.LogNormalDistribution;
 import com.facebook.LinkBench.distributions.ProbabilityDistribution;
 import com.facebook.LinkBench.generators.DataGenerator;
-import com.facebook.LinkBench.generators.UniformDataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
 import com.facebook.LinkBench.stats.SampledStats;
 import com.facebook.LinkBench.util.ClassLoadUtil;
@@ -79,12 +78,15 @@ public class LinkBenchRequest implements Runnable {
   // Probability distribution for ids in multiget
   ProbabilityDistribution multigetDist;
   
+  // Statistics
   SampledStats stats;
   LatencyStats latencyStats;
 
+  // Other informational counters
   long numfound = 0;
   long numnotfound = 0;
-
+  long numHistoryQueries = 0;
+  
   /** 
    * Random number generator use for generating workload.  If
    * initialized with same seed, should generate same sequence of requests
@@ -641,7 +643,9 @@ public class LinkBenchRequest implements Runnable {
                        " total requests = " + i +
                        " requests/second = " + ((1000 * i)/(curtime - starttime)) +
                        " found = " + numfound +
-                       " not found = " + numnotfound);
+                       " not found = " + numnotfound +
+                       " history queries = " + numHistoryQueries + "/" +
+                                   stats.getCount(LinkBenchOp.GET_LINKS_LIST));
 
   }
 
@@ -696,7 +700,7 @@ public class LinkBenchRequest implements Runnable {
       // Update in place
       listTailHistory.set(choice, last.clone());
     }
-      
+    numHistoryQueries++;
     return links;
   }
 
