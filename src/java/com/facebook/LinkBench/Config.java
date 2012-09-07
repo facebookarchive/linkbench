@@ -30,6 +30,7 @@ public class Config {
   public static final String NLINKS_FUNC = "nlinks_func";
   public static final String NLINKS_CONFIG = "nlinks_config";
   public static final String NLINKS_DEFAULT = "nlinks_default";
+  public static final String LINK_TYPE_COUNT ="link_type_count";
   
   /* Data generation */
   public static final String LINK_DATASIZE = "link_datasize";

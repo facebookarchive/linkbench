@@ -19,7 +19,7 @@ public class Link {
   }
 
   Link() {
-    link_type = LinkStore.LINK_TYPE;
+    link_type = LinkStore.DEFAULT_LINK_TYPE;
     id1_type = LinkStore.ID1_TYPE;
     id2_type = LinkStore.ID2_TYPE;
     visibility = LinkStore.VISIBILITY_DEFAULT;

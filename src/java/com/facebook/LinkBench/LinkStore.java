@@ -7,7 +7,7 @@ import java.util.Properties;
 
 public abstract class LinkStore {
   // void createLinkTable();
-  public static final long LINK_TYPE = 123456789;
+  public static final long DEFAULT_LINK_TYPE = 123456789;
   public static final long MAX_ID2 = Long.MAX_VALUE;
   public static final int ID1_TYPE = 2048;
   public static final int ID2_TYPE = 2048;

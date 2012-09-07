@@ -241,22 +241,9 @@ public class LinkBenchLoad implements Runnable {
     
     long prevPercentPrinted = 0;
     for (long id1 = chunk.start; id1 < chunk.end; id1 += chunk.step) {
-      long nlinks = id2chooser.calcLinkCount(id1);
-      if (id2chooser.sameShuffle) {
-        sameShuffle++;
-      } else {
-        diffShuffle++;
-      }
-      
-      links_in_chunk += nlinks;
- 
-      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-        logger.trace("id1 = " + id1 +
-                           " nlinks = " + nlinks);
-      }
-
-      createOutLinks(chunk.rng, link, loadBuffer, countLoadBuffer,
-          id1, nlinks, singleAssoc, bulkLoad, bulkLoadBatchSize);
+      long added_links= createOutLinks(chunk.rng, link, loadBuffer, countLoadBuffer,
+          id1, singleAssoc, bulkLoad, bulkLoadBatchSize);
+      links_in_chunk += added_links;
  
       if (!singleAssoc) {
         long nloaded = (id1 - chunk.start) / chunk.step;
@@ -280,50 +267,66 @@ public class LinkBenchLoad implements Runnable {
    * @param link
    * @param loadBuffer
    * @param id1
-   * @param nlinks
    * @param singleAssoc
    * @param bulkLoad
    * @param bulkLoadBatchSize
+   * @return total number of links added
    */
-  private void createOutLinks(Random rng,
+  private long createOutLinks(Random rng,
       Link link, ArrayList<Link> loadBuffer,
       ArrayList<LinkCount> countLoadBuffer,
-      long id1, long nlinks, boolean singleAssoc, boolean bulkLoad,
+      long id1, boolean singleAssoc, boolean bulkLoad,
       int bulkLoadBatchSize) {
     Map<Long, LinkCount> linkTypeCounts = null;
     if (bulkLoad) {
       linkTypeCounts = new HashMap<Long, LinkCount>();
     }
+    long nlinks_total = 0;
     
-    for (long j = 0; j < nlinks; j++) {
-      if (bulkLoad) {
-        // Can't reuse link object
-        link = initLink();
-      }
-      constructLink(rng, link, id1, j, singleAssoc);
-      
-      if (bulkLoad) {
-        loadBuffer.add(link);
-        if (loadBuffer.size() >= bulkLoadBatchSize) {
-          loadLinks(loadBuffer);
-        }
-        
-        // Update link counts for this type
-        LinkCount count = linkTypeCounts.get(link.link_type); 
-        if (count == null) {
-          count = new LinkCount(id1,link.id1_type, link.link_type,
-                                link.time, link.version, 1);
-          linkTypeCounts.put(link.link_type, count);
-        } else {
-          count.count++;
-          count.time = Math.max(count.time, link.time);
-          count.version = link.version;
-        }
+    for (long link_type: id2chooser.getLinkTypes()) {
+      long nlinks = id2chooser.calcLinkCount(id1, link_type);
+      nlinks_total += nlinks;
+      if (id2chooser.sameShuffle) {
+        sameShuffle++;
       } else {
-        loadLink(link, j, nlinks, singleAssoc);
+        diffShuffle++;
       }
+     
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace("id1 = " + id1 + " link_type = " + link_type +
+                           " nlinks = " + nlinks);
+      }
+      for (long j = 0; j < nlinks; j++) {
+        if (bulkLoad) {
+          // Can't reuse link object
+          link = initLink();
+        }
+        constructLink(rng, link, id1, link_type, j, singleAssoc);
+        
+        if (bulkLoad) {
+          loadBuffer.add(link);
+          if (loadBuffer.size() >= bulkLoadBatchSize) {
+            loadLinks(loadBuffer);
+          }
+          
+          // Update link counts for this type
+          LinkCount count = linkTypeCounts.get(link.link_type); 
+          if (count == null) {
+            count = new LinkCount(id1,link.id1_type, link.link_type,
+                                  link.time, link.version, 1);
+            linkTypeCounts.put(link.link_type, count);
+          } else {
+            count.count++;
+            count.time = Math.max(count.time, link.time);
+            count.version = link.version;
+          }
+        } else {
+          loadLink(link, j, nlinks, singleAssoc);
+        }
+      }
+      
     }
-    
+
     // Maintain the counts separately
     if (bulkLoad) {
       for (LinkCount count: linkTypeCounts.values()) {
@@ -333,11 +336,12 @@ public class LinkBenchLoad implements Runnable {
         }
       }
     }
+    return nlinks_total;
   }
 
   private Link initLink() {
     Link link = new Link();
-    link.link_type = LinkStore.LINK_TYPE;
+    link.link_type = LinkStore.DEFAULT_LINK_TYPE;
     link.id1_type = LinkStore.ID1_TYPE;
     link.id2_type = LinkStore.ID2_TYPE;
     link.visibility = LinkStore.VISIBILITY_DEFAULT;
@@ -356,9 +360,10 @@ public class LinkBenchLoad implements Runnable {
    * @param singleAssoc whether we are in singleAssoc mode
    */
   private void constructLink(Random rng, Link link, long id1,
-      long outlink_ix, boolean singleAssoc) {
+      long link_type, long outlink_ix, boolean singleAssoc) {
     link.id1 = id1;
-
+    link.link_type = link_type;
+    
     // Using random number generator for id2 means we won't know
     // which id2s exist. So link id1 to
     // maxid1 + id1 + 1 thru maxid1 + id1 + nlinks(id1) UNLESS
@@ -366,7 +371,7 @@ public class LinkBenchLoad implements Runnable {
     if (singleAssoc) {
       link.id2 = 45; // some constant
     } else {
-      link.id2 = id2chooser.chooseForLoad(rng, id1, outlink_ix);
+      link.id2 = id2chooser.chooseForLoad(rng, id1, link_type,outlink_ix);
       int datasize = (int)linkDataSize.choose(rng);
       link.data = linkDataGen.fill(rng, new byte[datasize]);
     }

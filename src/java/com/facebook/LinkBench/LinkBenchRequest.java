@@ -369,18 +369,21 @@ public class LinkBenchRequest implements Runnable {
         // generate add request
         type = LinkBenchOp.ADD_LINK;
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
+        link.link_type = id2chooser.chooseRandomLinkType(rng);
         starttime = System.nanoTime();
         addLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_deletelink) {
         type = LinkBenchOp.DELETE_LINK;
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
+        link.link_type = id2chooser.chooseRandomLinkType(rng);
         starttime = System.nanoTime();
         deleteLink(link);
         endtime = System.nanoTime();
       } else if (r <= pc_updatelink) {
         type = LinkBenchOp.UPDATE_LINK;
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
+        link.link_type = id2chooser.chooseRandomLinkType(rng);
         starttime = System.nanoTime();
         updateLink(link);
         endtime = System.nanoTime();
@@ -388,27 +391,29 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkBenchOp.COUNT_LINK;
 
-        link.id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+        long id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+        long link_type = id2chooser.chooseRandomLinkType(rng);
         starttime = System.nanoTime();
-        countLinks(link);
+        countLinks(id1, link_type);
         endtime = System.nanoTime();
 
       } else if (r <= pc_getlink) {
 
         type = LinkBenchOp.MULTIGET_LINK;
 
-        link.id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+        long id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+        long link_type = id2chooser.chooseRandomLinkType(rng);
         int nid2s = 1;
         if (multigetDist != null) { 
           nid2s = (int)multigetDist.choose(rng);
         }
         long id2s[] = new long[nid2s];
         for (int i = 0; i < nid2s; i++) {
-          id2s[i] = id2chooser.chooseForOp(rng, link.id1, 0.5); 
+          id2s[i] = id2chooser.chooseForOp(rng, id1, link_type, 0.5); 
         } 
 
         starttime = System.nanoTime();
-        int found = getLink(link.id1, link.link_type, id2s);
+        int found = getLink(id1, link_type, id2s);
         assert(found >= 0 && found <= nid2s);
         endtime = System.nanoTime();
 
@@ -427,9 +432,10 @@ public class LinkBenchRequest implements Runnable {
                     !this.listTailHistory.isEmpty()) {
           links = getLinkListTail();
         } else {
-          link.id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+          long id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+          long link_type = id2chooser.chooseRandomLinkType(rng);
           starttime = System.nanoTime();
-          links = getLinkList(link);
+          links = getLinkList(id1, link_type);
           endtime = System.nanoTime();
         }
         
@@ -654,15 +660,15 @@ public class LinkBenchRequest implements Runnable {
     return links == null ? 0 : links.length;
   }
 
-  Link[] getLinkList(Link link) throws Exception {
-    Link links[] = linkStore.getLinkList(dbid, link.id1, link.link_type);
+  Link[] getLinkList(long id1, long link_type) throws Exception {
+    Link links[] = linkStore.getLinkList(dbid, id1, link_type);
     
     // If there were more links than limit, record
     if (links != null && links.length >= linkStore.getRangeLimit()) {
       Link lastLink = links[links.length-1];
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-        logger.trace("Maybe more history for (" + link.id1 +"," + 
-                      link.link_type + " older than " + lastLink.time);
+        logger.trace("Maybe more history for (" + id1 +"," + 
+                      link_type + " older than " + lastLink.time);
       }
       
       if (listTailHistory.size() < listTailHistoryLimit) {
@@ -704,16 +710,16 @@ public class LinkBenchRequest implements Runnable {
     return links;
   }
 
-  long countLinks(Link link) throws Exception {
-    return linkStore.countLinks(dbid, link.id1, link.link_type);
+  long countLinks(long id1, long link_type) throws Exception {
+    return linkStore.countLinks(dbid, id1, link_type);
   }
 
   void addLink(Link link) throws Exception {
-    link.link_type = LinkStore.LINK_TYPE;
+    link.link_type = LinkStore.DEFAULT_LINK_TYPE;
     link.id1_type = LinkStore.ID1_TYPE;
     link.id2_type = LinkStore.ID2_TYPE;
 
-    link.id2 = id2chooser.chooseForOp(rng, link.id1, 0.1);
+    link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type, 0.1);
 
     link.visibility = LinkStore.VISIBILITY_DEFAULT;
     link.version = 0;
@@ -728,10 +734,8 @@ public class LinkBenchRequest implements Runnable {
   }
 
   void updateLink(Link link) throws Exception {
-    link.link_type = LinkStore.LINK_TYPE;
-    
     // Update one of the existing links
-    link.id2 = id2chooser.chooseForOp(rng, link.id1, 0.5);
+    link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type, 0.5);
 
     link.id1_type = LinkStore.ID1_TYPE;
     link.id2_type = LinkStore.ID2_TYPE;
@@ -748,8 +752,8 @@ public class LinkBenchRequest implements Runnable {
   }
 
   void deleteLink(Link link) throws Exception {
-    link.link_type = LinkStore.LINK_TYPE;
-    link.id2 = id2chooser.chooseForOp(rng, link.id1, 1.0);
+    link.link_type = LinkStore.DEFAULT_LINK_TYPE;
+    link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type, 1.0);
 
     // no inverses for now
     linkStore.deleteLink(dbid, link.id1, link.link_type, link.id2,

@@ -647,7 +647,7 @@ public class LinkStoreMysql extends GraphStore {
       return;
     
     StringBuilder sqlSB = new StringBuilder(); 
-    sqlSB.append("INSERT INTO " + dbid + "." + counttable +
+    sqlSB.append("REPLACE INTO " + dbid + "." + counttable +
         "(id, id_type, link_type, count, time, version) " +
         "VALUES ");
     boolean first = true;
@@ -664,9 +664,6 @@ public class LinkStoreMysql extends GraphStore {
         ", " + count.time +
         ", " + count.version + ")");
     }
-    sqlSB.append("ON DUPLICATE KEY UPDATE"
-        + " count = VALUES(count), time = VALUES(time),"
-        + " version = VALUES(version)");
         
     String sql = sqlSB.toString();
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {

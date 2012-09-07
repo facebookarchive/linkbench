@@ -310,7 +310,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   public void testMultiget() throws IOException, Exception {
     DummyLinkStore store = getStoreHandle(true);
     long id1 = 99999999999L;
-    Link a = new Link(id1, LinkStore.LINK_TYPE, 42, 0, 0,
+    Link a = new Link(id1, LinkStore.DEFAULT_LINK_TYPE, 42, 0, 0,
                       LinkStore.VISIBILITY_DEFAULT, new byte[0], 1,
                       System.currentTimeMillis());
     Link b = a.clone();
@@ -763,10 +763,10 @@ public abstract class LinkStoreTestBase extends TestCase {
       long startId, long idCount, int linksPerId, long maxTimestamp)
                                                           throws Exception {
     for (long i = startId; i < startId + idCount; i++) {
-      assertEquals(wrappedStore.countLinks(testDB, i, LinkStore.LINK_TYPE),
+      assertEquals(wrappedStore.countLinks(testDB, i, LinkStore.DEFAULT_LINK_TYPE),
                    linksPerId);
       
-      Link links[] = wrappedStore.getLinkList(testDB, i, LinkStore.LINK_TYPE);
+      Link links[] = wrappedStore.getLinkList(testDB, i, LinkStore.DEFAULT_LINK_TYPE);
       if (linksPerId == 0) {
         assertTrue(links == null);
       } else {
@@ -774,7 +774,7 @@ public abstract class LinkStoreTestBase extends TestCase {
         long lastTimestamp = Long.MAX_VALUE;
         for (Link l: links) {
           assertEquals(l.id1, i);
-          assertEquals(l.link_type, LinkStore.LINK_TYPE);
+          assertEquals(l.link_type, LinkStore.DEFAULT_LINK_TYPE);
           assertEquals(l.visibility, LinkStore.VISIBILITY_DEFAULT);
           assertEquals(l.id1_type, LinkStore.ID1_TYPE);
           assertEquals(l.id2_type, LinkStore.ID2_TYPE);
@@ -797,7 +797,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       throws Exception {
     // attempt to delete data
     for (long i = startId; i < startId + idCount; i++) {
-      Link links[] = store.getLinkList(testDB, i, LinkStore.LINK_TYPE);
+      Link links[] = store.getLinkList(testDB, i, LinkStore.DEFAULT_LINK_TYPE);
       if (links != null) {
         for (Link l: links) {
           assert(l != null);

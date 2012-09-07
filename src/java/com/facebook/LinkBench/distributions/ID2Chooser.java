@@ -5,6 +5,7 @@ import java.util.Random;
 
 import com.facebook.LinkBench.Config;
 import com.facebook.LinkBench.InvertibleShuffler;
+import com.facebook.LinkBench.LinkStore;
 import com.facebook.LinkBench.RealDistribution;
 import com.facebook.LinkBench.RealDistribution.DistributionType;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
@@ -21,6 +22,9 @@ public class ID2Chooser {
 
   /** if > 0, choose id2s in range [startid1, randomid2max) */
   private final long randomid2max;
+  
+  /** Number of distinct link types */
+  private final int linkTypeCount;
   
   private final InvertibleShuffler nLinksShuffler;
   // #links distribution from properties file
@@ -47,13 +51,23 @@ public class ID2Chooser {
     // configuration for generating id2
     id2gen_config = Integer.parseInt(props.getProperty(Config.ID2GEN_CONFIG, "0"));
     
+    linkTypeCount = Integer.parseInt(props.getProperty(Config.LINK_TYPE_COUNT, "1"));
     linkDist = LinkDistributions.loadLinkDistribution(props, startid1, maxid1);
     nLinksShuffler = RealDistribution.getShuffler(DistributionType.LINKS,
                                                  maxid1 - startid1);
   }
   
 
-  public long chooseForLoad(Random rng, long id1, long outlink_ix) {
+  /**
+   * Choose an ids
+   * @param rng
+   * @param id1
+   * @param link_type
+   * @param outlink_ix this is the ith link of this type for this id1 
+   * @return
+   */
+  public long chooseForLoad(Random rng, long id1, long link_type, 
+                                                  long outlink_ix) {
     if (randomid2max == 0) {
       return id1 + outlink_ix;
     } else {
@@ -64,12 +78,14 @@ public class ID2Chooser {
   /**
    * Choose an id2 for an operation given an id1 
    * @param id1
+   * @param linkType
    * @param pExisting approximate probability that id should be in 
    *        existing range
    * @return
    */
-  public long chooseForOp(Random rng, long id1, double pExisting) {
-    long nlinks = calcLinkCount(id1);
+  public long chooseForOp(Random rng, long id1, long linkType, 
+                                                double pExisting) {
+    long nlinks = calcLinkCount(id1, linkType);
   
     // We want to sometimes add a link that already exists and sometimes
     // add a new link. So generate id2 such that it has roughly pExisting 
@@ -99,7 +115,7 @@ public class ID2Chooser {
    * Sets sameShuffle field to true if shuffled was same as original
    * @return number of links for this id1
    */
-  public long calcLinkCount(long id1) {
+  public long calcTotalLinkCount(long id1) {
     assert(id1 >= startid1 && id1 < maxid1);
     // Shuffle.  A low id after shuffling means many links, a high means few
     long shuffled;
@@ -124,6 +140,36 @@ public class ID2Chooser {
     long newid2 = id2 - (id2 % nrequesters) + requesterID;
     if ((newid2 > randomid2max) && (randomid2max > 0)) newid2 -= nrequesters;
     return newid2;
+  }
+  
+  public long[] getLinkTypes() {
+    long res[] = new long[linkTypeCount];
+    // Just have link types in a sequence starting at the default one
+    for (int i = 0; i < linkTypeCount; i++) {
+      res[i] = LinkStore.DEFAULT_LINK_TYPE + i;
+    }
+    return res;
+  }
+  
+  /**
+   * Choose a link type.
+   * For now just select each type with equal probability.
+   */
+  public long chooseRandomLinkType(Random rng) {
+    return LinkStore.DEFAULT_LINK_TYPE + rng.nextInt(linkTypeCount);
+  }
+  
+  public long calcLinkCount(long id1, long linkType) {
+    // Divide total links between types so that total is correct 
+    long totCount = calcTotalLinkCount(id1);
+    long minCount = totCount / linkTypeCount;
+    long leftOver = totCount - minCount;
+    int typeNum = (int)(linkType -LinkStore.DEFAULT_LINK_TYPE);
+    if (typeNum < leftOver) {
+      return minCount + 1;
+    } else {
+      return minCount;
+    }
   }
 
 }
