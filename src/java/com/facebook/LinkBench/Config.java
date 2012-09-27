@@ -37,6 +37,7 @@ public class Config {
   public static final String NODE_DATASIZE = "node_datasize";
   public static final String UNIFORM_GEN_STARTBYTE = "startbyte";
   public static final String UNIFORM_GEN_ENDBYTE = "endbyte";
+  public static final String MOTIF_GEN_UNIQUENESS = "uniqueness";
   public static final String LINK_ADD_DATAGEN = "link_add_datagen";
   public static final String LINK_ADD_DATAGEN_PREFIX = "link_add_datagen_";
   public static final String LINK_UP_DATAGEN = "link_up_datagen";
@@ -108,5 +109,4 @@ public class Config {
 
   /* External data */
   public static final String DISTRIBUTION_DATA_FILE = "data_file";
-
 }
