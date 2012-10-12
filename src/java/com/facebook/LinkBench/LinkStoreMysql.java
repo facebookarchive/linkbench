@@ -127,7 +127,10 @@ public class LinkStoreMysql extends GraphStore {
                         "?elideSetAutoCommits=true" +
                         "&useLocalTransactionState=true" +
                         "&allowMultiQueries=true" +
-                        "&useLocalSessionState=true",
+                        "&useLocalSessionState=true" +
+   /* Need affected row count from queries to distinguish updates/inserts
+    * consistently across different MySql versions (see MySql bug 46675) */
+                        "&useAffectedRows=true",
                         user, pwd);
     //System.err.println("connected");
     conn.setAutoCommit(false);
@@ -233,14 +236,13 @@ public class LinkStoreMysql extends GraphStore {
         }
         break;
 
-      case 2:
-        // nothing changed (a row is found but its visibility was
-        // already VISIBILITY_DEFAULT)
+      case 0:
+        // A row is found but its visibility was unchanged
         // --> need to update other data
         update_data = true;
         break;
 
-      case 3:
+      case 2:
         // a visibility was changed from VISIBILITY_HIDDEN to DEFAULT 
         // or vice-versa
         // --> need to update both counttable and other data

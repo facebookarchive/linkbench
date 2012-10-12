@@ -230,6 +230,16 @@ public abstract class LinkStoreTestBase extends TestCase {
       assertTrue(writtenLink.equals(links[0]));
     }
     
+    // Update link but don't change, check nothing changes
+    store.updateLink(testDB, writtenLink, true);
+    if (store.isRealLinkStore()) {
+      assertTrue(writtenLink.equals(store.getLink(testDB, id1, ltype, id2)));
+      assertEquals(1, store.countLinks(testDB, id1, ltype));
+      Link links[] = store.getLinkList(testDB, id1, ltype);
+      assertEquals(1, links.length);
+      assertTrue(writtenLink.equals(links[0]));
+    }
+    
     store.deleteLink(testDB, id1, ltype, id2, true, true);
   }
   
