@@ -131,7 +131,7 @@ public class LinkDistributions {
     Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
     String nlinks_func; // distribution function for #links
 
-    nlinks_func = props.getProperty(Config.NLINKS_FUNC);
+    nlinks_func = ConfigUtil.getPropertyRequired(props, Config.NLINKS_FUNC);
 
     // We have built-in versions defined by LinkDistMode, and also support
     // dynamic loading of ProbabilityDistribution instances
@@ -153,11 +153,9 @@ public class LinkDistributions {
     } else {
       // Various arithmetic modes
       // an additional parameter for the function
-      int nlinks_config = Integer.parseInt(props
-          .getProperty(Config.NLINKS_CONFIG));
+      int nlinks_config = ConfigUtil.getInt(props, Config.NLINKS_CONFIG);
       // minimum #links - expected to be 0 or 1
-      int nlinks_default = Integer.parseInt(props
-          .getProperty(Config.NLINKS_DEFAULT));
+      int nlinks_default = ConfigUtil.getInt(props, Config.NLINKS_DEFAULT);
       logger.debug("Using built-in arithmetic link distribution " + mode
                     + " with default #links " + nlinks_config + " and "
                     + " config parameter " + nlinks_config);

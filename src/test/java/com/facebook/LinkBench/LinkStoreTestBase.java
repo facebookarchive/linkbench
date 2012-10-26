@@ -743,8 +743,8 @@ public abstract class LinkStoreTestBase extends TestCase {
     
     /* Load up queue with work */
     BlockingQueue<LoadChunk>  chunk_q = new LinkedBlockingQueue<LoadChunk>();
-    long startId = Long.parseLong(props.getProperty(Config.MIN_ID));
-    long idCount = Long.parseLong(props.getProperty(Config.MAX_ID)) - startId;
+    long startId = ConfigUtil.getLong(props, Config.MIN_ID);
+    long idCount = ConfigUtil.getLong(props, Config.MAX_ID) - startId;
     
     int chunkSize = 128;
     int seq = 0;

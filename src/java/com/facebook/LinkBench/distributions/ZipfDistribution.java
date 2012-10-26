@@ -7,6 +7,7 @@ import java.util.Random;
 import org.apache.commons.math3.util.FastMath;
 
 import com.facebook.LinkBench.Config;
+import com.facebook.LinkBench.ConfigUtil;
 
 public class ZipfDistribution implements ProbabilityDistribution {
   private long min = 0;
@@ -37,7 +38,7 @@ public class ZipfDistribution implements ProbabilityDistribution {
     
     this.min = min;
     this.max = max;
-    String shapeS = props != null ? props.getProperty(
+    String shapeS = props != null ? ConfigUtil.getPropertyRequired(props,
                                   keyPrefix + "shape") : null;
     if (shapeS == null ) {
       throw new IllegalArgumentException("ZipfDistribution must be provided " +
@@ -51,8 +52,8 @@ public class ZipfDistribution implements ProbabilityDistribution {
     }
     
     if (props != null && props.containsKey(keyPrefix + Config.PROB_MEAN)) {
-      scale = (max - min) * Double.parseDouble(props.getProperty(
-                                  keyPrefix + Config.PROB_MEAN));
+      scale = (max - min) * ConfigUtil.getDouble(props, 
+                                  keyPrefix + Config.PROB_MEAN);
     } else {
       scale = 1.0;
     }

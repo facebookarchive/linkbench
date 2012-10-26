@@ -70,14 +70,13 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    * @param currentphase LOAD or REQUEST
    * @param mapperid id of the mapper 0, 1, ...
    */
-  private static LinkStore initStore(Phase currentphase,
-                                                    int mapperid)
+  private static LinkStore initStore(Phase currentphase, int mapperid)
     throws IOException {
 
     LinkStore newstore = null;
 
     if (store == null) {
-      store = props.getProperty(Config.LINKSTORE_CLASS);
+      store = ConfigUtil.getPropertyRequired(props, Config.LINKSTORE_CLASS);
       logger.info("Using store class: " + store);
     }
 
@@ -308,8 +307,8 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       LinkStore store = initStore(Phase.LOAD, loaderid.get());
       LatencyStats latencyStats = new LatencyStats(nloaders.get());
 
-      long maxid1 = Long.parseLong(Config.MAX_ID);
-      long startid1 = Long.parseLong(Config.MIN_ID);
+      long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
+      long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
       
       LoadProgress prog_tracker = new LoadProgress(
           Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER), maxid1 - startid1);
@@ -435,14 +434,14 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    * main route of the LOAD phase
    */
   private void load() throws IOException, InterruptedException {
-    boolean loaddata = Boolean.parseBoolean(
-            props.getProperty(Config.LOAD_DATA));
+    boolean loaddata = (!props.containsKey(Config.LOAD_DATA)) ||
+                        ConfigUtil.getBool(props, Config.LOAD_DATA);
     if (!loaddata) {
       logger.info("Skipping load data per the config");
       return;
     }
 
-    int nloaders = Integer.parseInt(props.getProperty(Config.NUM_LOADERS));
+    int nloaders = ConfigUtil.getInt(props, Config.NUM_LOADERS);
     final JobConf jobconf = createJobConf(LOAD, nloaders);
     FileSystem fs = setupInputFiles(jobconf, nloaders);
 
@@ -453,10 +452,9 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       long loadtime = (System.currentTimeMillis() - starttime);
 
       // compute total #links loaded
-      long maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
-      long startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
-      int nlinks_default = Integer.parseInt(
-                             props.getProperty(Config.NLINKS_DEFAULT));
+      long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
+      long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
+      int nlinks_default = ConfigUtil.getInt(props, Config.NLINKS_DEFAULT);
       long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
       long actuallinks = readOutput(fs, jobconf);
 
@@ -474,7 +472,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    */
   private void sendrequests() throws IOException, InterruptedException {
     // config info for requests
-    int nrequesters = Integer.parseInt(props.getProperty(Config.NUM_REQUESTERS));
+    int nrequesters = ConfigUtil.getInt(props, Config.NUM_REQUESTERS);
     final JobConf jobconf = createJobConf(REQUEST, nrequesters);
     FileSystem fs = setupInputFiles(jobconf, nrequesters);
 
@@ -515,11 +513,12 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       TMP_DIR = new Path(tempdirname);
     }
     // whether report progress through reporter
-    REPORT_PROGRESS = Boolean.parseBoolean(
-                props.getProperty(Config.MAPRED_REPORT_PROGRESS));
+    REPORT_PROGRESS = (!props.containsKey(Config.MAPRED_REPORT_PROGRESS)) ||
+        ConfigUtil.getBool(props, Config.MAPRED_REPORT_PROGRESS);
+
     // whether store mapper input in files
-    USE_INPUT_FILES = Boolean.parseBoolean(
-                props.getProperty(Config.MAPRED_USE_INPUT_FILES));
+    USE_INPUT_FILES = (!props.containsKey(Config.MAPRED_USE_INPUT_FILES)) ||
+                    ConfigUtil.getBool(props, Config.MAPRED_USE_INPUT_FILES);
 
     load();
     sendrequests();

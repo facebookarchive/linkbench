@@ -60,11 +60,8 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   public void init(long min, long max, Properties props, String keyPrefix) {
     this.min = min;
     this.max = max; 
-    String dist = props.getProperty(keyPrefix + DISTRIBUTION_CONFIG);
-    if (dist == null) {
-      throw new RuntimeException("Distribution for RealDistribution was not"
-         + " specified in either object constructor or properties");
-    }
+    String dist = ConfigUtil.getPropertyRequired(props,
+                              keyPrefix + DISTRIBUTION_CONFIG);
     
     DistributionType configuredType;
     if (dist.equals("link_reads")) {
@@ -234,7 +231,8 @@ public class RealDistribution extends PiecewiseLinearDistribution {
    * value and the cumulative distribution at that value i.e. <x, CDF(x)>.
    */
   private static void getStatisticalData(Properties props) throws FileNotFoundException {
-    String filename = props.getProperty(Config.DISTRIBUTION_DATA_FILE);
+    String filename = ConfigUtil.getPropertyRequired(props,
+                            Config.DISTRIBUTION_DATA_FILE);
     
     // If relative path, should be relative to linkbench home directory
     String fileAbsPath;

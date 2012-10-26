@@ -114,8 +114,8 @@ public class LinkBenchLoad implements Runnable {
     /*
      * Load settings from properties
      */
-    maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
-    startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
+    maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
+    startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
     
     // math functions may cause problems for id1 = 0. Start at 1.
     if (startid1 <= 0) {
@@ -124,15 +124,16 @@ public class LinkBenchLoad implements Runnable {
 
     debuglevel = ConfigUtil.getDebugLevel(props);
     
-    double medianLinkDataSize = Double.parseDouble(props.getProperty(
-                                                      Config.LINK_DATASIZE));
+    double medianLinkDataSize = ConfigUtil.getDouble(props,
+                                              Config.LINK_DATASIZE);
     linkDataSize = new LogNormalDistribution();
     linkDataSize.init(0, LinkStore.MAX_LINK_DATA, medianLinkDataSize,
                                          Config.LINK_DATASIZE_SIGMA);
     
     try {
       linkDataGen = ClassLoadUtil.newInstance(
-          props.getProperty(Config.LINK_ADD_DATAGEN), DataGenerator.class);
+          ConfigUtil.getPropertyRequired(props, Config.LINK_ADD_DATAGEN),
+          DataGenerator.class);
       linkDataGen.init(props, Config.LINK_ADD_DATAGEN_PREFIX);
     } catch (ClassNotFoundException ex) {
       logger.error(ex);
@@ -140,10 +141,10 @@ public class LinkBenchLoad implements Runnable {
             + ex.getMessage());
     }
     
-    long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
-    int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
+    long displayfreq = ConfigUtil.getLong(props, Config.DISPLAY_FREQ);
+    int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
     
-    dbid = props.getProperty(Config.DBID);
+    dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
         
     /*
      * Initialize statistics

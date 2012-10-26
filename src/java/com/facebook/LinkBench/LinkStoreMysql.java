@@ -64,9 +64,9 @@ public class LinkStoreMysql extends GraphStore {
 
   public void initialize(Properties props, Phase currentPhase,
     int threadId) throws IOException, Exception {
-    counttable = props.getProperty(Config.COUNT_TABLE);
-    if (counttable == null || counttable.equals("")) {
-      String msg = "Error! counttable is empty/ not found!"
+    counttable = ConfigUtil.getPropertyRequired(props, Config.COUNT_TABLE);
+    if (counttable.equals("")) {
+      String msg = "Error! " + Config.COUNT_TABLE + " is empty!"
           + "Please check configuration file.";
       logger.error(msg);
       throw new RuntimeException(msg);
@@ -75,29 +75,28 @@ public class LinkStoreMysql extends GraphStore {
     nodetable = props.getProperty(Config.NODE_TABLE);
     if (nodetable.equals("")) {
       // For now, don't assume that nodetable is provided
-      String msg = "Error! nodetable is empty!"
+      String msg = "Error! " + Config.NODE_TABLE + " is empty!"
           + "Please check configuration file.";
       logger.error(msg);
       throw new RuntimeException(msg);
     }
     
-    host = props.getProperty(CONFIG_HOST);
-    user = props.getProperty(CONFIG_USER);
-    pwd = props.getProperty(CONFIG_PASSWORD);
+    host = ConfigUtil.getPropertyRequired(props, CONFIG_HOST);
+    user = ConfigUtil.getPropertyRequired(props, CONFIG_USER);
+    pwd = ConfigUtil.getPropertyRequired(props, CONFIG_PASSWORD);
     port = props.getProperty(CONFIG_PORT);
-    defaultDB = props.getProperty(Config.DBID);
+    defaultDB = ConfigUtil.getPropertyRequired(props, Config.DBID);
     
     if (port == null || port.equals("")) port = "3306"; //use default port
     debuglevel = ConfigUtil.getDebugLevel(props);
     phase = currentPhase;
 
     if (props.containsKey(CONFIG_BULK_INSERT_BATCH)) {
-      bulkInsertSize = Integer.parseInt(
-                        props.getProperty(CONFIG_BULK_INSERT_BATCH));
+      bulkInsertSize = ConfigUtil.getInt(props, CONFIG_BULK_INSERT_BATCH);
     }
     if (props.containsKey(CONFIG_DISABLE_BINLOG_LOAD)) {
-      disableBinLogForLoad = Boolean.parseBoolean(
-                        props.getProperty(CONFIG_DISABLE_BINLOG_LOAD));
+      disableBinLogForLoad = ConfigUtil.getBool(props,
+                                      CONFIG_DISABLE_BINLOG_LOAD);
     }
     
     // connect
@@ -108,7 +107,7 @@ public class LinkStoreMysql extends GraphStore {
       throw e;
     }
 
-    linktable = props.getProperty(Config.LINK_TABLE);
+    linktable = ConfigUtil.getPropertyRequired(props, Config.LINK_TABLE);
   }
 
   // connects to test database

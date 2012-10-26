@@ -150,16 +150,15 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
 
 
       Configuration conf = HBaseConfiguration.create();
-      String tablename = props.getProperty("tablename");
+      String tablename = ConfigUtil.getPropertyRequired(props, Config.LINK_TABLE);
       table = new HTable(conf, tablename);
 
       debuglevel = ConfigUtil.getDebugLevel(props);
-      sleeprate = Double.parseDouble(props.getProperty("sleeprate"));
-      sleeptime = Integer.parseInt(props.getProperty("sleeptime"));
-      maxsleepingthreads = Integer.parseInt(props.getProperty(
-            "maxsleepingthreads"));
+      sleeprate = ConfigUtil.getDouble(props, "sleeprate");
+      sleeptime = ConfigUtil.getInt(props, "sleeptime");
+      maxsleepingthreads = ConfigUtil.getInt(props, "maxsleepingthreads");
 
-      if (Integer.parseInt(props.getProperty("id2gen_config")) != 1) {
+      if (ConfigUtil.getInt(props, "id2gen_config") != 1) {
         System.err.println("Fatal error: id2gen_config must be 1.");
         System.err.println("Please check config file.");
         System.exit(1);

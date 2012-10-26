@@ -161,11 +161,7 @@ public class AccessDistributions {
     }
     
     String func_key = keyPrefix + Config.ACCESS_FUNCTION_SUFFIX;
-    String access_func = props.getProperty(func_key);
-
-    if (access_func == null) {
-      throw new LinkBenchConfigError(func_key + " not defined");
-    }
+    String access_func = ConfigUtil.getPropertyRequired(props, func_key);
     
     try {
       AccessDistMode mode = AccessDistMode.valueOf(access_func.toUpperCase());
@@ -180,11 +176,7 @@ public class AccessDistributions {
         return new ProbAccessDistribution(realDist, shuffler);
       } else  {
         String config_key = keyPrefix + Config.ACCESS_CONFIG_SUFFIX;
-        String config_val_str = props.getProperty(config_key);
-        if (config_val_str == null) {
-          throw new LinkBenchConfigError(config_key + " not specified");
-        }
-        long config_val = Long.parseLong(config_val_str);
+        long config_val = ConfigUtil.getLong(props, config_key);
         logger.debug("Using built-in access distribution " + mode +
                     " with config param " + config_val +
                     " for " + kind.toString().toLowerCase());

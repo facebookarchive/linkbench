@@ -4,6 +4,7 @@ import java.util.Properties;
 import java.util.Random;
 
 import com.facebook.LinkBench.Config;
+import com.facebook.LinkBench.ConfigUtil;
 import com.facebook.LinkBench.InvertibleShuffler;
 import com.facebook.LinkBench.LinkStore;
 import com.facebook.LinkBench.RealDistribution;
@@ -46,12 +47,12 @@ public class ID2Chooser {
     this.requesterID = requesterID;
     
     // random number generator for id2
-    randomid2max = Long.parseLong(props.getProperty(Config.RANDOM_ID2_MAX));
+    randomid2max = ConfigUtil.getLong(props, Config.RANDOM_ID2_MAX);
     
     // configuration for generating id2
-    id2gen_config = Integer.parseInt(props.getProperty(Config.ID2GEN_CONFIG, "0"));
+    id2gen_config = ConfigUtil.getInt(props, Config.ID2GEN_CONFIG, 0);
     
-    linkTypeCount = Integer.parseInt(props.getProperty(Config.LINK_TYPE_COUNT, "1"));
+    linkTypeCount = ConfigUtil.getInt(props, Config.LINK_TYPE_COUNT, 1);
     linkDist = LinkDistributions.loadLinkDistribution(props, startid1, maxid1);
     nLinksShuffler = RealDistribution.getShuffler(DistributionType.LINKS,
                                                  maxid1 - startid1);

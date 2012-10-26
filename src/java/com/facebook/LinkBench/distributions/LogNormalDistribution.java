@@ -5,6 +5,8 @@ import java.util.Random;
 
 import org.apache.commons.math3.util.FastMath;
 
+import com.facebook.LinkBench.ConfigUtil;
+
 public class LogNormalDistribution implements ProbabilityDistribution {
   private long min;
   private long max;
@@ -16,8 +18,8 @@ public class LogNormalDistribution implements ProbabilityDistribution {
   
   @Override
   public void init(long min, long max, Properties props, String keyPrefix) {
-    double sigma = Double.parseDouble(props.getProperty(CONFIG_SIGMA));
-    double median = Double.parseDouble(props.getProperty(CONFIG_MEDIAN));
+    double sigma = ConfigUtil.getDouble(props, CONFIG_SIGMA);
+    double median = ConfigUtil.getDouble(props, CONFIG_MEDIAN);
     init(min, max, median, sigma);
   }
   

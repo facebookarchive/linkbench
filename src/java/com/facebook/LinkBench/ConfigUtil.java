@@ -86,4 +86,124 @@ public class ConfigUtil {
     }
     lbLogger.addAppender(console);
   }
+  
+  /**
+   * Look up key in props, failing if not present
+   * @param props
+   * @param key
+   * @return
+   * @throws LinkBenchConfigError thrown if key not present
+   */
+  public static String getPropertyRequired(Properties props, String key)
+    throws LinkBenchConfigError {
+    String v = props.getProperty(key);
+    if (v == null) {
+      throw new LinkBenchConfigError("Expected configuration key " + key +
+                                     " to be defined");
+    }
+    return v;
+  }
+  
+  public static int getInt(Properties props, String key)
+      throws LinkBenchConfigError {
+    return getInt(props, key, null);
+  }
+  
+  /**
+   * Retrieve a config key and convert to integer
+   * @param props
+   * @param key
+   * @return a non-null string value
+   * @throws LinkBenchConfigError if not present or not integer
+   */
+  public static int getInt(Properties props, String key, Integer defaultVal)
+      throws LinkBenchConfigError {
+    if (defaultVal != null && !props.containsKey(key)) {
+      return defaultVal;
+    }
+    String v = getPropertyRequired(props, key);
+    try { 
+      return Integer.parseInt(v);
+    } catch (NumberFormatException e) {
+      throw new LinkBenchConfigError("Expected configuration key " + key + 
+                " to be integer, but was '" + v + "'");
+    }
+  }
+  
+  public static long getLong(Properties props, String key)
+      throws LinkBenchConfigError {
+    return getLong(props, key, null); 
+  }
+  
+  /**
+   * Retrieve a config key and convert to long integer
+   * @param props
+   * @param key
+   * @param defaultVal default value if key not present
+   * @return
+   * @throws LinkBenchConfigError if not present or not integer
+   */
+  public static long getLong(Properties props, String key, Long defaultVal)
+      throws LinkBenchConfigError {
+    if (defaultVal != null && !props.containsKey(key)) {
+      return defaultVal;
+    }
+    String v = getPropertyRequired(props, key);
+    try { 
+      return Long.parseLong(v);
+    } catch (NumberFormatException e) {
+      throw new LinkBenchConfigError("Expected configuration key " + key + 
+                " to be long integer, but was '" + v + "'");
+    }
+  }
+  
+  
+  public static double getDouble(Properties props, String key) 
+                throws LinkBenchConfigError {
+    return getDouble(props, key, null);
+  }
+  
+  /**
+   * Retrieve a config key and convert to double
+   * @param props
+   * @param key
+   * @param defaultVal default value if key not present
+   * @return
+   * @throws LinkBenchConfigError if not present or not double
+   */
+  public static double getDouble(Properties props, String key,
+        Double defaultVal) throws LinkBenchConfigError {
+    if (defaultVal != null && !props.containsKey(key)) {
+      return defaultVal;
+    }
+    String v = getPropertyRequired(props, key);
+    try { 
+      return Double.parseDouble(v);
+    } catch (NumberFormatException e) {
+      throw new LinkBenchConfigError("Expected configuration key " + key + 
+                " to be double, but was '" + v + "'");
+    }
+  }
+  
+  /**
+   * Retrieve a config key and convert to boolean.
+   * Valid boolean strings are "true" or "false", case insensitive 
+   * @param props
+   * @param key
+   * @return
+   * @throws LinkBenchConfigError if not present or not boolean
+   */
+  public static boolean getBool(Properties props, String key)
+      throws LinkBenchConfigError {
+    String v = getPropertyRequired(props, key).trim().toLowerCase();
+    // Parse manually since parseBoolean accepts many things as "false"
+    if (v.equals("true")) {
+      return true;
+    } else if (v.equals("false")) {
+      return false;
+    } else {
+      throw new LinkBenchConfigError("Expected configuration key " + key + 
+                " to be true or false, but was '" + v + "'");
+    }
+  }
 }

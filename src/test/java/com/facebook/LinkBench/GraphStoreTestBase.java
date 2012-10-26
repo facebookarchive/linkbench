@@ -229,8 +229,8 @@ public abstract class GraphStoreTestBase extends TestCase {
   private void serialLoadNodes(Random rng, Logger logger, Properties props,
       DummyLinkStore storeHandle) throws Exception {
     storeHandle.initialize(props, Phase.LOAD, 0);
-    storeHandle.resetNodeStore(testDB, Long.parseLong(props.getProperty(
-        Config.MIN_ID)));
+    storeHandle.resetNodeStore(testDB, ConfigUtil.getLong(props, 
+                                                  Config.MIN_ID));
     storeHandle.close(); // Close before passing to loader
     
     LatencyStats stats = new LatencyStats(1);

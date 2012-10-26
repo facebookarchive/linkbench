@@ -6,6 +6,7 @@ import java.util.Random;
 import org.apache.commons.math3.util.FastMath;
 
 import com.facebook.LinkBench.Config;
+import com.facebook.LinkBench.ConfigUtil;
 
 /**
  * Geometric distribution
@@ -28,19 +29,12 @@ public class GeometricDistribution implements ProbabilityDistribution {
   
   @Override
   public void init(long min, long max, Properties props, String keyPrefix) {
+    double parsedP = ConfigUtil.getDouble(props, keyPrefix + PROB_PARAM_KEY);
     
-    String pStr = props.getProperty(keyPrefix + PROB_PARAM_KEY);
-    if (pStr == null) {
-      throw new IllegalArgumentException("Expected properties key " +
-                                         keyPrefix + PROB_PARAM_KEY);
-    }
-    double parsedP = Double.parseDouble(pStr);
-    
-    String meanStr = props.getProperty(keyPrefix + 
-                                  Config.PROB_MEAN);
     double scaleVal = 1.0;;
-    if (meanStr != null) {
-      scaleVal = (max - min) * Double.parseDouble(meanStr);
+    if (props.containsKey(Config.PROB_MEAN)) {
+      scaleVal = (max - min) * ConfigUtil.getDouble(props, 
+                            keyPrefix + Config.PROB_MEAN);
     }
     init(min, max, parsedP, scaleVal);
   }

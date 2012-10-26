@@ -58,15 +58,15 @@ public class NodeLoader implements Runnable {
     this.latencyStats = latencyStats;
     this.loaderId = loaderId;
     
-    double medianDataLength = Double.parseDouble(props.getProperty(
-                                           Config.NODE_DATASIZE));
+    double medianDataLength = ConfigUtil.getDouble(props, Config.NODE_DATASIZE);
     nodeDataLength = new LogNormalDistribution();
     nodeDataLength.init(0, NodeStore.MAX_NODE_DATA, medianDataLength, 
                                           Config.NODE_DATASIZE_SIGMA);
 
     try {
       nodeDataGen = ClassLoadUtil.newInstance(
-          props.getProperty(Config.NODE_ADD_DATAGEN), DataGenerator.class);
+          ConfigUtil.getPropertyRequired(props, Config.NODE_ADD_DATAGEN),
+          DataGenerator.class);
       nodeDataGen.init(props, Config.NODE_ADD_DATAGEN_PREFIX);
     } catch (ClassNotFoundException ex) {
       logger.error(ex);
@@ -75,12 +75,11 @@ public class NodeLoader implements Runnable {
     }
     
     debuglevel = ConfigUtil.getDebugLevel(props);
-    dbid = props.getProperty(Config.DBID);
+    dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
     
 
-    long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
-    int maxsamples = Integer.parseInt(props.getProperty(
-                                                    Config.MAX_STAT_SAMPLES));
+    long displayfreq = ConfigUtil.getLong(props, Config.DISPLAY_FREQ);
+    int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
     this.stats = new SampledStats(loaderId, displayfreq, maxsamples, csvStreamOut);
   }
 
@@ -97,8 +96,7 @@ public class NodeLoader implements Runnable {
 
     try {
       // Set up ids to start at desired range
-      nodeStore.resetNodeStore(dbid, 
-                    Long.parseLong(props.getProperty(Config.MIN_ID)));
+      nodeStore.resetNodeStore(dbid, ConfigUtil.getLong(props, Config.MIN_ID));
     } catch (Exception e) {
       logger.error("Error while resetting IDs, cannot proceed with " +
       		"node loading", e);
@@ -108,8 +106,8 @@ public class NodeLoader implements Runnable {
     int bulkLoadBatchSize = nodeStore.bulkLoadBatchSize();
     ArrayList<Node> nodeLoadBuffer = new ArrayList<Node>(bulkLoadBatchSize);
 
-    long maxId = Long.parseLong(props.getProperty(Config.MAX_ID));
-    long startId = Long.parseLong(props.getProperty(Config.MIN_ID));
+    long maxId = ConfigUtil.getLong(props, Config.MAX_ID);
+    long startId = ConfigUtil.getLong(props, Config.MIN_ID);
     totalNodes = maxId - startId;
     nextReport = startId + REPORT_INTERVAL;
     startTime_ms = System.currentTimeMillis();

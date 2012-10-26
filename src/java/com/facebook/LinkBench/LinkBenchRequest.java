@@ -133,14 +133,13 @@ public class LinkBenchRequest implements Runnable {
     this.requesterID = requesterID;
 
     debuglevel = ConfigUtil.getDebugLevel(props);
-    dbid = props.getProperty(Config.DBID);
-    nrequests = Long.parseLong(props.getProperty(Config.NUM_REQUESTS));
-    requestrate = Long.parseLong(props.getProperty(Config.REQUEST_RATE, "0"));
-    maxFailedRequests = Long.parseLong(props.getProperty(
-                                                Config.MAX_FAILED_REQUESTS, "0"));
-    maxtime = Long.parseLong(props.getProperty(Config.MAX_TIME));
-    maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
-    startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
+    dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
+    nrequests = ConfigUtil.getLong(props, Config.NUM_REQUESTS);
+    requestrate = ConfigUtil.getLong(props, Config.REQUEST_RATE, 0L);
+    maxFailedRequests = ConfigUtil.getLong(props,  Config.MAX_FAILED_REQUESTS, 0L);
+    maxtime = ConfigUtil.getLong(props, Config.MAX_TIME);
+    maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
+    startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
 
     // math functions may cause problems for id1 < 1
     if (startid1 <= 0) {
@@ -169,32 +168,31 @@ public class LinkBenchRequest implements Runnable {
       initNodeRequestDistributions(props);
     }
 
-    long displayfreq = Long.parseLong(props.getProperty(Config.DISPLAY_FREQ));
-    progressfreq_ms = Long.parseLong(props.getProperty(Config.PROGRESS_FREQ, "6")) 
-                                                                          * 1000;
-    int maxsamples = Integer.parseInt(props.getProperty(Config.MAX_STAT_SAMPLES));
+    long displayfreq = ConfigUtil.getLong(props, Config.DISPLAY_FREQ);
+    progressfreq_ms = ConfigUtil.getLong(props, Config.PROGRESS_FREQ, 6L) * 1000;
+    int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
     stats = new SampledStats(requesterID, displayfreq, maxsamples, csvStreamOut);
    
     listTailHistoryLimit = 2048; // Hardcoded limit for now
     listTailHistory = new ArrayList<Link>(listTailHistoryLimit);
-    p_historical_getlinklist = Double.parseDouble(props.getProperty(
-                    Config.PR_GETLINKLIST_HISTORY, "0.0")) / 100; 
-        
+    p_historical_getlinklist = ConfigUtil.getDouble(props,
+                        Config.PR_GETLINKLIST_HISTORY, 0.0) / 100; 
+    
     lastNodeId = startid1;
   }
 
   private void initRequestProbabilities(Properties props) {
-    pc_addlink = Double.parseDouble(props.getProperty(Config.PR_ADD_LINK));
-    pc_deletelink = pc_addlink + Double.parseDouble(props.getProperty(Config.PR_DELETE_LINK));
-    pc_updatelink = pc_deletelink + Double.parseDouble(props.getProperty(Config.PR_UPDATE_LINK));
-    pc_countlink = pc_updatelink + Double.parseDouble(props.getProperty(Config.PR_COUNT_LINKS));
-    pc_getlink = pc_countlink + Double.parseDouble(props.getProperty(Config.PR_GET_LINK));
-    pc_getlinklist = pc_getlink + Double.parseDouble(props.getProperty(Config.PR_GET_LINK_LIST));
+    pc_addlink = ConfigUtil.getDouble(props, Config.PR_ADD_LINK);
+    pc_deletelink = pc_addlink + ConfigUtil.getDouble(props, Config.PR_DELETE_LINK);
+    pc_updatelink = pc_deletelink + ConfigUtil.getDouble(props, Config.PR_UPDATE_LINK);
+    pc_countlink = pc_updatelink + ConfigUtil.getDouble(props, Config.PR_COUNT_LINKS);
+    pc_getlink = pc_countlink + ConfigUtil.getDouble(props, Config.PR_GET_LINK);
+    pc_getlinklist = pc_getlink + ConfigUtil.getDouble(props, Config.PR_GET_LINK_LIST);
     
-    pc_addnode = pc_getlinklist + Double.parseDouble(props.getProperty(Config.PR_ADD_NODE, "0.0"));
-    pc_updatenode = pc_addnode + Double.parseDouble(props.getProperty(Config.PR_UPDATE_NODE, "0.0"));
-    pc_deletenode = pc_updatenode + Double.parseDouble(props.getProperty(Config.PR_DELETE_NODE, "0.0"));
-    pc_getnode = pc_deletenode + Double.parseDouble(props.getProperty(Config.PR_GET_NODE, "0.0"));
+    pc_addnode = pc_getlinklist + ConfigUtil.getDouble(props, Config.PR_ADD_NODE, 0.0);
+    pc_updatenode = pc_addnode + ConfigUtil.getDouble(props, Config.PR_UPDATE_NODE, 0.0);
+    pc_deletenode = pc_updatenode + ConfigUtil.getDouble(props, Config.PR_DELETE_NODE, 0.0);
+    pc_getnode = pc_deletenode + ConfigUtil.getDouble(props, Config.PR_GET_NODE, 0.0);
     
     if (Math.abs(pc_getnode - 100.0) > 1e-5) {//compare real numbers
       throw new LinkBenchConfigError("Percentages of request types do not " + 
@@ -215,10 +213,8 @@ public class LinkBenchRequest implements Runnable {
     // Distribution of #id2s per multiget
     String multigetDistClass = props.getProperty(Config.LINK_MULTIGET_DIST);
     if (multigetDistClass != null && multigetDistClass.trim().length() != 0) {
-      int multigetMin = Integer.parseInt(props.getProperty(
-                                            Config.LINK_MULTIGET_DIST_MIN));
-      int multigetMax = Integer.parseInt(props.getProperty(
-                                            Config.LINK_MULTIGET_DIST_MAX));
+      int multigetMin = ConfigUtil.getInt(props, Config.LINK_MULTIGET_DIST_MIN);
+      int multigetMax = ConfigUtil.getInt(props, Config.LINK_MULTIGET_DIST_MAX);
       try {
         multigetDist = ClassLoadUtil.newInstance(multigetDistClass,
                                             ProbabilityDistribution.class);
@@ -236,17 +232,19 @@ public class LinkBenchRequest implements Runnable {
 
   private void initLinkDataGeneration(Properties props) {
     try {
-      double medLinkDataSize = Double.parseDouble(props.getProperty(
-                                                      Config.LINK_DATASIZE));
+      double medLinkDataSize = ConfigUtil.getDouble(props, 
+                                            Config.LINK_DATASIZE);
       linkDataSize = new LogNormalDistribution();
       linkDataSize.init(0, LinkStore.MAX_LINK_DATA, medLinkDataSize,
                            Config.LINK_DATASIZE_SIGMA);
       linkAddDataGen = ClassLoadUtil.newInstance(
-          props.getProperty(Config.LINK_ADD_DATAGEN), DataGenerator.class);
+          ConfigUtil.getPropertyRequired(props, Config.LINK_ADD_DATAGEN),
+          DataGenerator.class);
       linkAddDataGen.init(props, Config.LINK_ADD_DATAGEN_PREFIX);
       
       linkUpDataGen = ClassLoadUtil.newInstance(
-          props.getProperty(Config.LINK_UP_DATAGEN), DataGenerator.class);
+          ConfigUtil.getPropertyRequired(props, Config.LINK_UP_DATAGEN),
+          DataGenerator.class);
       linkUpDataGen.init(props, Config.LINK_UP_DATAGEN_PREFIX);
     } catch (ClassNotFoundException ex) {
       logger.error(ex);
@@ -281,18 +279,20 @@ public class LinkBenchRequest implements Runnable {
 
   private void initNodeDataGeneration(Properties props) {
     try {  
-      double medNodeDataSize = Double.parseDouble(props.getProperty(
-                                              Config.NODE_DATASIZE));
+      double medNodeDataSize = ConfigUtil.getDouble(props, 
+                                              Config.NODE_DATASIZE);
       nodeDataSize = new LogNormalDistribution();
       nodeDataSize.init(0, NodeStore.MAX_NODE_DATA, medNodeDataSize,
                         Config.NODE_DATASIZE_SIGMA);
 
-      String dataGenClass = props.getProperty(Config.NODE_ADD_DATAGEN);
+      String dataGenClass = ConfigUtil.getPropertyRequired(props, 
+                                         Config.NODE_ADD_DATAGEN);
       nodeAddDataGen = ClassLoadUtil.newInstance(dataGenClass,
                                                  DataGenerator.class);
       nodeAddDataGen.init(props, Config.NODE_ADD_DATAGEN_PREFIX);
       
-      dataGenClass = props.getProperty(Config.NODE_UP_DATAGEN);
+      dataGenClass = ConfigUtil.getPropertyRequired(props, 
+                        Config.NODE_UP_DATAGEN);
       nodeUpDataGen = ClassLoadUtil.newInstance(dataGenClass,
                                                  DataGenerator.class);
       nodeUpDataGen.init(props, Config.NODE_UP_DATAGEN_PREFIX);
@@ -812,10 +812,10 @@ public class LinkBenchRequest implements Runnable {
 
   public static RequestProgress createProgress(Logger logger,
        Properties props) {
-    long total_requests = Long.parseLong(props.getProperty(Config.NUM_REQUESTS))
-                      * Long.parseLong(props.getProperty(Config.NUM_REQUESTERS));
+    long total_requests = ConfigUtil.getLong(props, Config.NUM_REQUESTS)
+                      * ConfigUtil.getLong(props, Config.NUM_REQUESTERS);
     return new RequestProgress(logger, total_requests,
-        Long.parseLong(props.getProperty(Config.MAX_TIME)));
+        ConfigUtil.getLong(props, Config.MAX_TIME));
   }
 }
 

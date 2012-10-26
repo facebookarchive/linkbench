@@ -4,6 +4,7 @@ import java.util.Properties;
 import java.util.Random;
 
 import com.facebook.LinkBench.Config;
+import com.facebook.LinkBench.ConfigUtil;
 
 /**
  * Uniform distribution over integers in range [minID, maxID),
@@ -23,8 +24,8 @@ public class UniformDistribution implements ProbabilityDistribution {
     this.min = min;
     this.max = max;
     if (props != null && props.containsKey(keyPrefix + Config.PROB_MEAN)) {
-      scale = (max - min) * Double.parseDouble(props.getProperty(
-                                  keyPrefix + Config.PROB_MEAN));
+      scale = (max - min) * ConfigUtil.getDouble(props, 
+                                  keyPrefix + Config.PROB_MEAN);
     } else {
       scale = 1.0;
     }

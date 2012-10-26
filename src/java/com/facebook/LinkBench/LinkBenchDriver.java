@@ -47,6 +47,7 @@ import com.facebook.LinkBench.util.ClassLoadUtil;
 public class LinkBenchDriver {
   
   public static final int EXIT_BADARGS = 1;
+  public static final int EXIT_BADCONFIG = 2;
   
   /* Command line arguments */
   private static String configFile = null;
@@ -102,11 +103,9 @@ public class LinkBenchDriver {
     //   LinkStoreMysql :  run benchmark on  mySQL
     //   LinkStoreHBaseGeneralAtomicityTesting : atomicity testing on HBase.
     
-    String linkStoreClassName = props.getProperty(Config.LINKSTORE_CLASS);
-    if (linkStoreClassName == null) {
-      throw new Exception("Config key " + Config.LINKSTORE_CLASS + 
-                          " must be defined");
-    }
+    String linkStoreClassName = ConfigUtil.getPropertyRequired(props, 
+                                            Config.LINKSTORE_CLASS);
+    
     logger.info("Using LinkStore implementation: " + linkStoreClassName);
     
     LinkStore linkStore;
@@ -164,16 +163,16 @@ public class LinkBenchDriver {
     }
 
     // load data
-    int nLinkLoaders = Integer.parseInt(props.getProperty(Config.NUM_LOADERS));
+    int nLinkLoaders = ConfigUtil.getInt(props, Config.NUM_LOADERS);
     
 
     boolean bulkLoad = true;
     BlockingQueue<LoadChunk> chunk_q = new LinkedBlockingQueue<LoadChunk>();
     
     // max id1 to generate
-    long maxid1 = Long.parseLong(props.getProperty(Config.MAX_ID));
+    long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
     // id1 at which to start
-    long startid1 = Long.parseLong(props.getProperty(Config.MIN_ID));
+    long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
     
     // Create loaders
     logger.info("Starting loaders " + nLinkLoaders);
@@ -182,8 +181,7 @@ public class LinkBenchDriver {
     Random masterRandom = createMasterRNG(props, Config.LOAD_RANDOM_SEED);
     
 
-    boolean genNodes = Boolean.parseBoolean(props.getProperty(
-                                            Config.GENERATE_NODES));
+    boolean genNodes = ConfigUtil.getBool(props, Config.GENERATE_NODES);
     int nTotalLoaders = genNodes ? nLinkLoaders + 1 : nLinkLoaders;
     
     LatencyStats latencyStats = new LatencyStats(nTotalLoaders);
@@ -216,8 +214,7 @@ public class LinkBenchDriver {
     long loadtime = concurrentExec(loaders);
 
     // compute total #links loaded
-    int nlinks_default = Integer.parseInt(props.getProperty(
-                                            Config.NLINKS_DEFAULT));
+    int nlinks_default = ConfigUtil.getInt(props, Config.NLINKS_DEFAULT);
 
     long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
     long expectedNodes = maxid1 - startid1;
@@ -257,7 +254,7 @@ public class LinkBenchDriver {
   private Random createMasterRNG(Properties props, String configKey) {
     long seed;
     if (props.containsKey(configKey)) {
-      seed = Long.parseLong(props.getProperty(configKey));
+      seed = ConfigUtil.getLong(props, configKey);
       logger.info("Using configured random seed " + configKey + "=" + seed);
     } else {
       seed = System.nanoTime() ^ (long)configKey.hashCode();
@@ -286,8 +283,7 @@ public class LinkBenchDriver {
     // Enqueue work chunks.  Do it in reverse order as a heuristic to improve
     // load balancing, since queue is FIFO and later chunks tend to be larger
     
-    int chunkSize = Integer.parseInt(
-                      props.getProperty(Config.LOADER_CHUNK_SIZE, "2048"));
+    int chunkSize = ConfigUtil.getInt(props, Config.LOADER_CHUNK_SIZE, 2048);
     long chunk_num = 0;
     ArrayList<LoadChunk> stack = new ArrayList<LoadChunk>();
     for (long id1 = startid1; id1 < maxid1; id1 += chunkSize) {
@@ -314,8 +310,7 @@ public class LinkBenchDriver {
     }
 
     // config info for requests
-    int nrequesters = Integer.parseInt(props.getProperty(
-                                            Config.NUM_REQUESTERS));
+    int nrequesters = ConfigUtil.getInt(props, Config.NUM_REQUESTERS);
     if (nrequesters == 0) {
       logger.info("NO REQUEST PHASE CONFIGURED. ");
       return;
@@ -417,7 +412,12 @@ public class LinkBenchDriver {
     
     LinkBenchDriver d = new LinkBenchDriver(configFile, 
                                 cmdLineProps, logFile);
-    d.drive();
+    try {
+      d.drive();
+    } catch (LinkBenchConfigError e) {
+      System.err.println("Configuration error: " + e.toString());
+      System.exit(EXIT_BADCONFIG);
+    }
   }
 
   private static void printUsage(Options options) {

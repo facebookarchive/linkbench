@@ -4,6 +4,7 @@ import java.util.Properties;
 import java.util.Random;
 
 import com.facebook.LinkBench.Config;
+import com.facebook.LinkBench.ConfigUtil;
 import com.facebook.LinkBench.LinkBenchConfigError;
 
 /**
@@ -92,12 +93,12 @@ public class MotifDataGenerator implements DataGenerator {
   
   @Override
   public void init(Properties props, String keyPrefix) {
-    int startByte = Integer.parseInt(props.getProperty(keyPrefix +
-                                     Config.UNIFORM_GEN_STARTBYTE));
-    int endByte = Integer.parseInt(props.getProperty(keyPrefix +
-                                     Config.UNIFORM_GEN_ENDBYTE));
-    double uniqueness = Integer.parseInt(props.getProperty(keyPrefix +
-                                     Config.MOTIF_GEN_UNIQUENESS));
+    int startByte = ConfigUtil.getInt(props, keyPrefix +
+                                     Config.UNIFORM_GEN_STARTBYTE);
+    int endByte = ConfigUtil.getInt(props, keyPrefix +
+                                     Config.UNIFORM_GEN_ENDBYTE);
+    double uniqueness = ConfigUtil.getInt(props, keyPrefix +
+                                     Config.MOTIF_GEN_UNIQUENESS);
     init(startByte, endByte, uniqueness);
   }
 
