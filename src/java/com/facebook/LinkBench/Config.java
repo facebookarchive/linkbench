@@ -62,7 +62,8 @@ public class Config {
   public static final String READ_CONFIG_PREFIX = "read_";
   public static final String WRITE_CONFIG_PREFIX = "write_";
   public static final String NODE_READ_CONFIG_PREFIX = "node_read_";
-  public static final String NODE_WRITE_CONFIG_PREFIX = "node_write_";
+  public static final String NODE_UPDATE_CONFIG_PREFIX = "node_update_";
+  public static final String NODE_DELETE_CONFIG_PREFIX = "node_delete_";
   public static final String ACCESS_FUNCTION_SUFFIX = "function";
   public static final String ACCESS_CONFIG_SUFFIX = "config";
   public static final String READ_FUNCTION = "read_function";

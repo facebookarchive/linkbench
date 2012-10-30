@@ -153,8 +153,11 @@ public class AccessDistributions {
     case NODE_READS:
       keyPrefix = Config.NODE_READ_CONFIG_PREFIX;
       break;
-    case NODE_WRITES:
-      keyPrefix = Config.NODE_WRITE_CONFIG_PREFIX;
+    case NODE_UPDATES:
+      keyPrefix = Config.NODE_UPDATE_CONFIG_PREFIX;
+      break;
+    case NODE_DELETES:
+      keyPrefix = Config.NODE_DELETE_CONFIG_PREFIX;
       break;
     default:
       throw new RuntimeException("Bad kind " + kind);

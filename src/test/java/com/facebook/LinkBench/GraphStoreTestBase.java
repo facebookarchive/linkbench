@@ -103,10 +103,12 @@ public abstract class GraphStoreTestBase extends TestCase {
     
     props.setProperty(Config.NODE_READ_CONFIG_PREFIX + 
           Config.ACCESS_FUNCTION_SUFFIX, UniformDistribution.class.getName());
-    props.setProperty(Config.NODE_WRITE_CONFIG_PREFIX +
+    props.setProperty(Config.NODE_UPDATE_CONFIG_PREFIX +
         Config.ACCESS_FUNCTION_SUFFIX, AccessDistMode.ROUND_ROBIN.name());
-    props.setProperty(Config.NODE_WRITE_CONFIG_PREFIX +
+    props.setProperty(Config.NODE_UPDATE_CONFIG_PREFIX +
         Config.ACCESS_CONFIG_SUFFIX, "0");
+    props.setProperty(Config.NODE_DELETE_CONFIG_PREFIX +
+        Config.ACCESS_FUNCTION_SUFFIX, UniformDistribution.class.getName());
     
     props.setProperty(Config.NODE_DATASIZE, "1024");
     props.setProperty(Config.NODE_ADD_DATAGEN,

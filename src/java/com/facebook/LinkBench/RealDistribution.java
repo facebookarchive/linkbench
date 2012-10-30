@@ -38,8 +38,11 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   public static final long[] NODE_ACCESS_SHUFFLER_PARAMS = {27, 13};
   public static final long NODE_READ_SHUFFLER_SEED = 4766565305853767165L;
   public static final int NODE_READ_SHUFFLER_GROUPS = 1024;
-  public static final long NODE_WRITE_SHUFFLER_SEED = NODE_READ_SHUFFLER_SEED;
-  public static final int NODE_WRITE_SHUFFLER_GROUPS = 
+  public static final long NODE_UPDATE_SHUFFLER_SEED = NODE_READ_SHUFFLER_SEED;
+  public static final int NODE_UPDATE_SHUFFLER_GROUPS = 
+                                                    NODE_READ_SHUFFLER_GROUPS;
+  public static final long NODE_DELETE_SHUFFLER_SEED = NODE_READ_SHUFFLER_SEED;
+  public static final int NODE_DELETE_SHUFFLER_GROUPS = 
                                                     NODE_READ_SHUFFLER_GROUPS;
 
   public static enum DistributionType {
@@ -47,7 +50,8 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     LINK_READS,
     LINK_WRITES,
     NODE_READS,
-    NODE_WRITES,
+    NODE_UPDATES,
+    NODE_DELETES,
   }
 
   private DistributionType type = null;
@@ -71,7 +75,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     } else if (dist.equals("node_reads")) {
       configuredType = DistributionType.NODE_READS;
     } else if (dist.equals("node_writes")) {
-      configuredType = DistributionType.NODE_WRITES;
+      configuredType = DistributionType.NODE_UPDATES;
     } else if (dist.equals("links")) {
       configuredType = DistributionType.LINKS;
     } else {
@@ -101,7 +105,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
       init(min, max, link_nreads_cdf, link_nreads_cs, link_nreads_right_points,
                                               link_nreads_expected_val);
       break;
-    case NODE_WRITES:
+    case NODE_UPDATES:
       init(min, max, node_nwrites_cdf, nwrites_cs, nwrites_right_points,
                                               node_nwrites_expected_val);
       break;
@@ -208,7 +212,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
       dist == DistributionType.LINK_READS? link_nreads_cdf :
       dist == DistributionType.LINK_WRITES ? link_nwrites_cdf : 
       dist == DistributionType.NODE_READS ? node_nreads_cdf :
-      dist == DistributionType.NODE_WRITES ? node_nwrites_cdf :
+      dist == DistributionType.NODE_UPDATES ? node_nwrites_cdf :
                                                           null;
     if (points == null) return null;
 
@@ -334,9 +338,12 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     case NODE_READS:
       return new InvertibleShuffler(NODE_READ_SHUFFLER_SEED,
           NODE_READ_SHUFFLER_GROUPS, n);
-    case NODE_WRITES:
-      return new InvertibleShuffler(NODE_WRITE_SHUFFLER_SEED,
-          NODE_WRITE_SHUFFLER_GROUPS, n);
+    case NODE_UPDATES:
+      return new InvertibleShuffler(NODE_UPDATE_SHUFFLER_SEED,
+          NODE_UPDATE_SHUFFLER_GROUPS, n);
+    case NODE_DELETES:
+      return new InvertibleShuffler(NODE_DELETE_SHUFFLER_SEED,
+          NODE_DELETE_SHUFFLER_GROUPS, n);
     case LINKS:
       return new InvertibleShuffler(NLINKS_SHUFFLER_SEED,
           NLINKS_SHUFFLER_GROUPS, n);

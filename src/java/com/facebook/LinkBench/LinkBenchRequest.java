@@ -105,7 +105,8 @@ public class LinkBenchRequest implements Runnable {
   private AccessDistribution writeDist; // link writes
   private AccessDistribution readDist; // link reads
   private AccessDistribution nodeReadDist; // node reads
-  private AccessDistribution nodeWriteDist; // node writes
+  private AccessDistribution nodeUpdateDist; // node writes
+  private AccessDistribution nodeDeleteDist; // node deletes
   
   private ID2Chooser id2chooser;
   public LinkBenchRequest(LinkStore linkStore,
@@ -266,13 +267,24 @@ public class LinkBenchRequest implements Runnable {
     }
     
     try {
-      nodeWriteDist  = AccessDistributions.loadAccessDistribution(props, 
-        startid1, maxid1, DistributionType.NODE_WRITES);
+      nodeUpdateDist  = AccessDistributions.loadAccessDistribution(props, 
+        startid1, maxid1, DistributionType.NODE_UPDATES);
     } catch (LinkBenchConfigError e) {
       // Not defined
       logger.info("Node access distribution not configured: " +
               e.getMessage());
       throw new LinkBenchConfigError("Node write distribution not " +
+            "configured but node write operations have non-zero probability");
+    }
+    
+    try {
+      nodeDeleteDist = AccessDistributions.loadAccessDistribution(props, 
+        startid1, maxid1, DistributionType.NODE_DELETES);
+    } catch (LinkBenchConfigError e) {
+      // Not defined
+      logger.info("Node delete distribution not configured: " +
+              e.getMessage());
+      throw new LinkBenchConfigError("Node delete distribution not " +
             "configured but node write operations have non-zero probability");
     }
   }
@@ -325,8 +337,11 @@ public class LinkBenchRequest implements Runnable {
     case NODE_READS:
       dist = nodeReadDist;
       break;
-    case NODE_WRITES:
-      dist = nodeWriteDist;
+    case NODE_UPDATES:
+      dist = nodeUpdateDist;
+      break;
+    case NODE_DELETES:
+      dist = nodeDeleteDist;
       break;
     default:
       throw new RuntimeException("Unknown value for type: " + type);
@@ -457,7 +472,7 @@ public class LinkBenchRequest implements Runnable {
         type = LinkBenchOp.UPDATE_NODE;
         // Choose an id that has previously been created (but might have
         // been since deleted
-        long upId = chooseRequestID(DistributionType.NODE_WRITES, 
+        long upId = chooseRequestID(DistributionType.NODE_UPDATES, 
                                      lastNodeId);
         // Generate new data randomly
         Node newNode = createUpdateNode(upId);
@@ -471,7 +486,7 @@ public class LinkBenchRequest implements Runnable {
         }
       } else if (r <= pc_deletenode) {
         type = LinkBenchOp.DELETE_NODE;
-        long idToDelete = chooseRequestID(DistributionType.NODE_WRITES, 
+        long idToDelete = chooseRequestID(DistributionType.NODE_DELETES, 
                                           lastNodeId);
         starttime = System.nanoTime();
         boolean deleted = nodeStore.deleteNode(dbid, LinkStore.ID1_TYPE,

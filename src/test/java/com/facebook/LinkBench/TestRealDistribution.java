@@ -101,7 +101,7 @@ public class TestRealDistribution extends TestCase {
     System.out.println("testGetNextId1(1000000, 2000001, nwrites) err=" + err);
     err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.NODE_READS);
     System.out.println("testGetNextId1(1000000, 2000001, node_nreads) err=" + err);
-    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.NODE_WRITES);
+    err = testGetNextId1(props, rng, 1000000, 2000001, DistributionType.NODE_UPDATES);
     System.out.println("testGetNextId1(1000000, 2000001, node_nwrites) err=" + err);
 
     err = testGetNextId1(props, rng, 1234567, 7654321, DistributionType.LINK_READS);
