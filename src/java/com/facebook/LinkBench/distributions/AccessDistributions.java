@@ -147,8 +147,14 @@ public class AccessDistributions {
     case LINK_READS:
       keyPrefix = Config.READ_CONFIG_PREFIX;
       break;
+    case LINK_READS_UNCORR:
+      keyPrefix = Config.READ_UNCORR_CONFIG_PREFIX;
+      break;
     case LINK_WRITES:
       keyPrefix = Config.WRITE_CONFIG_PREFIX;
+      break;
+    case LINK_WRITES_UNCORR:
+      keyPrefix = Config.WRITE_UNCORR_CONFIG_PREFIX;
       break;
     case NODE_READS:
       keyPrefix = Config.NODE_READ_CONFIG_PREFIX;

@@ -21,21 +21,26 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   public static final String DISTRIBUTION_CONFIG = "realdist";
   private static final Logger logger = 
                       Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
-  /* params to shuffle
-  final static long[] NLINKS_SHUFFLER_PARAMS = {13, 7};
-  final static long[] WRITE_SHUFFLER_PARAMS = {23, 13};
-  final static long[] READ_SHUFFLER_PARAMS = {19, 11};
-  */
-  public final static long[] NLINKS_SHUFFLER_PARAMS = {13, 7};
+  /* params to shuffler for link degree */
   public static final long NLINKS_SHUFFLER_SEED = 20343988438726021L;
   public static final int NLINKS_SHUFFLER_GROUPS = 1024;
-  public final static long[] WRITE_SHUFFLER_PARAMS = {13, 7};
-  public static final long WRITE_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
-  public static final int WRITE_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
-  public final static long[] READ_SHUFFLER_PARAMS = {13, 7};
-  public static final long READ_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
-  public static final int READ_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
-  public static final long[] NODE_ACCESS_SHUFFLER_PARAMS = {27, 13};
+  
+  /* shufflers to generate distributions uncorrelated to above */
+  public static final long UNCORR_SHUFFLER_SEED = 53238253823453L;
+  public static final int UNCORR_SHUFFLER_GROUPS = 1024;
+  
+  /* Shufflers for requests that are correlated with link degree */ 
+  public static final long WRITE_CORR_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
+  public static final int WRITE_CORR_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
+  public static final long READ_CORR_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
+  public static final int READ_CORR_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
+  
+  /* Shufflers for requests that are uncorrelated with link degree */
+  public static final long WRITE_UNCORR_SHUFFLER_SEED = UNCORR_SHUFFLER_SEED;
+  public static final int WRITE_UNCORR_SHUFFLER_GROUPS = UNCORR_SHUFFLER_GROUPS;
+  public static final long READ_UNCORR_SHUFFLER_SEED = UNCORR_SHUFFLER_SEED;
+  public static final int READ_UNCORR_SHUFFLER_GROUPS = UNCORR_SHUFFLER_GROUPS;
+  
   public static final long NODE_READ_SHUFFLER_SEED = 4766565305853767165L;
   public static final int NODE_READ_SHUFFLER_GROUPS = 1024;
   public static final long NODE_UPDATE_SHUFFLER_SEED = NODE_READ_SHUFFLER_SEED;
@@ -48,7 +53,9 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   public static enum DistributionType {
     LINKS,
     LINK_READS,
+    LINK_READS_UNCORR,
     LINK_WRITES,
+    LINK_WRITES_UNCORR,
     NODE_READS,
     NODE_UPDATES,
     NODE_DELETES,
@@ -330,11 +337,17 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   public static InvertibleShuffler getShuffler(DistributionType type, long n) {
     switch (type) {
     case LINK_READS:
-      return new InvertibleShuffler(READ_SHUFFLER_SEED,
-            READ_SHUFFLER_GROUPS, n);
+      return new InvertibleShuffler(READ_CORR_SHUFFLER_SEED,
+            READ_CORR_SHUFFLER_GROUPS, n);
+    case LINK_READS_UNCORR:
+      return new InvertibleShuffler(READ_UNCORR_SHUFFLER_SEED,
+            READ_UNCORR_SHUFFLER_GROUPS, n);
     case LINK_WRITES:
-      return new InvertibleShuffler(WRITE_SHUFFLER_SEED,
-          WRITE_SHUFFLER_GROUPS, n);
+      return new InvertibleShuffler(WRITE_CORR_SHUFFLER_SEED,
+          WRITE_CORR_SHUFFLER_GROUPS, n);
+    case LINK_WRITES_UNCORR:
+      return new InvertibleShuffler(WRITE_UNCORR_SHUFFLER_SEED,
+          WRITE_UNCORR_SHUFFLER_GROUPS, n);
     case NODE_READS:
       return new InvertibleShuffler(NODE_READ_SHUFFLER_SEED,
           NODE_READ_SHUFFLER_GROUPS, n);

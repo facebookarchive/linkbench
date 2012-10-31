@@ -103,7 +103,11 @@ public class LinkBenchRequest implements Runnable {
 
   // Access distributions
   private AccessDistribution writeDist; // link writes
+  private AccessDistribution writeDistUncorr; // to blend with link writes
+  private double writeDistUncorrBlend; // Percentage to used writeDist2 for
   private AccessDistribution readDist; // link reads
+  private AccessDistribution readDistUncorr; // to blend with link reads
+  private double readDistUncorrBlend; // Percentage to used readDist2 for
   private AccessDistribution nodeReadDist; // node reads
   private AccessDistribution nodeUpdateDist; // node writes
   private AccessDistribution nodeDeleteDist; // node deletes
@@ -207,6 +211,29 @@ public class LinkBenchRequest implements Runnable {
             startid1, maxid1, DistributionType.LINK_WRITES);
     readDist = AccessDistributions.loadAccessDistribution(props, 
         startid1, maxid1, DistributionType.LINK_READS);
+    
+    // Load uncorrelated distributions for blending if needed
+    writeDistUncorr = null;
+    if (props.contains(Config.WRITE_UNCORR_BLEND)) {
+      // Ratio of queries to use uncorrelated.  Convert from percentage
+      writeDistUncorrBlend = ConfigUtil.getDouble(props, 
+                Config.WRITE_UNCORR_BLEND) / 100.0;
+      if (writeDistUncorrBlend > 0.0) {
+        writeDistUncorr = AccessDistributions.loadAccessDistribution(props, 
+            startid1, maxid1, DistributionType.LINK_WRITES_UNCORR);
+      }
+    }
+    
+    readDistUncorr = null;
+    if (props.contains(Config.READ_UNCORR_BLEND)) {
+      // Ratio of queries to use uncorrelated.  Convert from percentage
+      readDistUncorrBlend = ConfigUtil.getDouble(props, 
+                Config.READ_UNCORR_BLEND) / 100.0;
+      if (readDistUncorrBlend > 0.0) {
+        readDistUncorr = AccessDistributions.loadAccessDistribution(props, 
+            startid1, maxid1, DistributionType.LINK_READS_UNCORR);
+      }
+    }
     
     id2chooser = new ID2Chooser(props, startid1, maxid1, 
                                 nrequesters, requesterID);
@@ -324,15 +351,27 @@ public class LinkBenchRequest implements Runnable {
   }
 
   // gets id1 for the request based on desired distribution
-  private long chooseRequestID(DistributionType type,
-                                        long previousId1) {
+  private long chooseRequestID(DistributionType type, long previousId1) {
     AccessDistribution dist;
     switch (type) {
     case LINK_READS:
-      dist = readDist;
+      // Blend between distributions if needed
+      if (readDistUncorr == null || rng.nextDouble() >= readDistUncorrBlend) {
+        dist = readDist;
+      } else {
+        dist = readDistUncorr;
+      }
       break;
     case LINK_WRITES:
-      dist = writeDist;
+      // Blend between distributions if needed
+      if (writeDistUncorr == null || rng.nextDouble() >= writeDistUncorrBlend) {
+        dist = writeDist;
+      } else {
+        dist = writeDistUncorr;
+      }
+      break;
+    case LINK_WRITES_UNCORR:
+      dist = writeDistUncorr;
       break;
     case NODE_READS:
       dist = nodeReadDist;
@@ -456,9 +495,6 @@ public class LinkBenchRequest implements Runnable {
         
         int count = ((links == null) ? 0 : links.length);
         stats.addStats(LinkBenchOp.RANGE_SIZE, count, false);
-        if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-          logger.trace("getlinklist count = " + count);
-        }
       } else if (r <= pc_addnode) {
         type = LinkBenchOp.ADD_NODE;
         Node newNode = createAddNode();
@@ -677,7 +713,10 @@ public class LinkBenchRequest implements Runnable {
 
   Link[] getLinkList(long id1, long link_type) throws Exception {
     Link links[] = linkStore.getLinkList(dbid, id1, link_type);
-    
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+       logger.trace("getLinkList(id1=" + id1 + ", link_type="  + link_type
+                     + ") => count=" + (links == null ? 0 : links.length));
+    }
     // If there were more links than limit, record
     if (links != null && links.length >= linkStore.getRangeLimit()) {
       Link lastLink = links[links.length-1];
@@ -705,6 +744,11 @@ public class LinkBenchRequest implements Runnable {
     Link links[] = linkStore.getLinkList(dbid, prevLast.id1,
         prevLast.link_type, 0, prevLast.time, 1, linkStore.getRangeLimit());
     
+    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+      logger.trace("getLinkListTail(id1=" + prevLast.id1 + ", link_type=" 
+                + prevLast.link_type + ", max_time=" + prevLast.time
+                + " => count=" + (links == null ? 0 : links.length));
+   }
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Historical range query for (" + prevLast.id1 +"," +
                     prevLast.link_type + " older than " + prevLast.time +

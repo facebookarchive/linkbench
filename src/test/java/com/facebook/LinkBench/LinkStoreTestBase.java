@@ -17,6 +17,7 @@ import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
 import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistMode;
 import com.facebook.LinkBench.distributions.GeometricDistribution;
+import com.facebook.LinkBench.distributions.ZipfDistribution;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistMode;
 import com.facebook.LinkBench.distributions.UniformDistribution;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
@@ -138,6 +139,12 @@ public abstract class LinkStoreTestBase extends TestCase {
                                         UniformDistribution.class.getName());
     props.setProperty(Config.READ_FUNCTION, AccessDistMode.RECIPROCAL.name());
     props.setProperty(Config.READ_CONFIG, "0");
+    // Test blending on reads
+    props.setProperty(Config.READ_UNCORR_BLEND, "0.5");
+    props.setProperty(Config.READ_UNCORR_FUNCTION,
+                          ZipfDistribution.class.getName());
+    props.setProperty(Config.READ_UNCORR_CONFIG_PREFIX + "shape", "0.5");
+    
     
     if (enableMultiget) {
       props.setProperty(Config.LINK_MULTIGET_DIST, 
