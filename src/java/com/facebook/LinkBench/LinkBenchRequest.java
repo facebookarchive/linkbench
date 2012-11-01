@@ -214,7 +214,7 @@ public class LinkBenchRequest implements Runnable {
     
     // Load uncorrelated distributions for blending if needed
     writeDistUncorr = null;
-    if (props.contains(Config.WRITE_UNCORR_BLEND)) {
+    if (props.containsKey(Config.WRITE_UNCORR_BLEND)) {
       // Ratio of queries to use uncorrelated.  Convert from percentage
       writeDistUncorrBlend = ConfigUtil.getDouble(props, 
                 Config.WRITE_UNCORR_BLEND) / 100.0;
@@ -225,7 +225,7 @@ public class LinkBenchRequest implements Runnable {
     }
     
     readDistUncorr = null;
-    if (props.contains(Config.READ_UNCORR_BLEND)) {
+    if (props.containsKey(Config.READ_UNCORR_BLEND)) {
       // Ratio of queries to use uncorrelated.  Convert from percentage
       readDistUncorrBlend = ConfigUtil.getDouble(props, 
                 Config.READ_UNCORR_BLEND) / 100.0;
