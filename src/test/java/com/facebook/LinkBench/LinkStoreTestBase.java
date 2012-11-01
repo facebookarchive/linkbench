@@ -672,16 +672,23 @@ public abstract class LinkStoreTestBase extends TestCase {
     long idCount = 10;
     int rangeLimit = 10;
     
-    int linksPerId = (int) (rangeLimit * 2.5);
+    int linksPerId = (int) (rangeLimit * 20);
     
     Properties props = basicProps();
-    double pHistory = 0.5; // Half history requests
-    int requests = 5000; // enough requests that we should get ~50% history
+    double pHistory = 0.25; // Quarter history requests
+    int requests = 50000; // enough requests that we should get 20%+ history 
+                          // queries with something in cache. Many requests to
+                          // ensure we cycle through lists multiple times
     long timeLimit = requests;    
     
     fillLoadProps(props, startId, idCount, linksPerId);
     fillReqProps(props, startId, idCount, requests, timeLimit,
                  0, 0, 0, 0, 0, 100, false);
+    // Use uniform distribution to make sure we get lots of lists in history
+    props.setProperty(Config.READ_FUNCTION, UniformDistribution.class.getName());
+    // Test blending on reads
+    props.setProperty(Config.READ_UNCORR_BLEND, "0.0");
+    
     props.setProperty(Config.PR_GETLINKLIST_HISTORY, Double.toString(
                                                       pHistory * 100));
     
@@ -710,7 +717,8 @@ public abstract class LinkStoreTestBase extends TestCase {
           + " " + (actualPHistory * 100) + "%");
       if (reqStore.isRealLinkStore()) {
         assertTrue(actualPHistory <= 1.05 * pHistory);
-        assertTrue(actualPHistory >= 0.95 * pHistory);
+        // Can be substantially lower due to history cache being empty
+        assertTrue(actualPHistory >= 0.75 * pHistory);
       }
     } finally {
       deleteIDRange(testDB, getStoreHandle(true), startId, idCount);

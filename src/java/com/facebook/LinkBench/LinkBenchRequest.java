@@ -3,6 +3,7 @@ package com.facebook.LinkBench;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
@@ -70,8 +71,44 @@ public class LinkBenchRequest implements Runnable {
   // Chance of doing historical range query
   double p_historical_getlinklist;
   
+  private static class HistoryKey {
+    public final long id1;
+    public final long link_type;
+    public HistoryKey(long id1, long link_type) {
+      super();
+      this.id1 = id1;
+      this.link_type = link_type;
+    }
+    
+    public HistoryKey(Link l) {
+      this(l.id1, l.link_type);
+    }
+    
+    @Override
+    public int hashCode() {
+      final int prime = 31;
+      int result = 1;
+      result = prime * result + (int) (id1 ^ (id1 >>> 32));
+      result = prime * result + (int) (link_type ^ (link_type >>> 32));
+      return result;
+    }
+    
+    @Override
+    public boolean equals(Object obj) {
+      if (!(obj instanceof HistoryKey))
+        return false;
+      HistoryKey other = (HistoryKey) obj;
+      return id1 == other.id1 && link_type == other.link_type;
+    }
+    
+  }
+  
   // Cache of last link in lists where full list wasn't retrieved
   ArrayList<Link> listTailHistory;
+  
+  // Index of history to avoid duplicates
+  HashMap<HistoryKey, Integer> listTailHistoryIndex;
+  
   // Limit of cache size
   private int listTailHistoryLimit;
   
@@ -180,6 +217,7 @@ public class LinkBenchRequest implements Runnable {
    
     listTailHistoryLimit = 2048; // Hardcoded limit for now
     listTailHistory = new ArrayList<Link>(listTailHistoryLimit);
+    listTailHistoryIndex = new HashMap<HistoryKey, Integer>();
     p_historical_getlinklist = ConfigUtil.getDouble(props,
                         Config.PR_GETLINKLIST_HISTORY, 0.0) / 100; 
     
@@ -725,17 +763,13 @@ public class LinkBenchRequest implements Runnable {
                       link_type + " older than " + lastLink.time);
       }
       
-      if (listTailHistory.size() < listTailHistoryLimit) {
-        listTailHistory.add(lastLink.clone());
-      } else {
-        int choice = rng.nextInt(listTailHistory.size());
-        listTailHistory.set(choice, lastLink.clone());
-      }
+      addTailCacheEntry(lastLink);
     }
     return links;
   }
 
   Link[] getLinkListTail() throws Exception {
+    assert(!listTailHistoryIndex.isEmpty());
     assert(!listTailHistory.isEmpty());
     int choice = rng.nextInt(listTailHistory.size());
     Link prevLast = listTailHistory.get(choice);
@@ -755,8 +789,8 @@ public class LinkBenchRequest implements Runnable {
                     ": " + (links == null ? 0 : links.length) + " results");
     }
     
-    // There might be yet more history
     if (links != null && links.length == linkStore.getRangeLimit()) {
+      // There might be yet more history
       Link last = links[links.length-1];
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
         logger.trace("might be yet more history for (" + last.id1 +"," +
@@ -764,9 +798,61 @@ public class LinkBenchRequest implements Runnable {
       }
       // Update in place
       listTailHistory.set(choice, last.clone());
+    } else {
+      // No more history after this, remove from cache
+      removeTailCacheEntry(choice, null); 
     }
     numHistoryQueries++;
     return links;
+  }
+
+  /**
+   * Add a new link to the history cache, unless already present
+   * @param lastLink the last (i.e. lowest timestamp) link retrieved 
+   */
+  private void addTailCacheEntry(Link lastLink) {
+    HistoryKey key = new HistoryKey(lastLink);
+    if (listTailHistoryIndex.containsKey(key)) {
+      // Already present
+      return;
+    }
+    
+    if (listTailHistory.size() < listTailHistoryLimit) {
+      listTailHistory.add(lastLink.clone());
+      listTailHistoryIndex.put(key, listTailHistory.size() - 1);
+    } else {
+      // Need to evict entry
+      int choice = rng.nextInt(listTailHistory.size());
+      removeTailCacheEntry(choice, lastLink.clone());
+    }
+  }
+
+  /**
+   * Remove or replace entry in listTailHistory and update index
+   * @param pos index of entry in listTailHistory
+   * @param repl replace with this if not null
+   */
+  private void removeTailCacheEntry(int pos, Link repl) {
+    Link entry = listTailHistory.get(pos);
+    if (pos == listTailHistory.size() - 1) {
+      // removing from last position, don't need to fill gap
+      listTailHistoryIndex.remove(new HistoryKey(entry));
+      int lastIx = listTailHistory.size() - 1;
+      if (repl == null) {
+        listTailHistory.remove(lastIx);
+      } else {
+        listTailHistory.set(lastIx, repl);
+        listTailHistoryIndex.put(new HistoryKey(repl), lastIx);
+      }
+    } else { 
+      if (repl == null) {
+        // Replace with last entry in cache to fill gap
+        repl = listTailHistory.get(listTailHistory.size() - 1);
+        listTailHistory.remove(listTailHistory.size() - 1);
+      }
+      listTailHistory.set(pos, repl);
+      listTailHistoryIndex.put(new HistoryKey(repl), pos);
+    }
   }
 
   long countLinks(long id1, long link_type) throws Exception {
