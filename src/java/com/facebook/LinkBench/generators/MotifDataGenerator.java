@@ -97,9 +97,15 @@ public class MotifDataGenerator implements DataGenerator {
                                      Config.UNIFORM_GEN_STARTBYTE);
     int endByte = ConfigUtil.getInt(props, keyPrefix +
                                      Config.UNIFORM_GEN_ENDBYTE);
-    double uniqueness = ConfigUtil.getInt(props, keyPrefix +
+    double uniqueness = ConfigUtil.getDouble(props, keyPrefix +
                                      Config.MOTIF_GEN_UNIQUENESS);
-    init(startByte, endByte, uniqueness);
+    if (props.contains(keyPrefix + Config.MOTIF_GEN_LENGTH)) {
+      int motifBytes = ConfigUtil.getInt(props, keyPrefix 
+                               + Config.MOTIF_GEN_LENGTH);
+      init(startByte, endByte, uniqueness, motifBytes);
+    } else {
+      init(startByte, endByte, uniqueness);
+    }
   }
 
   /**
