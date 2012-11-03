@@ -136,7 +136,7 @@ public class MotifDataGenerator implements DataGenerator {
     int chunk = Math.min(MAX_CHUNK_SIZE, motifBytes);
     
     for (int i = 0; i < n; i += chunk) {
-      if (i == 0 || rng.nextDouble() < uniqueness) {
+      if (rng.nextDouble() < uniqueness) {
         int chunkEnd = Math.min(n, i + chunk);
         // New sequence of unique bytes
         for (int j = i; j < chunkEnd; j++) {
@@ -145,8 +145,6 @@ public class MotifDataGenerator implements DataGenerator {
       } else {
         int thisChunk = Math.min(chunk, n - i);
         int k = rng.nextInt(motifBytes - thisChunk + 1);
-        //System.err.println("Copying " + thisChunk + " bytes starting at "
-        //                              + k + " to " + i);
         // Copy previous sequence of bytes
         System.arraycopy(motifs, k, data, i, thisChunk);
       }
