@@ -50,10 +50,42 @@ public abstract class LinkStore {
   // cleaned up, reset, reopened, whatever 
   public abstract void clearErrors(int threadID);
 
-  public abstract void addLink(String dbid, Link a, boolean noinverse) throws Exception;
-  public abstract void deleteLink(String dbid, long id1, long link_type, long id2, 
+  /**
+   * Add provided link to the store.  If already exists, update with new data
+   * @param dbid
+   * @param a
+   * @param noinverse
+   * @return true if new link added, false if updated. Implementation is
+   *              optional, for informational purposes only.
+   * @throws Exception
+   */
+  public abstract boolean addLink(String dbid, Link a, boolean noinverse) throws Exception;
+  
+  /**
+   * Delete link identified by parameters from store
+   * @param dbid
+   * @param id1
+   * @param link_type
+   * @param id2
+   * @param noinverse
+   * @param expunge if true, delete permanently.  If false, hide instead
+   * @return true if row existed. Implementation is optional, for informational
+   *         purposes only.
+   * @throws Exception
+   */
+  public abstract boolean deleteLink(String dbid, long id1, long link_type, long id2, 
                    boolean noinverse, boolean expunge) throws Exception;
-  public abstract void updateLink(String dbid, Link a, boolean noinverse) 
+ 
+  /**
+   * Update a link in the database, or add if not found
+   * @param dbid
+   * @param a
+   * @param noinverse
+   * @return true if link found, false if new link created.  Implementation is
+   *      optional, for informational purposes only.
+   * @throws Exception
+   */
+  public abstract boolean updateLink(String dbid, Link a, boolean noinverse) 
     throws Exception;
 
   /**

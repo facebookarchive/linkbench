@@ -193,7 +193,7 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
 
 
   @Override
-  public void addLink(String dbid, Link a, boolean noinverse)
+  public boolean addLink(String dbid, Link a, boolean noinverse)
     throws Exception {
 
       String linkHead = combine(a.id1, a.link_type, a.id2);
@@ -245,11 +245,12 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
                  "; get value = " + bytesToString(value) +
                  "; expected value = " + bytesToString(tempvalue));
     }
+    return true; // always pretend was added
   }
 
 
   @Override
-  public void deleteLink(String dbid, long id1, long link_type, long id2,
+  public boolean deleteLink(String dbid, long id1, long link_type, long id2,
                          boolean noinverse, boolean expunge)
     throws Exception {
     String linkHead = combine(id1, link_type, id2);
@@ -286,13 +287,15 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
     Get g = new Get(row);
     Result result = table.get(g);
     assertTrue(result.isEmpty(), linkHead);
+    return true; // always pretend was found
   }
 
 
   @Override
-  public void updateLink(String dbid, Link a, boolean noinverse)
+  public boolean updateLink(String dbid, Link a, boolean noinverse)
     throws Exception {
     addLink(dbid, a, noinverse);
+    return true; // always pretend was updated
   }
 
 

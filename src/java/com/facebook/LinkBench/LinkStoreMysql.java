@@ -201,7 +201,7 @@ public class LinkStoreMysql extends GraphStore {
   }
 
 
-  public void addLink(String dbid, Link l, boolean noinverse)
+  public boolean addLink(String dbid, Link l, boolean noinverse)
     throws Exception {
 
      if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
@@ -224,6 +224,7 @@ public class LinkStoreMysql extends GraphStore {
 
     // based on nrows, determine whether the previous query was an insert
     // or update
+    boolean row_found;
     boolean update_data = false;
     int update_count = 0;
 
@@ -233,12 +234,14 @@ public class LinkStoreMysql extends GraphStore {
         if (l.visibility == VISIBILITY_DEFAULT) {
           update_count = 1;
         }
+        row_found = false;
         break;
 
       case 0:
         // A row is found but its visibility was unchanged
         // --> need to update other data
         update_data = true;
+        row_found = true;
         break;
 
       case 2:
@@ -251,6 +254,7 @@ public class LinkStoreMysql extends GraphStore {
           update_count = -1;
         }
         update_data = true;
+        row_found = true;
         break;
 
       default:
@@ -308,6 +312,7 @@ public class LinkStoreMysql extends GraphStore {
     if (INTERNAL_TESTING) {
       testCount(stmt, dbid, linktable, counttable, l.id1, l.link_type);
     }
+    return row_found;
   }
 
   /**
@@ -354,7 +359,7 @@ public class LinkStoreMysql extends GraphStore {
     return nrows;
 }
 
-  public void deleteLink(String dbid, long id1, long link_type, long id2,
+  public boolean deleteLink(String dbid, long id1, long link_type, long id2,
                          boolean noinverse, boolean expunge)
     throws Exception {
 
@@ -384,8 +389,10 @@ public class LinkStoreMysql extends GraphStore {
     ResultSet result = stmt.executeQuery(select);
 
     int visibility = -1;
+    boolean found = false;
     while (result.next()) {
       visibility = result.getInt("visibility");
+      found = true;
     }
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
@@ -393,7 +400,7 @@ public class LinkStoreMysql extends GraphStore {
                 id1, link_type, id2, visibility));
     }
 
-    if (visibility == -1) {
+    if (!found) {
       // do nothing
     }
     else if (visibility == VISIBILITY_HIDDEN) {
@@ -459,13 +466,14 @@ public class LinkStoreMysql extends GraphStore {
 
     conn.commit();
     // conn.setAutoCommit(true);
+    return found;
   }
 
 
-  public void updateLink(String dbid, Link l, boolean noinverse)
+  public boolean updateLink(String dbid, Link l, boolean noinverse)
     throws Exception {
-
-    addLink(dbid, l, noinverse);
+    boolean added = addLink(dbid, l, noinverse);
+    return !added; // return rue if updated instead of added
   }
 
 

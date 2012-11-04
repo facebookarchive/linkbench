@@ -195,16 +195,18 @@ public class MemoryLinkStore extends GraphStore {
   }
 
   @Override
-  public void addLink(String dbid, Link a, boolean noinverse) throws Exception {
+  public boolean addLink(String dbid, Link a, boolean noinverse) throws Exception {
     synchronized (linkdbs) {
       SortedSet<Link> links = findLinkByKey(dbid, a.id1, a.link_type, true);
   
+      boolean exists = false;
       // Check for duplicates
       Iterator<Link> it = links.iterator();
       while (it.hasNext()) {
         Link existing = it.next();
         if (existing.id2 == a.id2) {
           it.remove();
+          exists = true;
         }
       }
       // Clone argument before inserting
@@ -212,11 +214,12 @@ public class MemoryLinkStore extends GraphStore {
   
       /*System.err.println(String.format("added link (%d, %d, %d), %d in list",
                 a.id1, a.link_type, a.id2, links.size()));*/
+      return !exists;
     }
   }
 
   @Override
-  public void deleteLink(String dbid, long id1, long link_type, long id2,
+  public boolean deleteLink(String dbid, long id1, long link_type, long id2,
       boolean noinverse, boolean expunge) throws Exception {
     synchronized (linkdbs) {
       //NOTE: does not reclaim space from unused structures
@@ -231,15 +234,16 @@ public class MemoryLinkStore extends GraphStore {
             } else {
               it.remove();
             }
-            return;
+            return true; // found it!
           }
         }
       }
     }
+    return false;
   }
 
   @Override
-  public void updateLink(String dbid, Link a, boolean noinverse)
+  public boolean updateLink(String dbid, Link a, boolean noinverse)
       throws Exception {
     synchronized (linkdbs) {
       SortedSet<Link> linkSet = findLinkByKey(dbid, a.id1, a.link_type, false);
@@ -250,7 +254,7 @@ public class MemoryLinkStore extends GraphStore {
           if (l.id2 == a.id2) {
             it.remove();
             linkSet.add(a.clone());
-            return;
+            return true;
           }
         }
       }

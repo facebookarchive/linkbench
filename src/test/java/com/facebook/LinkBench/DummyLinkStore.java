@@ -101,35 +101,39 @@ public class DummyLinkStore extends GraphStore {
   }
 
   @Override
-  public void addLink(String dbid, Link a, boolean noinverse) throws Exception {
+  public boolean addLink(String dbid, Link a, boolean noinverse) throws Exception {
     checkInitialized();
     adds++;
     if (wrappedStore != null) {
-      wrappedStore.addLink(dbid, a, noinverse);
+      return wrappedStore.addLink(dbid, a, noinverse);
+    } else {
+      return true;
     }
   }
 
   @Override
-  public void deleteLink(String dbid, long id1, long link_type, long id2,
+  public boolean deleteLink(String dbid, long id1, long link_type, long id2,
       boolean noinverse, boolean expunge) throws Exception {
     checkInitialized();
     deletes++;
-    // TODO Auto-generated method stub
 
     if (wrappedStore != null) {
-      wrappedStore.deleteLink(dbid, id1, link_type, id2, noinverse, expunge);
+      return wrappedStore.deleteLink(dbid, id1, link_type, id2, noinverse, expunge);
+    } else {
+      return true;
     }
   }
 
   @Override
-  public void updateLink(String dbid, Link a, boolean noinverse)
+  public boolean updateLink(String dbid, Link a, boolean noinverse)
       throws Exception {
     checkInitialized();
     updates++;
-    // TODO Auto-generated method stub
 
     if (wrappedStore != null) {
-      wrappedStore.updateLink(dbid, a, noinverse);
+      return wrappedStore.updateLink(dbid, a, noinverse);
+    } else {
+      return true;
     }
   }
 
@@ -150,7 +154,6 @@ public class DummyLinkStore extends GraphStore {
       throws Exception {
     checkInitialized();
     getLinks++;
-    // TODO Auto-generated method stub
     if (wrappedStore != null) {
       return wrappedStore.getLink(dbid, id1, link_type, id2);
     } else {
@@ -163,7 +166,6 @@ public class DummyLinkStore extends GraphStore {
       throws Exception {
     checkInitialized();
     getLinkLists++;
-    // TODO Auto-generated method stub
     if (wrappedStore != null) {
       return wrappedStore.getLinkList(dbid, id1, link_type);
     } else {
@@ -191,7 +193,6 @@ public class DummyLinkStore extends GraphStore {
       throws Exception {
     checkInitialized();
     countLinks++;
-    // TODO Auto-generated method stub
     if (wrappedStore != null) {
       return wrappedStore.countLinks(dbid, id1, link_type);
     } else {
