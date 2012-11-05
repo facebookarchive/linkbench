@@ -51,7 +51,6 @@ Execute the following commands in the database:
       `time` bigint(20) unsigned NOT NULL DEFAULT '0',
       `version` int(11) unsigned NOT NULL DEFAULT '0',
       PRIMARY KEY (`id1`,`id2`,`link_type`),
-      KEY `id2_vis` (`id2`,`visibility`),
       KEY `id1_type` (`id1`,`link_type`,`visibility`,`time`,`version`,`data`)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
@@ -86,7 +85,7 @@ Loading LinkBench Data:
 In the MySql shell, you can make these optional temporary changes to
 speed up the loading process:
 
-    mysql> alter table linktable drop key `id2_vis`, drop key `id1_type`;
+    mysql> alter table linktable drop key `id1_type`;
            set global innodb_flush_log_at_trx_commit = 2;
            set global sync_binlog = 0;
 
@@ -115,7 +114,7 @@ make sure that data loaded correctly.
 IF YOU PERFORMED THE PRIOR OPTIMIZATIONS FOR LOADING, REVERT THESE NOW:
     mysql> set global innodb_flush_log_at_trx_commit = 1;
            set global sync_binlog = 1;
-           alter table linktable add key `id2_vis` (`id2`,`visibility`), add key `id1_type`(`id1`,`link_type`,`visibility`,`time`,`version`,`data`);
+           alter table linktable add key `id1_type`(`id1`,`link_type`,`visibility`,`time`,`version`,`data`);
 
 The last alter table statement will take about 30 minutes.  Once it
 finishes you can check the on-disk size of the MySql database:

@@ -64,7 +64,6 @@ public class MySqlTestConfig {
         "`time` bigint(20) unsigned NOT NULL DEFAULT '0'," +
         "`version` int(11) unsigned NOT NULL DEFAULT '0'," +
         "PRIMARY KEY (`id1`,`id2`,`link_type`)," +
-        "KEY `id2_vis` (`id2`,`visibility`)," +
         "KEY `id1_type` (`id1`,`link_type`,`visibility`,`time`,`version`,`data`)" +
         ") ENGINE=InnoDB DEFAULT CHARSET=latin1;", 
         testDB, MySqlTestConfig.linktable));
