@@ -18,6 +18,18 @@ import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
  */
 public class ID2Chooser {
 
+  /*
+   * Constants controlling the desired probability of a link for (id1, link_type, id2)
+   * existing for a given operation.  must be > 0
+   */
+  public static final double P_GET_EXIST = 0.5; // Mix of new and pre-loaded
+  public static final double P_UPDATE_EXIST = 0.9; // Mostly pre-loaded
+  public static final double P_DELETE_EXIST = 0.9;
+  public static final double P_ADD_EXIST = 0.05; // Avoid colliding with pre-loaded too much
+  
+  // How many times to try to find a unique id2
+  private static final int MAX_UNIQ_ITERS = 100;
+  
   private final long startid1;
   private long maxid1;
 
@@ -87,14 +99,79 @@ public class ID2Chooser {
   public long chooseForOp(Random rng, long id1, long linkType, 
                                                 double pExisting) {
     long nlinks = calcLinkCount(id1, linkType);
-  
+    long range = calcID2Range(pExisting, nlinks);
+    return chooseForOpInternal(rng, id1, range);
+  }
+
+
+  public long[] chooseMultipleForOp(Random rng, long id1, long linkType,
+      int nid2s, double pExisting) {
+    long id2s[] = new long[nid2s];
+    long nlinks = calcLinkCount(id1, linkType);
+    long range = calcID2Range(pExisting, nlinks);
+    if (range <= nid2s && randomid2max == 0) {
+      // Range is smaller than required # of ids, fill in all from range
+      for (int i = 0; i < nid2s; i++) {
+        long id2 = id1 + i;
+        if (id2gen_config == 1) {
+          id2 = fixId2(id2, nrequesters, requesterID, randomid2max);
+        }
+        id2s[i] =  id2;
+      }
+    } else {
+      for (int i = 0; i < nid2s; i++) {
+        long id2;
+        int iters = 0; // avoid long or infinite loop
+        do {
+          // Find a unique id2
+          id2 = chooseForOpInternal(rng, id1, range);
+          iters++;
+        } while (contains(id2s, i, id2) && iters <= MAX_UNIQ_ITERS);
+        id2s[i] = id2;
+      }
+    }
+    
+    return id2s;
+  }
+
+  /**
+   * Check if id2 is in first n elements of id2s 
+   * @param id2s
+   * @param i
+   * @param id2
+   * @return
+   */
+  private boolean contains(long[] id2s, int n, long id2) {
+    for (int i = 0; i < n; i++) {
+      if (id2s[i] == id2) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
+  private long calcID2Range(double pExisting, long nlinks) {
+    long range = (long) Math.ceil((1/pExisting) * nlinks);
+    range = Math.max(1, range);// Ensure non-empty range
+    return range;
+  }
+
+
+  /**
+   * Internal helper to choose id
+   * @param rng
+   * @param id1 
+   * @param range range size of id2s to select within
+   * @return
+   */
+  private long chooseForOpInternal(Random rng, long id1, long range) {
+    assert(range >= 1);
     // We want to sometimes add a link that already exists and sometimes
     // add a new link. So generate id2 such that it has roughly pExisting 
     // chance of already existing.
     // This happens unless randomid2max is non-zero (in which case just pick a 
-    // random id2 upto randomid2max). 
-    long range = (long) Math.round((1/pExisting) * nlinks);
-    range = Math.max(range, 1); // Ensure non-empty range
+    // random id2 upto randomid2max).
     long id2; 
     if (randomid2max == 0) {
       id2 = id1 + rng.nextInt((int)range);

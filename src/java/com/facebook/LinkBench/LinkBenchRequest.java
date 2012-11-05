@@ -462,7 +462,8 @@ public class LinkBenchRequest implements Runnable {
         type = LinkBenchOp.ADD_LINK;
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
         link.link_type = id2chooser.chooseRandomLinkType(rng);
-        link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type, 0.1);
+        link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type,
+                                                ID2Chooser.P_ADD_EXIST);
         link.id1_type = LinkStore.ID1_TYPE;
         link.id2_type = LinkStore.ID2_TYPE;
         link.visibility = LinkStore.VISIBILITY_DEFAULT;
@@ -484,7 +485,8 @@ public class LinkBenchRequest implements Runnable {
         type = LinkBenchOp.DELETE_LINK;
         long id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
         long link_type = id2chooser.chooseRandomLinkType(rng);
-        long id2 = id2chooser.chooseForOp(rng, id1, link_type, 1.0);
+        long id2 = id2chooser.chooseForOp(rng, id1, link_type,
+                                          ID2Chooser.P_DELETE_EXIST);
         starttime = System.nanoTime();
         linkStore.deleteLink(dbid, id1, link_type, id2,
          true, // no inverse
@@ -499,7 +501,8 @@ public class LinkBenchRequest implements Runnable {
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
         link.link_type = id2chooser.chooseRandomLinkType(rng);
         // Update one of the existing links
-        link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type, 0.5);
+        link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type,
+                                              ID2Chooser.P_UPDATE_EXIST);
         link.id1_type = LinkStore.ID1_TYPE;
         link.id2_type = LinkStore.ID2_TYPE;
         link.visibility = LinkStore.VISIBILITY_DEFAULT;
@@ -540,10 +543,8 @@ public class LinkBenchRequest implements Runnable {
         if (multigetDist != null) { 
           nid2s = (int)multigetDist.choose(rng);
         }
-        long id2s[] = new long[nid2s];
-        for (int i = 0; i < nid2s; i++) {
-          id2s[i] = id2chooser.chooseForOp(rng, id1, link_type, 0.5); 
-        } 
+        long id2s[] = id2chooser.chooseMultipleForOp(rng, id1, link_type, nid2s,
+                                                 ID2Chooser.P_GET_EXIST);
 
         starttime = System.nanoTime();
         int found = getLink(id1, link_type, id2s);
