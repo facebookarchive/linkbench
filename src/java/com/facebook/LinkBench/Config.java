@@ -113,6 +113,10 @@ public class Config {
   public static final String DISPLAY_FREQ = "displayfreq";
   public static final String MAPRED_REPORT_PROGRESS = "reportprogress";
   public static final String PROGRESS_FREQ = "progressfreq";
+  
+  /* Reporting for progress indicators */
+  public static String REQ_PROG_INTERVAL = "req_progress_interval";
+  public static String LOAD_PROG_INTERVAL = "load_progress_interval";
       
   /* MapReduce specific configuration */
   public static final String TEMPDIR = "tempdir";

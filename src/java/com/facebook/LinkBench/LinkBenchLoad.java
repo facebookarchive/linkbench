@@ -23,13 +23,13 @@ import com.facebook.LinkBench.util.ClassLoadUtil;
 
 
 /*
- * TODO: update to reflect changes
- * Muli-threaded loader for loading data into hbase.
- * The range from startid1 to maxid1 is chunked up into equal sized
- * disjoint ranges so that each loader can work on its range.
- * The #links generated for an id1 is random but based on probablities
- * given in nlinks_choices and odds_in_billion. The actual counts of
- * #links generated is tracked in nlinks_counts.
+ * Multi-threaded loader for loading graph edges (but not nodes) into
+ * LinkStore. The range from startid1 to maxid1 is chunked up into equal sized
+ * disjoint ranges.  These are then enqueued for processing by a number
+ * of loader threads to be loaded in parallel. The #links generated for 
+ * an id1 is based on the configured distribution.  The # of link types,
+ * and link payload data is also controlled by the configuration file.
+ *  The actual counts of #links generated is tracked in nlinks_counts.
  */
 
 public class LinkBenchLoad implements Runnable {
@@ -207,7 +207,7 @@ public class LinkBenchLoad implements Runnable {
     }
     
     if (!singleAssoc) {
-      logger.info(" Same shuffle = " + sameShuffle +
+      logger.debug(" Same shuffle = " + sameShuffle +
                          " Different shuffle = " + diffShuffle);
       if (bulkLoad) {
         stats.displayStats(System.currentTimeMillis(), 
@@ -532,17 +532,29 @@ public class LinkBenchLoad implements Runnable {
     }
   }
   public static class LoadProgress {
-    // TODO: hardcoded
-    private static final long PROGRESS_REPORT_INTERVAL = 50000;
+    /** report progress at intervals of progressReportInterval links */
+    private final long progressReportInterval;
     
-    public LoadProgress(Logger progressLogger, long id1s_total) {
+    public LoadProgress(Logger progressLogger,
+                        long id1s_total, long progressReportInterval) {
       super();
+      this.progressReportInterval = progressReportInterval;
       this.progressLogger = progressLogger;
       this.id1s_total = id1s_total;
       this.starttime_ms = 0;
       this.id1s_loaded = new AtomicLong();
       this.links_loaded = new AtomicLong();
     }
+    
+    public static LoadProgress create(Logger progressLogger, Properties props) {
+      long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
+      long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
+      long nids = maxid1 - startid1;
+      long progressReportInterval = ConfigUtil.getLong(props, 
+                           Config.LOAD_PROG_INTERVAL, 50000L);
+      return new LoadProgress(progressLogger, nids, progressReportInterval);
+    }
+    
     private final Logger progressLogger;
     private final AtomicLong id1s_loaded; // progress
     private final AtomicLong links_loaded; // progress
@@ -565,8 +577,8 @@ public class LinkBenchLoad implements Runnable {
       long curr_links = links_loaded.addAndGet(links_incr);
       long prev_links = curr_links - links_incr;
       
-      if ((curr_links / PROGRESS_REPORT_INTERVAL) >
-          (prev_links / PROGRESS_REPORT_INTERVAL) || curr_id1s == id1s_total) {
+      if ((curr_links / progressReportInterval) >
+          (prev_links / progressReportInterval) || curr_id1s == id1s_total) {
         double percentage = (curr_id1s / (double)id1s_total) * 100.0;
 
         // Links per second loaded

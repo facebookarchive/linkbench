@@ -81,6 +81,5 @@ unset IFS
 CLASS='com.facebook.LinkBench.LinkBenchDriver'
 
 # run it
-set -x
 exec "$JAVA" $JAVA_HEAP_MAX $OPTS $JMX_OPTS -classpath "$CLASSPATH" $CLASS \
           "$@"

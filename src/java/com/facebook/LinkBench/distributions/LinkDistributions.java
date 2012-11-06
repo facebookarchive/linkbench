@@ -16,8 +16,7 @@ public class LinkDistributions {
     public abstract long getNlinks(long id1);
     
     /**
-     * TODO:
-     * This is a hack to let caller know it should shuffle IDs
+     * Let caller know it should shuffle IDs
      * @return
      */
     public boolean doShuffle();

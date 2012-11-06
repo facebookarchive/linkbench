@@ -902,8 +902,8 @@ public class LinkBenchRequest implements Runnable {
   public static class RequestProgress {
     // How many ops before a thread should register its progress
     static final int THREAD_REPORT_INTERVAL = 250;
-    // How many ops before a progress update should be printed to console
-    private static final int PROGRESS_PRINT_INTERVAL = 10000;
+    /** How many ops before a progress update should be printed to console */
+    private final long interval;
     
     private final Logger progressLogger;
     
@@ -913,8 +913,9 @@ public class LinkBenchRequest implements Runnable {
     private long startTime;
     private long timeLimit_s;
 
-    public RequestProgress(Logger progressLogger,
-                      long totalRequests, long timeLimit) {
+    public RequestProgress(Logger progressLogger, long totalRequests,
+                            long timeLimit, long interval) {
+      this.interval = interval;
       this.progressLogger = progressLogger;
       this.totalRequests = totalRequests;
       this.requestsDone = new AtomicLong();
@@ -930,7 +931,6 @@ public class LinkBenchRequest implements Runnable {
       long curr = requestsDone.addAndGet(requestIncr);
       long prev = curr - requestIncr;
       
-      long interval = PROGRESS_PRINT_INTERVAL;
       if ((curr / interval) > (prev / interval) || curr == totalRequests) {
         float progressPercent = ((float) curr) / totalRequests * 100;
         long now = System.currentTimeMillis();
@@ -952,8 +952,10 @@ public class LinkBenchRequest implements Runnable {
        Properties props) {
     long total_requests = ConfigUtil.getLong(props, Config.NUM_REQUESTS)
                       * ConfigUtil.getLong(props, Config.NUM_REQUESTERS);
+    long progressInterval = ConfigUtil.getLong(props, Config.REQ_PROG_INTERVAL,
+                                               10000L);
     return new RequestProgress(logger, total_requests,
-        ConfigUtil.getLong(props, Config.MAX_TIME));
+        ConfigUtil.getLong(props, Config.MAX_TIME), progressInterval);
   }
 }
 

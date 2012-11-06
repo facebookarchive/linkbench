@@ -187,7 +187,7 @@ public class LinkBenchDriver {
     LatencyStats latencyStats = new LatencyStats(nTotalLoaders);
     List<Runnable> loaders = new ArrayList<Runnable>(nTotalLoaders);
     
-    LoadProgress loadTracker = new LoadProgress(logger, maxid1 - startid1); 
+    LoadProgress loadTracker = LoadProgress.create(logger, props); 
     for (int i = 0; i < nLinkLoaders; i++) {
       LinkStore linkStore = createLinkStore();
       
@@ -211,18 +211,14 @@ public class LinkBenchDriver {
 
     // run loaders
     loadTracker.startTimer();
-    long loadtime = concurrentExec(loaders);
+    long loadTime = concurrentExec(loaders);
 
-    // compute total #links loaded
-    int nlinks_default = ConfigUtil.getInt(props, Config.NLINKS_DEFAULT);
-
-    long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
     long expectedNodes = maxid1 - startid1;
-    long actuallinks = 0;
+    long actualLinks = 0;
     long actualNodes = 0;
     for (final Runnable l:loaders) {
       if (l instanceof LinkBenchLoad) {
-        actuallinks += ((LinkBenchLoad)l).getLinksLoaded();
+        actualLinks += ((LinkBenchLoad)l).getLinksLoaded();
       } else {
         assert(l instanceof NodeLoader);
         actualNodes += ((NodeLoader)l).getNodesLoaded();
@@ -235,12 +231,14 @@ public class LinkBenchDriver {
       latencyStats.printCSVStats(csvStatsFile, true);
     }
     
-    logger.info("LOAD PHASE COMPLETED. Loaded " + actualNodes + "/" + 
-          expectedNodes + " nodes. " +
-          "Expected to load " + expectedlinks + " links. " +
-           actuallinks + " links loaded in " + (loadtime/1000) 
-           + " seconds." + "Links/second = " + ((1000*actuallinks)/loadtime));
-
+    double loadTime_s = (loadTime/1000.0);
+    logger.info(String.format("LOAD PHASE COMPLETED. " +
+        " Loaded %d nodes (Expected %d)." +
+        " Loaded %d links (%.2f links per node). " + 
+        " Took %.1f seconds.  Links/second = %d", 
+        actualNodes, expectedNodes, actualLinks,
+        actualLinks / (double) actualNodes, loadTime_s,
+        (long) Math.round(actualLinks / loadTime_s)));
   }
 
   /**
@@ -352,8 +350,8 @@ public class LinkBenchDriver {
     }
     
     logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
-                       " requests done in " + (requesttime/1000) + " seconds." +
-                       "Requests/second = " + (1000*requestsdone)/requesttime);
+                 " requests done in " + (requesttime/1000) + " seconds." +
+                 " Requests/second = " + (1000*requestsdone)/requesttime);
     if (abortedRequesters > 0) {
       logger.error(String.format("Benchmark did not complete cleanly: %d/%d " +
       		"request threads aborted.  See error log entries for details.",

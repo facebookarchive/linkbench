@@ -579,12 +579,12 @@ public abstract class LinkStoreTestBase extends TestCase {
   
       DummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);
-      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1000);
       
       LinkBenchRequest requester = new LinkBenchRequest(reqStore,
                       null, props, latencyStats, System.out, tracker, rng,
                       0, 1);
-      
+      tracker.startTimer();
       requester.run();
       latencyStats.displayLatencyStats();
       latencyStats.printCSVStats(System.out, true);
@@ -638,7 +638,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       Random rng = createRNG();
       
       serialLoad(rng, logger, props, getStoreHandle(false));
-      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1000);
       
       DummyLinkStore reqStore = getStoreHandle(false);
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
@@ -646,6 +646,7 @@ public abstract class LinkStoreTestBase extends TestCase {
                       rng, 0, 1);
       
       long startTime = System.currentTimeMillis();
+      tracker.startTimer();
       requester.run();
       long endTime = System.currentTimeMillis();
       
@@ -696,7 +697,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       Random rng = createRNG();
       
       serialLoad(rng, logger, props, getStoreHandle(false));
-      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit);
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1000);
       
       DummyLinkStore reqStore = getStoreHandle(false);
       reqStore.setRangeLimit(rangeLimit); // Small limit for testing
@@ -704,6 +705,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
                       props, latencyStats, System.out, tracker, rng, 0, 1);
 
+      tracker.startTimer();
       requester.run();
       latencyStats.displayLatencyStats();
       
@@ -772,7 +774,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     chunk_q.add(LoadChunk.SHUTDOWN);
     
     
-    LoadProgress tracker = new LoadProgress(logger, idCount);
+    LoadProgress tracker = new LoadProgress(logger, idCount, 1000);
     tracker.startTimer();
     LinkBenchLoad loader = new LinkBenchLoad(store, 
         props, latencyStats, System.out, 0, false, chunk_q, tracker);

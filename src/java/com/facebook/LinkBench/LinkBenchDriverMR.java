@@ -310,8 +310,8 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
       long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
       
-      LoadProgress prog_tracker = new LoadProgress(
-          Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER), maxid1 - startid1);
+      LoadProgress prog_tracker = LoadProgress.create(
+            Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER), props);
       
       LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats, 
                                null,
