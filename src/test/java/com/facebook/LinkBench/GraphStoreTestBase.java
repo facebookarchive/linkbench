@@ -164,7 +164,7 @@ public abstract class GraphStoreTestBase extends TestCase {
   
       DummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);
-      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 10000);
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1, 10000);
       
       // Test both link and node requests
       LinkBenchRequest requester = new LinkBenchRequest(reqStore,

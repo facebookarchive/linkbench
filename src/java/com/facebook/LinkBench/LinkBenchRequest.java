@@ -31,20 +31,28 @@ public class LinkBenchRequest implements Runnable {
   
   RequestProgress progressTracker;
 
-  long nrequests;
+  long numRequests;
   /** Requests per second: <= 0 for unlimited rate */
   private long requestrate;
   
   /** Maximum number of failed requests: < 0 for unlimited */
   private long maxFailedRequests;
   
-  long maxtime;
+  /** 
+   * Time to run benchmark for before collecting stats. Allows
+   * caches, etc to warm up.
+   */
+  private long warmupTime;
+  
+  /** Maximum time to run benchmark for, not including warmup time */
+  long maxTime;
   int nrequesters;
   int requesterID;
   long maxid1;
   long startid1;
   Level debuglevel;
-  long progressfreq_ms;
+  long displayFreq_ms;
+  long progressFreq_ms;
   String dbid;
   boolean singleAssoc = false;
 
@@ -134,7 +142,7 @@ public class LinkBenchRequest implements Runnable {
   // Last node id accessed
   long lastNodeId;
   
-  long requestsdone = 0;
+  long requestsDone = 0;
   long errors = 0;
   boolean aborted;
 
@@ -176,10 +184,11 @@ public class LinkBenchRequest implements Runnable {
 
     debuglevel = ConfigUtil.getDebugLevel(props);
     dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
-    nrequests = ConfigUtil.getLong(props, Config.NUM_REQUESTS);
+    numRequests = ConfigUtil.getLong(props, Config.NUM_REQUESTS);
     requestrate = ConfigUtil.getLong(props, Config.REQUEST_RATE, 0L);
     maxFailedRequests = ConfigUtil.getLong(props,  Config.MAX_FAILED_REQUESTS, 0L);
-    maxtime = ConfigUtil.getLong(props, Config.MAX_TIME);
+    warmupTime = Math.max(0, ConfigUtil.getLong(props, Config.WARMUP_TIME, 0L));
+    maxTime = ConfigUtil.getLong(props, Config.MAX_TIME);
     maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
     startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
 
@@ -210,10 +219,10 @@ public class LinkBenchRequest implements Runnable {
       initNodeRequestDistributions(props);
     }
 
-    long displayfreq = ConfigUtil.getLong(props, Config.DISPLAY_FREQ);
-    progressfreq_ms = ConfigUtil.getLong(props, Config.PROGRESS_FREQ, 6L) * 1000;
+    displayFreq_ms = ConfigUtil.getLong(props, Config.DISPLAY_FREQ, 60L) * 1000;
+    progressFreq_ms = ConfigUtil.getLong(props, Config.PROGRESS_FREQ, 6L) * 1000;
     int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
-    stats = new SampledStats(requesterID, displayfreq, maxsamples, csvStreamOut);
+    stats = new SampledStats(requesterID, maxsamples, csvStreamOut);
    
     listTailHistoryLimit = 2048; // Hardcoded limit for now
     listTailHistory = new ArrayList<Link>(listTailHistoryLimit);
@@ -381,7 +390,7 @@ public class LinkBenchRequest implements Runnable {
   }
 
   public long getRequestsDone() {
-    return requestsdone;
+    return requestsDone;
   }
   
   public boolean didAbort() {
@@ -441,12 +450,11 @@ public class LinkBenchRequest implements Runnable {
   }
 
   /**
-   * Randomly choose a single request and execute it, updating
-   * statistics
-   * @param requestno
+   * Randomly choose a single request and execute it, updating statistics
+   * @param recordStats If true, record latency and other stats.
    * @return true if successful, false on error
    */
-  private boolean onerequest(long requestno) {
+  private boolean oneRequest(boolean recordStats) {
 
     double r = rng.nextDouble() * 100.0;
 
@@ -574,7 +582,9 @@ public class LinkBenchRequest implements Runnable {
         }
         
         int count = ((links == null) ? 0 : links.length);
-        stats.addStats(LinkBenchOp.RANGE_SIZE, count, false);
+        if (recordStats) {
+          stats.addStats(LinkBenchOp.RANGE_SIZE, count, false);
+        }
       } else if (r <= pc_addnode) {
         type = LinkBenchOp.ADD_NODE;
         Node newNode = createAddNode();
@@ -636,10 +646,12 @@ public class LinkBenchRequest implements Runnable {
       // convert to microseconds
       long timetaken = (endtime - starttime)/1000;
 
-      // record statistics
-      stats.addStats(type, timetaken, false);
-      latencyStats.recordLatency(requesterID, type, timetaken);
-
+      if (recordStats) {
+        // record statistics
+        stats.addStats(type, timetaken, false);
+        latencyStats.recordLatency(requesterID, type, timetaken);
+      }
+      
       return true;
     } catch (Throwable e){//Catch exception if any
 
@@ -649,8 +661,9 @@ public class LinkBenchRequest implements Runnable {
 
       logger.error(type.displayName() + " error " +
                          e.getMessage(), e);
-
-      stats.addStats(type, timetaken2, true);
+      if (recordStats) {
+        stats.addStats(type, timetaken2, true);
+      }
       linkStore.clearErrors(requesterID);
       return false;
     }
@@ -680,7 +693,7 @@ public class LinkBenchRequest implements Runnable {
   @Override
   public void run() {
     logger.info("Requester thread #" + requesterID + " started: will do "
-        + nrequests + " ops.");
+        + numRequests + " ops after " + warmupTime + " second warmup");
     logger.debug("Requester thread #" + requesterID + " first random number "
                   + rng.nextLong());
     
@@ -694,10 +707,18 @@ public class LinkBenchRequest implements Runnable {
       throw new RuntimeException(e);
     }
     
-    long starttime = System.currentTimeMillis();
-    long endtime = starttime + maxtime * 1000;
-    long lastupdate = starttime;
-    long curtime = 0;
+    long warmupStartTime = System.currentTimeMillis();
+    boolean warmupDone = warmupTime <= 0;
+    long benchmarkStartTime; 
+    if (!warmupDone) {
+      benchmarkStartTime = warmupStartTime + warmupTime * 1000;
+    } else {
+      benchmarkStartTime = warmupStartTime;
+    }
+    long endTime = benchmarkStartTime + maxTime * 1000;
+    long lastUpdate = warmupStartTime;
+    long curTime = warmupStartTime;
+    
     long i;
 
     if (singleAssoc) {
@@ -709,16 +730,15 @@ public class LinkBenchRequest implements Runnable {
         link.id1 = 46;
         type = LinkBenchOp.ADD_LINK;
         // no inverses for now
-        boolean alreadyExists = linkStore.addLink(dbid, link, true);
-        boolean addLink = !alreadyExists;
+        linkStore.addLink(dbid, link, true);
 
         // read this assoc from the database over and over again
         type = LinkBenchOp.MULTIGET_LINK;
-        for (i = 0; i < nrequests; i++) {
+        for (i = 0; i < numRequests; i++) {
           int found = getLink(link.id1, link.link_type,
                                   new long[]{link.id2});
           if (found == 1) {
-            requestsdone++;
+            requestsDone++;
           } else {
             logger.warn("ThreadID = " + requesterID +
                                " not found link for id1=45");
@@ -732,60 +752,107 @@ public class LinkBenchRequest implements Runnable {
       return;
     }
     
-    int requestsSinceLastUpdate = 0;
+    long warmupRequests = 0;
+    long requestsSinceLastUpdate = 0;
+    long lastStatDisplay_ms = curTime;
     long reqTime_ns = System.nanoTime();
     double requestrate_ns = ((double)requestrate)/1e9;
-    for (i = 0; i < nrequests; i++) {
+    while (requestsDone < numRequests) {
       if (requestrate > 0) {
         reqTime_ns = Timer.waitExpInterval(rng, reqTime_ns, requestrate_ns);
       }
-      boolean success = onerequest(i);
-      requestsdone++;
+      boolean success = oneRequest(warmupDone);
       if (!success) {
         errors++;
         if (maxFailedRequests >= 0 && errors > maxFailedRequests) {
           logger.error(String.format("Requester #%d aborting: %d failed requests" +
-          		" (out of %d total) ", requesterID, errors, requestsdone));
+          		" (out of %d total) ", requesterID, errors, requestsDone));
           aborted = true;
           return;
         }
       }
       
-      curtime = System.currentTimeMillis();
+      curTime = System.currentTimeMillis();
       
-      if (curtime > lastupdate + progressfreq_ms) {
-        logger.info(String.format("Requester #%d %d/%d requests done",
-            requesterID, requestsdone, nrequests));
-        lastupdate = curtime;
+      // Track requests done
+      if (warmupDone) {
+        requestsDone++;
+        requestsSinceLastUpdate++;
+        if (requestsSinceLastUpdate >= RequestProgress.THREAD_REPORT_INTERVAL) {
+          progressTracker.update(requestsSinceLastUpdate);
+          requestsSinceLastUpdate = 0;
+        }
+      } else {
+        warmupRequests++;
       }
       
-      requestsSinceLastUpdate++;
-      if (curtime > endtime) {
-        break;
+      // Per-thread periodic progress updates
+      if (curTime > lastUpdate + progressFreq_ms) {
+        if (warmupDone) {
+          logger.info(String.format("Requester #%d %d/%d requests done",
+              requesterID, requestsDone, numRequests));
+          lastUpdate = curTime;
+        } else {
+          logger.info(String.format("Requester #%d warming up.  " +
+          		" %d warmup requests done. %d/%d seconds of warmup done",
+              requesterID, warmupRequests, (curTime - warmupStartTime) / 1000,
+              warmupTime));
+          lastUpdate = curTime;
+        }
       }
-      if (requestsSinceLastUpdate >= RequestProgress.THREAD_REPORT_INTERVAL) {
-        progressTracker.update(requestsSinceLastUpdate);
+      
+      // Per-thread periodic stat dumps after warmup done
+      if (warmupDone && (lastStatDisplay_ms + displayFreq_ms) <= curTime) {
+        displayStats(lastStatDisplay_ms, curTime);
+        stats.resetSamples();
+        lastStatDisplay_ms = curTime;
+      }
+
+      // Check if warmup completed
+      if (!warmupDone && curTime >= benchmarkStartTime) {
+        warmupDone = true;
+        lastUpdate = curTime;
+        lastStatDisplay_ms = curTime;
         requestsSinceLastUpdate = 0;
+        logger.info(String.format("Requester #%d warmup finished " +
+        		" after %d warmup requests.  0/%d requests done",
+            requesterID, warmupRequests, numRequests));
+        lastUpdate = curTime;
+      }
+      
+      // Enforce time limit
+      if (curTime > endTime) {
+        logger.info(String.format("Requester #%d: time limit of %ds elapsed" +
+              ", shutting down.", requesterID, maxTime));
+        break;
       }
     }
     
+    // Do final update of statistics
     progressTracker.update(requestsSinceLastUpdate);
+    displayStats(lastStatDisplay_ms, System.currentTimeMillis());
+    
+    // Report final stats
+    logger.info("ThreadID = " + requesterID +
+                       " total requests = " + requestsDone +
+                       " requests/second = " + ((1000 * requestsDone)/
+                                                Math.max(1, (endTime - benchmarkStartTime))) +
+                       " found = " + numfound +
+                       " not found = " + numnotfound +
+                       " history queries = " + numHistoryQueries + "/" +
+                                   stats.getCount(LinkBenchOp.GET_LINKS_LIST));
 
-    stats.displayStats(System.currentTimeMillis(), Arrays.asList(
+  }
+
+  private void displayStats(long lastStatDisplay_ms, long now_ms) {
+    stats.displayStats(lastStatDisplay_ms, now_ms,
+        Arrays.asList(
         LinkBenchOp.MULTIGET_LINK, LinkBenchOp.GET_LINKS_LIST,
         LinkBenchOp.COUNT_LINK,
         LinkBenchOp.UPDATE_LINK, LinkBenchOp.ADD_LINK, 
         LinkBenchOp.RANGE_SIZE, LinkBenchOp.ADD_NODE,
         LinkBenchOp.UPDATE_NODE, LinkBenchOp.DELETE_NODE,
         LinkBenchOp.GET_NODE));
-    logger.info("ThreadID = " + requesterID +
-                       " total requests = " + i +
-                       " requests/second = " + ((1000 * i)/(curtime - starttime)) +
-                       " found = " + numfound +
-                       " not found = " + numnotfound +
-                       " history queries = " + numHistoryQueries + "/" +
-                                   stats.getCount(LinkBenchOp.GET_LINKS_LIST));
-
   }
 
   int getLink(long id1, long link_type, long id2s[]) throws Exception {
@@ -910,23 +977,28 @@ public class LinkBenchRequest implements Runnable {
     private long totalRequests;
     private final AtomicLong requestsDone;
     
-    private long startTime;
+    private long benchmarkStartTime;
+    private long warmupTime_s;
     private long timeLimit_s;
 
     public RequestProgress(Logger progressLogger, long totalRequests,
-                            long timeLimit, long interval) {
+                            long timeLimit_s, long warmupTime_s, long interval) {
       this.interval = interval;
       this.progressLogger = progressLogger;
       this.totalRequests = totalRequests;
       this.requestsDone = new AtomicLong();
-      this.timeLimit_s = timeLimit;
-      this.startTime = 0;
+      this.timeLimit_s = timeLimit_s;
+      this.warmupTime_s = warmupTime_s;
     }
     
     public void startTimer() {
-      startTime = System.currentTimeMillis();
+      benchmarkStartTime = System.currentTimeMillis() + warmupTime_s * 1000;
     }
     
+    public long getBenchmarkStartTime() {
+      return benchmarkStartTime;
+    }
+
     public void update(long requestIncr) {
       long curr = requestsDone.addAndGet(requestIncr);
       long prev = curr - requestIncr;
@@ -934,7 +1006,7 @@ public class LinkBenchRequest implements Runnable {
       if ((curr / interval) > (prev / interval) || curr == totalRequests) {
         float progressPercent = ((float) curr) / totalRequests * 100;
         long now = System.currentTimeMillis();
-        long elapsed = now - startTime;
+        long elapsed = now - benchmarkStartTime;
         float elapsed_s = ((float) elapsed) / 1000;
         float limitPercent = (elapsed_s / ((float) timeLimit_s)) * 100;
         float rate = curr / ((float)elapsed_s);
@@ -954,8 +1026,10 @@ public class LinkBenchRequest implements Runnable {
                       * ConfigUtil.getLong(props, Config.NUM_REQUESTERS);
     long progressInterval = ConfigUtil.getLong(props, Config.REQ_PROG_INTERVAL,
                                                10000L);
+    long warmupTime = ConfigUtil.getLong(props, Config.WARMUP_TIME, 0L);
+    long maxTime = ConfigUtil.getLong(props, Config.MAX_TIME);
     return new RequestProgress(logger, total_requests,
-        ConfigUtil.getLong(props, Config.MAX_TIME), progressInterval);
+              maxTime, warmupTime, progressInterval);
   }
 }
 

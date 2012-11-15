@@ -47,6 +47,14 @@ public class NodeLoader implements Runnable {
   /** Next node count to report on */
   private long nextReport = 0;
   
+
+  /** Last time stat update displayed */
+  private long lastDisplayTime_ms;
+
+  /** How often to display stat updates */
+  private final long displayFreq_ms;
+  
+  
   public NodeLoader(Properties props, Logger logger,
       NodeStore nodeStore, Random rng,
       LatencyStats latencyStats, PrintStream csvStreamOut, int loaderId) {
@@ -78,9 +86,9 @@ public class NodeLoader implements Runnable {
     dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
     
 
-    long displayfreq = ConfigUtil.getLong(props, Config.DISPLAY_FREQ);
+    displayFreq_ms = ConfigUtil.getLong(props, Config.DISPLAY_FREQ) * 1000;
     int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
-    this.stats = new SampledStats(loaderId, displayfreq, maxsamples, csvStreamOut);
+    this.stats = new SampledStats(loaderId, maxsamples, csvStreamOut);
   }
 
   @Override
@@ -111,16 +119,28 @@ public class NodeLoader implements Runnable {
     totalNodes = maxId - startId;
     nextReport = startId + REPORT_INTERVAL;
     startTime_ms = System.currentTimeMillis();
+    lastDisplayTime_ms = startTime_ms;
     for (long id = startId; id < maxId; id++) {
       genNode(rng, id, nodeLoadBuffer, bulkLoadBatchSize);
       
+      long now = System.currentTimeMillis();
+      if (lastDisplayTime_ms + displayFreq_ms <= now) {
+        displayAndResetStats();
+      }
     }
     // Load any remaining data
     loadNodes(nodeLoadBuffer);
     
     logger.info("Loading of nodes [" + startId + "," + maxId + ") done");
-    stats.displayStats(System.currentTimeMillis(), 
+    displayAndResetStats();
+  }
+
+  private void displayAndResetStats() {
+    long now = System.currentTimeMillis();
+    stats.displayStats(lastDisplayTime_ms, now, 
                        Arrays.asList(LinkBenchOp.LOAD_NODE_BULK));
+    stats.resetSamples();
+    lastDisplayTime_ms = now;
   }
 
   /**

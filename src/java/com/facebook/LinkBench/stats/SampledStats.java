@@ -47,13 +47,7 @@ public class SampledStats {
 
   // #errors encountered per type
   private long errors[];
-
-  // stats displayed after this many seconds
-  private long displayfreq;
-
-  // time at which we displayed stats
-  private long lastdisplaytime;
-
+  
   // Displayed along with stats
   private int threadID;
   
@@ -66,10 +60,8 @@ public class SampledStats {
   private Random rng;
 
   public SampledStats(int input_threadID,
-                        long input_displayfreq,
                         int input_maxsamples, PrintStream csvOutput) {
     threadID = input_threadID;
-    displayfreq = input_displayfreq;
     maxsamples = input_maxsamples;
     this.csvOutput = csvOutput;
     samples = new long[LinkStore.MAX_OPTYPES][maxsamples];
@@ -78,7 +70,6 @@ public class SampledStats {
     maximums = new long[LinkStore.MAX_OPTYPES];
     numops = new long[LinkStore.MAX_OPTYPES];
     errors = new long[LinkStore.MAX_OPTYPES];
-    lastdisplaytime = System.currentTimeMillis();
     
     rng = new Random();
     
@@ -114,21 +105,13 @@ public class SampledStats {
         samples[type.ordinal()][rng.nextInt(maxsamples)] = timetaken; 
       }
     }
-
-    long timenow = System.currentTimeMillis();
-    if ((timenow - lastdisplaytime) > displayfreq * 1000) {
-      // Display all stats for this thread
-      displayStatsAll(timenow);
-      resetSamples(timenow);
-    }
   }
 
 
-  private void resetSamples(long now_ms) {
+  public void resetSamples() {
     for (LinkBenchOp type: LinkBenchOp.values()) {
       opsSinceReset[type.ordinal()] = 0;
     }
-    lastdisplaytime = now_ms;
   }
 
   /**
@@ -139,10 +122,11 @@ public class SampledStats {
    * @param startTime_ms
    * @param nowTime_ms
    */
-  private void displayStats(LinkBenchOp type, int start, int end, long nowTime_ms) {
+  private void displayStats(LinkBenchOp type, int start, int end,
+        long sampleStartTime_ms, long nowTime_ms) {
     int elems = end - start;
     long timestamp = nowTime_ms / 1000;
-    long sampleDuration = nowTime_ms - lastdisplaytime;
+    long sampleDuration = nowTime_ms - sampleStartTime_ms;
     
     if (elems <= 0) {
         logger.info("ThreadID = " + threadID +
@@ -150,7 +134,7 @@ public class SampledStats {
                          " totalops = " + numops[type.ordinal()] +
                          " totalErrors = " + errors[type.ordinal()] +
                          " ops = " + opsSinceReset[type.ordinal()] + 
-                         " sampleDuration = " + sampleDuration +
+                         " sampleDuration = " + sampleDuration + "ms" +
                          " samples = " + elems);
         if (csvOutput != null) {
           csvOutput.println(threadID + "," + timestamp + "," + type.name() + 
@@ -186,7 +170,7 @@ public class SampledStats {
                      " totalOps = " + numops[type.ordinal()] +
                      " totalErrors = " + errors[type.ordinal()] +
                      " ops = " + opsSinceReset[type.ordinal()] +
-                     " sampleDuration = " + sampleDuration +
+                     " sampleDuration = " + sampleDuration + "ms" +
                      " samples = " + elems +
                      " mean = " + df.format(mean) +
                      " min = " + min +
@@ -216,14 +200,16 @@ public class SampledStats {
             "p75_us,p90_us,p95_us,p99_us,max_us");
   }
 
-  public void displayStatsAll( long nowTime_ms) {
-    displayStats(nowTime_ms, Arrays.asList(LinkBenchOp.values()));
+  public void displayStatsAll(long sampleStartTime_ms, long nowTime_ms) {
+    displayStats(sampleStartTime_ms, nowTime_ms,
+                 Arrays.asList(LinkBenchOp.values()));
   }
   
-  public void displayStats(long nowTime_ms, Collection<LinkBenchOp> ops) {
+  public void displayStats(long sampleStartTime_ms, long nowTime_ms,
+                           Collection<LinkBenchOp> ops) {
     for (LinkBenchOp op: ops) {
       displayStats(op, 0, Math.min(maxsamples, opsSinceReset[op.ordinal()]),
-                                   nowTime_ms);
+                                   sampleStartTime_ms, nowTime_ms);
     }
   }
 

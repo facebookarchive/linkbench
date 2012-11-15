@@ -579,7 +579,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   
       DummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);
-      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1000);
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 0, 1000);
       
       LinkBenchRequest requester = new LinkBenchRequest(reqStore,
                       null, props, latencyStats, System.out, tracker, rng,
@@ -638,7 +638,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       Random rng = createRNG();
       
       serialLoad(rng, logger, props, getStoreHandle(false));
-      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1000);
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 2, 1000);
       
       DummyLinkStore reqStore = getStoreHandle(false);
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
@@ -697,7 +697,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       Random rng = createRNG();
       
       serialLoad(rng, logger, props, getStoreHandle(false));
-      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1000);
+      RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 0, 1000);
       
       DummyLinkStore reqStore = getStoreHandle(false);
       reqStore.setRangeLimit(rangeLimit); // Small limit for testing

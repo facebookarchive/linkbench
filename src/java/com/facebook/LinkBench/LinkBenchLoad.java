@@ -65,11 +65,15 @@ public class LinkBenchLoad implements Runnable {
 
   private BlockingQueue<LoadChunk> chunk_q;
 
+  // Track last time stats were updated in ms
+  private long lastDisplayTime;
+  // How often stats should be reported
+  private final long displayFreq_ms;
+
   private LoadProgress prog_tracker;
 
   private Properties props;
 
-  
   /**
    * Convenience constructor
    * @param store2
@@ -141,7 +145,7 @@ public class LinkBenchLoad implements Runnable {
             + ex.getMessage());
     }
     
-    long displayfreq = ConfigUtil.getLong(props, Config.DISPLAY_FREQ);
+    displayFreq_ms = ConfigUtil.getLong(props, Config.DISPLAY_FREQ) * 1000;
     int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
     
     dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
@@ -152,7 +156,7 @@ public class LinkBenchLoad implements Runnable {
     linksloaded = 0;
     sameShuffle = 0;
     diffShuffle = 0;
-    stats = new SampledStats(loaderID, displayfreq, maxsamples, csvStreamOut);
+    stats = new SampledStats(loaderID, maxsamples, csvStreamOut);
     
     id2chooser = new ID2Chooser(props, startid1, maxid1, 1, 1);
   }
@@ -180,6 +184,7 @@ public class LinkBenchLoad implements Runnable {
     }
 
     logger.info("Starting loader thread  #" + loaderID + " loading links");
+    lastDisplayTime = System.currentTimeMillis();
     
     while (true) {
       LoadChunk chunk;
@@ -209,17 +214,24 @@ public class LinkBenchLoad implements Runnable {
     if (!singleAssoc) {
       logger.debug(" Same shuffle = " + sameShuffle +
                          " Different shuffle = " + diffShuffle);
-      if (bulkLoad) {
-        stats.displayStats(System.currentTimeMillis(), 
-            Arrays.asList(LinkBenchOp.LOAD_LINKS_BULK,
-            LinkBenchOp.LOAD_COUNTS_BULK, LinkBenchOp.LOAD_LINKS_BULK_NLINKS,
-            LinkBenchOp.LOAD_COUNTS_BULK_NLINKS));
-      } else {
-        stats.displayStats(System.currentTimeMillis(), Arrays.asList(LinkBenchOp.LOAD_LINK));
-      }
+      displayStats(lastDisplayTime, bulkLoad);
     }
     
     store.close();
+  }
+
+
+  private void displayStats(long startTime, boolean bulkLoad) {
+    long endTime = System.currentTimeMillis();
+    if (bulkLoad) {
+      stats.displayStats(startTime, endTime, 
+          Arrays.asList(LinkBenchOp.LOAD_LINKS_BULK,
+          LinkBenchOp.LOAD_COUNTS_BULK, LinkBenchOp.LOAD_LINKS_BULK_NLINKS,
+          LinkBenchOp.LOAD_COUNTS_BULK_NLINKS));
+    } else {
+      stats.displayStats(startTime, endTime,
+                         Arrays.asList(LinkBenchOp.LOAD_LINK));
+    }
   }
 
   private void processChunk(LoadChunk chunk, boolean bulkLoad,
@@ -256,6 +268,14 @@ public class LinkBenchLoad implements Runnable {
           logger.debug(chunk.toString() +  ": Percent done = " + percent);
           prevPercentPrinted = percent;
         }
+      }
+      
+      // Check if stats should be flushed and reset
+      long now = System.currentTimeMillis();
+      if (lastDisplayTime + displayFreq_ms <= now) {
+        displayStats(lastDisplayTime, bulkLoad);
+        stats.resetSamples();
+        lastDisplayTime = now;
       }
     }
     

@@ -331,8 +331,11 @@ public class LinkBenchDriver {
 
     progress.startTimer();
     // run requesters
-    long requesttime = concurrentExec(requesters);
-
+    concurrentExec(requesters);
+    long finishTime = System.currentTimeMillis();
+    // Calculate duration accounting for warmup time
+    long benchmarkTime = finishTime - progress.getBenchmarkStartTime(); 
+    
     long requestsdone = 0;
     int abortedRequesters = 0;
     // wait for requesters
@@ -350,8 +353,8 @@ public class LinkBenchDriver {
     }
     
     logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
-                 " requests done in " + (requesttime/1000) + " seconds." +
-                 " Requests/second = " + (1000*requestsdone)/requesttime);
+                 " requests done in " + (benchmarkTime/1000) + " seconds." +
+                 " Requests/second = " + (1000*requestsdone)/benchmarkTime);
     if (abortedRequesters > 0) {
       logger.error(String.format("Benchmark did not complete cleanly: %d/%d " +
       		"request threads aborted.  See error log entries for details.",
