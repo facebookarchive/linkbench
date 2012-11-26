@@ -59,7 +59,7 @@ public class ID2Chooser {
     this.requesterID = requesterID;
     
     // random number generator for id2
-    randomid2max = ConfigUtil.getLong(props, Config.RANDOM_ID2_MAX);
+    randomid2max = ConfigUtil.getLong(props, Config.RANDOM_ID2_MAX, 0L);
     
     // configuration for generating id2
     id2gen_config = ConfigUtil.getInt(props, Config.ID2GEN_CONFIG, 0);

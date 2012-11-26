@@ -150,7 +150,6 @@ public class RealDistribution extends PiecewiseLinearDistribution {
    */
   public static synchronized void loadOneShot(Properties props) {
     if (nlinks_cdf == null) {
-      logger.info("Loading real distribution data...");
       try {
         getStatisticalData(props);
       } catch (FileNotFoundException e) {
@@ -261,6 +260,8 @@ public class RealDistribution extends PiecewiseLinearDistribution {
         fileAbsPath = linkBenchHome + File.separator + filename;
       }
     }
+
+    logger.info("Loading real distribution data from " + fileAbsPath);
     
     Scanner scanner = new Scanner(new File(fileAbsPath));
     while (scanner.hasNext()) {

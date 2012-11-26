@@ -126,4 +126,5 @@ public class Config {
 
   /* External data */
   public static final String DISTRIBUTION_DATA_FILE = "data_file";
+  public static final String WORKLOAD_CONFIG_FILE = "workload_file";
 }

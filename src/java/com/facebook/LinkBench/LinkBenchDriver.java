@@ -51,6 +51,7 @@ public class LinkBenchDriver {
   
   /* Command line arguments */
   private static String configFile = null;
+  private static String workloadConfigFile = null;
   private static Properties cmdLineProps = null;
   private static String logFile = null;
   /** File for final statistics */
@@ -74,7 +75,45 @@ public class LinkBenchDriver {
       props.setProperty(key, overrideProps.getProperty(key));
     }
     
+    loadWorkloadProps();
+    
     ConfigUtil.setupLogging(props, logFile);
+
+    logger.info("Config file: " + configfile);
+    logger.info("Workload config file: " + workloadConfigFile);
+  }
+
+  /**
+   * Load properties from auxilliary workload properties file if provided.
+   * Properties from workload properties file do not override existing
+   * properties
+   * @throws IOException
+   * @throws FileNotFoundException
+   */
+  private void loadWorkloadProps() throws IOException, FileNotFoundException {
+    if (props.containsKey(Config.WORKLOAD_CONFIG_FILE)) {
+      workloadConfigFile = props.getProperty(Config.WORKLOAD_CONFIG_FILE);
+      if (!new File(workloadConfigFile).isAbsolute()) {
+        String linkBenchHome = ConfigUtil.findLinkBenchHome();
+        if (linkBenchHome == null) {
+          throw new RuntimeException("Data file config property "
+              + Config.WORKLOAD_CONFIG_FILE
+              + " was specified using a relative path, but linkbench home"
+              + " directory was not specified through environment var "
+              + ConfigUtil.linkbenchHomeEnvVar);
+        } else {
+          workloadConfigFile = linkBenchHome + File.separator + workloadConfigFile;
+        }
+      }
+      Properties workloadProps = new Properties();
+      props.load(new FileInputStream(workloadConfigFile));
+      // Add workload properties, but allow other values to override
+      for (String key: workloadProps.stringPropertyNames()) {
+        if (!props.contains(key)) {
+          props.setProperty(key, workloadProps.getProperty(key));
+        }
+      }
+    }
   }
 
   private static class Stores {
@@ -106,7 +145,7 @@ public class LinkBenchDriver {
     String linkStoreClassName = ConfigUtil.getPropertyRequired(props, 
                                             Config.LINKSTORE_CLASS);
     
-    logger.info("Using LinkStore implementation: " + linkStoreClassName);
+    logger.debug("Using LinkStore implementation: " + linkStoreClassName);
     
     LinkStore linkStore;
     try {
@@ -130,9 +169,9 @@ public class LinkBenchDriver {
       IOException {
     String nodeStoreClassName = props.getProperty(Config.NODESTORE_CLASS);
     if (nodeStoreClassName == null) {
-      logger.info("No NodeStore implementation provided");
+      logger.debug("No NodeStore implementation provided");
     } else {
-      logger.info("Using NodeStore implementation: " + nodeStoreClassName);
+      logger.debug("Using NodeStore implementation: " + nodeStoreClassName);
     }
     
     if (linkStore != null && linkStore.getClass().getName().equals(
