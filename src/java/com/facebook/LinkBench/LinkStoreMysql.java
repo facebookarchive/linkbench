@@ -266,11 +266,10 @@ public class LinkStoreMysql extends GraphStore {
     if (update_count != 0) {
       int base_count = update_count < 0 ? 0 : 1;
       // query to update counttable
-      // if (id, id_type) is not there yet, add a new record with count = 1
+      // if (id, link_type) is not there yet, add a new record with count = 1
       String updatecount = "INSERT INTO " + dbid + "." + counttable +
-                      "(id, id_type, link_type, count, time, version) " +
+                      "(id, link_type, count, time, version) " +
                       "VALUES (" + l.id1 +
-                      ", " + l.id1_type +
                       ", " + l.link_type +
                       ", " + base_count +
                       ", " + l.time +
@@ -292,10 +291,8 @@ public class LinkStoreMysql extends GraphStore {
 
     if (update_data) {
       // query to update link data (the first query only updates visibility)
-      String updatedata = "UPDATE " + dbid + "." + linktable +
-                  " SET id1_type = " + l.id1_type +
-                  ", id2_type = " + l.id2_type +
-                  ", visibility = " + l.visibility +
+      String updatedata = "UPDATE " + dbid + "." + linktable + " SET" +
+                  " visibility = " + l.visibility +
                   ", data = " +  stringLiteral(l.data)+
                   ", time = " + l.time +
                   ", version = " + l.version +
@@ -330,7 +327,7 @@ public class LinkStoreMysql extends GraphStore {
     // query to insert a link;
     StringBuilder sb = new StringBuilder();
     sb.append("INSERT INTO " + dbid + "." + linktable +
-                    "(id1, id1_type, id2, id2_type, link_type, " +
+                    "(id1, id2, link_type, " +
                     "visibility, data, time, version) VALUES ");
     boolean first = true;
     for (Link l : links) {
@@ -340,9 +337,7 @@ public class LinkStoreMysql extends GraphStore {
         sb.append(',');
       }
       sb.append("(" + l.id1 + 
-          ", " + l.id1_type + 
           ", " + l.id2 + 
-          ", " + l.id2_type + 
           ", " + l.link_type + 
           ", " + l.visibility + 
           ", " + stringLiteral(l.data) +
@@ -436,16 +431,14 @@ public class LinkStoreMysql extends GraphStore {
       // * otherwise, insert new link with count column = 0
       long currentTime = (new Date()).getTime();
       String update = "INSERT INTO " + dbid + "." + counttable +
-                      " (id, id_type, link_type, count, time, version) " +
+                      " (id, link_type, count, time, version) " +
                       "VALUES (" + id1 +
-                      ", " + LinkStore.ID1_TYPE +
                       ", " + link_type +
                       ", 0" +
                       ", " + currentTime +
                       ", " + 0 + ") " +
                       "ON DUPLICATE KEY UPDATE" +
-                      " id_type = " + LinkStore.ID1_TYPE +
-                      ", count = IF (count = 0, 0, count - 1)" +
+                      " count = IF (count = 0, 0, count - 1)" +
                       ", time = " + currentTime +
                       ", version = version + 1;";
 
@@ -491,7 +484,7 @@ public class LinkStoreMysql extends GraphStore {
   public Link[] multigetLinks(String dbid, long id1, long link_type, 
                               long[] id2s) throws Exception {
     StringBuilder querySB = new StringBuilder();
-    querySB.append(" select id1, id2, link_type, id1_type, id2_type," +
+    querySB.append(" select id1, id2, link_type," +
         " visibility, data, time, " +
         " version from " + dbid + "." + linktable +
         " where id1 = " + id1 + " and link_type = " + link_type +
@@ -544,7 +537,7 @@ public class LinkStoreMysql extends GraphStore {
                             long minTimestamp, long maxTimestamp,
                             int offset, int limit)
     throws Exception {
-    String query = " select id1, id2, link_type, id1_type, id2_type," +
+    String query = " select id1, id2, link_type," +
     		           " visibility, data, time," +
                    " version from " + dbid + "." + linktable +
                    " where id1 = " + id1 + " and link_type = " + link_type +
@@ -592,12 +585,10 @@ public class LinkStoreMysql extends GraphStore {
     l.id1 = rs.getLong(1);
     l.id2 = rs.getLong(2);
     l.link_type = rs.getLong(3);
-    l.id1_type = rs.getInt(4);
-    l.id2_type = rs.getInt(5);
-    l.visibility = rs.getByte(6);
-    l.data = rs.getBytes(7);
-    l.time = rs.getLong(8);
-    l.version = rs.getInt(9);
+    l.visibility = rs.getByte(4);
+    l.data = rs.getBytes(5);
+    l.time = rs.getLong(6);
+    l.version = rs.getInt(7);
     return l;
   }
 
@@ -657,7 +648,7 @@ public class LinkStoreMysql extends GraphStore {
     
     StringBuilder sqlSB = new StringBuilder(); 
     sqlSB.append("REPLACE INTO " + dbid + "." + counttable +
-        "(id, id_type, link_type, count, time, version) " +
+        "(id, link_type, count, time, version) " +
         "VALUES ");
     boolean first = true;
     for (LinkCount count: counts) {
@@ -667,7 +658,6 @@ public class LinkStoreMysql extends GraphStore {
         sqlSB.append(",");
       }
       sqlSB.append("(" + count.id1 +
-        ", " + count.id1_type +
         ", " + count.link_type +
         ", " + count.count +
         ", " + count.time +

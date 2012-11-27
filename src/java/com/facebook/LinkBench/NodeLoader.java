@@ -151,7 +151,7 @@ public class NodeLoader implements Runnable {
   private void genNode(Random rng, long id1, ArrayList<Node> nodeLoadBuffer,
                           int bulkLoadBatchSize) {
     int dataLength = (int)nodeDataLength.choose(rng);                          
-    Node node = new Node(id1, LinkStore.ID1_TYPE, System.currentTimeMillis(),
+    Node node = new Node(id1, LinkStore.DEFAULT_NODE_TYPE, System.currentTimeMillis(),
                          1, nodeDataGen.fill(rng, new byte[dataLength]));
     nodeLoadBuffer.add(node);
     if (nodeLoadBuffer.size() >= bulkLoadBatchSize) {

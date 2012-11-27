@@ -209,7 +209,7 @@ public abstract class GraphStoreTestBase extends TestCase {
       try {
         LinkStoreTestBase.deleteIDRange(testDB, getStoreHandle(true),
                                         startId, idCount);
-        deleteNodeIDRange(testDB, LinkStore.ID1_TYPE, 
+        deleteNodeIDRange(testDB, LinkStore.DEFAULT_NODE_TYPE, 
                           getStoreHandle(true), startId, idCount);
       } catch (Throwable t) {
         System.err.println("Error during cleanup:");

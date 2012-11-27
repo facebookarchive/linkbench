@@ -64,8 +64,6 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
     String temp = Long.toString(a.id1) + "." +
                   Long.toString(a.link_type) + "." +
                   Long.toString(a.id2) + "." +
-                  Integer.toString(a.id1_type) + "." +
-                  Integer.toString(a.id2_type) + "." +
                   Byte.toString(a.visibility) + "." +
                   Bytes.toString(a.data) + "." +
                   // there must be no (.) in a.data
@@ -92,12 +90,10 @@ public class LinkStoreHBaseGeneralAtomicityTesting extends LinkStore {
     a.id1 = Long.parseLong(tokens[0]);
     a.link_type = Long.parseLong(tokens[1]);
     a.id2 = Long.parseLong(tokens[2]);
-    a.id1_type = Integer.parseInt(tokens[3]);
-    a.id2_type = Integer.parseInt(tokens[4]);
-    a.visibility = Byte.parseByte(tokens[5]);
-    a.data = tokens[6].getBytes();
-    a.version = Integer.parseInt(tokens[7]);
-    a.time = Long.parseLong(tokens[8]);
+    a.visibility = Byte.parseByte(tokens[3]);
+    a.data = tokens[4].getBytes();
+    a.version = Integer.parseInt(tokens[5]);
+    a.time = Long.parseLong(tokens[6]);
     return a;
   }
 

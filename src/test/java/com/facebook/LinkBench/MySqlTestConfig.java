@@ -55,9 +55,7 @@ public class MySqlTestConfig {
     stmt.executeUpdate(String.format(
         "CREATE TABLE `%s`.`%s` (" + 
         "`id1` bigint(20) unsigned NOT NULL DEFAULT '0'," +
-        "`id1_type` int(10) unsigned NOT NULL DEFAULT '0'," +
         "`id2` bigint(20) unsigned NOT NULL DEFAULT '0'," +
-        "`id2_type` int(10) unsigned NOT NULL DEFAULT '0'," +
         "`link_type` bigint(20) unsigned NOT NULL DEFAULT '0'," +
         "`visibility` tinyint(3) NOT NULL DEFAULT '0'," +
         "`data` varchar(255) NOT NULL DEFAULT ''," +
@@ -69,7 +67,6 @@ public class MySqlTestConfig {
         testDB, MySqlTestConfig.linktable));
     stmt.executeUpdate(String.format("CREATE TABLE `%s`.`%s` (" +
         "`id` bigint(20) unsigned NOT NULL DEFAULT '0'," +
-        "`id_type` int(10) unsigned NOT NULL DEFAULT '0'," +
         "`link_type` bigint(20) unsigned NOT NULL DEFAULT '0'," +
         "`count` int(10) unsigned NOT NULL DEFAULT '0'," +
         "`time` bigint(20) unsigned NOT NULL DEFAULT '0'," +

@@ -5,13 +5,11 @@ import java.util.Arrays;
 
 public class Link {
 
-  public Link(long id1, long link_type, long id2, int id1_type, int id2_type,
+  public Link(long id1, long link_type, long id2,
       byte visibility, byte[] data, int version, long time) {
     this.id1 = id1;
     this.link_type = link_type;
     this.id2 = id2;
-    this.id1_type = id1_type;
-    this.id2_type = id2_type;
     this.visibility = visibility;
     this.data = data;
     this.version = version;
@@ -20,8 +18,6 @@ public class Link {
 
   Link() {
     link_type = LinkStore.DEFAULT_LINK_TYPE;
-    id1_type = LinkStore.ID1_TYPE;
-    id2_type = LinkStore.ID2_TYPE;
     visibility = LinkStore.VISIBILITY_DEFAULT;
   }
 
@@ -30,7 +26,6 @@ public class Link {
       Link o = (Link) other;
       return id1 == o.id1 && id2 == o.id2 &&
           link_type == o.link_type &&
-          id1_type == o.id1_type && id2_type == o.id2_type &&
           visibility == o.visibility &&
           version == o.version && time == o.time &&
           Arrays.equals(data, o.data);
@@ -41,8 +36,8 @@ public class Link {
   
   public String toString() {
     return String.format("Link(id1=%d, id2=%d, link_type=%d," +
-    		"id1_type=%d, id2_type=%d, visibility=%d, version=%d," +
-    		"time=%d, data=%s", id1, id2, link_type, id1_type, id2_type, 
+    		"visibility=%d, version=%d," +
+    		"time=%d, data=%s", id1, id2, link_type,
     		visibility, version, time, data.toString());
   }
   
@@ -55,8 +50,6 @@ public class Link {
     l.id1 = this.id1;
     l.link_type = this.link_type;
     l.id2 = this.id2;
-    l.id1_type = this.id1_type;
-    l.id2_type = this.id2_type;
     l.visibility = this.visibility;
     l.data = this.data.clone();
     l.version = this.version;
@@ -67,8 +60,6 @@ public class Link {
   public long id1;
   public long link_type;
   public long id2;
-  public int id1_type;
-  public int id2_type;
   public byte visibility;
   public byte[] data;
   public int version;

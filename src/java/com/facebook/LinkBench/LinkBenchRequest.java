@@ -472,8 +472,6 @@ public class LinkBenchRequest implements Runnable {
         link.link_type = id2chooser.chooseRandomLinkType(rng);
         link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type,
                                                 ID2Chooser.P_ADD_EXIST);
-        link.id1_type = LinkStore.ID1_TYPE;
-        link.id2_type = LinkStore.ID2_TYPE;
         link.visibility = LinkStore.VISIBILITY_DEFAULT;
         link.version = 0;
         link.time = System.currentTimeMillis();
@@ -511,8 +509,6 @@ public class LinkBenchRequest implements Runnable {
         // Update one of the existing links
         link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type,
                                               ID2Chooser.P_UPDATE_EXIST);
-        link.id1_type = LinkStore.ID1_TYPE;
-        link.id2_type = LinkStore.ID2_TYPE;
         link.visibility = LinkStore.VISIBILITY_DEFAULT;
         link.version = 0;
         link.time = System.currentTimeMillis();
@@ -615,7 +611,7 @@ public class LinkBenchRequest implements Runnable {
         long idToDelete = chooseRequestID(DistributionType.NODE_DELETES, 
                                           lastNodeId);
         starttime = System.nanoTime();
-        boolean deleted = nodeStore.deleteNode(dbid, LinkStore.ID1_TYPE,
+        boolean deleted = nodeStore.deleteNode(dbid, LinkStore.DEFAULT_NODE_TYPE,
                                                      idToDelete);
         endtime = System.nanoTime();
         lastNodeId = idToDelete;
@@ -627,7 +623,7 @@ public class LinkBenchRequest implements Runnable {
         starttime = System.nanoTime();
         long idToFetch = chooseRequestID(DistributionType.NODE_READS, 
                                          lastNodeId);
-        Node fetched = nodeStore.getNode(dbid, LinkStore.ID1_TYPE, idToFetch);
+        Node fetched = nodeStore.getNode(dbid, LinkStore.DEFAULT_NODE_TYPE, idToFetch);
         endtime = System.nanoTime();
         lastNodeId = idToFetch;
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
@@ -677,7 +673,7 @@ public class LinkBenchRequest implements Runnable {
    */
   private Node createAddNode() {
     byte data[] = nodeAddDataGen.fill(rng, new byte[(int)nodeDataSize.choose(rng)]);
-    return new Node(-1, LinkStore.ID1_TYPE, 1, 
+    return new Node(-1, LinkStore.DEFAULT_NODE_TYPE, 1, 
                     (int)(System.currentTimeMillis()/1000), data);
   }
   
@@ -686,7 +682,7 @@ public class LinkBenchRequest implements Runnable {
    */
   private Node createUpdateNode(long id) {
     byte data[] = nodeUpDataGen.fill(rng, new byte[(int)nodeDataSize.choose(rng)]);
-    return new Node(id, LinkStore.ID1_TYPE, 2, 
+    return new Node(id, LinkStore.DEFAULT_NODE_TYPE, 2, 
                     (int)(System.currentTimeMillis()/1000), data);
   }
 

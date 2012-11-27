@@ -333,7 +333,7 @@ public class LinkBenchLoad implements Runnable {
           // Update link counts for this type
           LinkCount count = linkTypeCounts.get(link.link_type); 
           if (count == null) {
-            count = new LinkCount(id1,link.id1_type, link.link_type,
+            count = new LinkCount(id1, link.link_type,
                                   link.time, link.version, 1);
             linkTypeCounts.put(link.link_type, count);
           } else {
@@ -363,8 +363,6 @@ public class LinkBenchLoad implements Runnable {
   private Link initLink() {
     Link link = new Link();
     link.link_type = LinkStore.DEFAULT_LINK_TYPE;
-    link.id1_type = LinkStore.ID1_TYPE;
-    link.id2_type = LinkStore.ID2_TYPE;
     link.visibility = LinkStore.VISIBILITY_DEFAULT;
     link.version = 0;
     link.data = new byte[0];

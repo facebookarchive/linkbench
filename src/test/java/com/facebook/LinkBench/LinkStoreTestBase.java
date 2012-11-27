@@ -189,7 +189,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     DummyLinkStore store = getStoreHandle(true);
 
     long id1 = 1123, id2 = 1124, ltype = 321;
-    Link writtenLink = new Link(id1, ltype, id2, 1, 1, 
+    Link writtenLink = new Link(id1, ltype, id2, 
         LinkStore.VISIBILITY_DEFAULT, new byte[] {0x1}, 1, 1994);
     store.addLink(testDB, writtenLink, true);
     if (store.isRealLinkStore()) {
@@ -255,22 +255,21 @@ public abstract class LinkStoreTestBase extends TestCase {
     DummyLinkStore store = getStoreHandle(true);
     long ida = 5434, idb = 5435, idc = 9999, idd = 9998;
     long ltypea = 1, ltypeb = 2;
-    int otype = 35342; 
     
     byte data[] = new byte[] {0xf, 0xa, 0xc, 0xe, 0xb, 0x0, 0x0, 0xc};
     long t = 10000000;
     Link links[] = new Link[] {
-       new Link(ida, ltypea, idc, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+       new Link(ida, ltypea, idc, LinkStore.VISIBILITY_DEFAULT,
            data, 1, System.currentTimeMillis()),
-       new Link(ida, ltypeb, idc, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+       new Link(ida, ltypeb, idc, LinkStore.VISIBILITY_DEFAULT,
            data, 1, System.currentTimeMillis()),
-       new Link(idb, ltypeb, ida, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+       new Link(idb, ltypeb, ida, LinkStore.VISIBILITY_DEFAULT,
            data, 1,  t + 1),
-       new Link(idb, ltypeb, idb, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+       new Link(idb, ltypeb, idb, LinkStore.VISIBILITY_DEFAULT,
            data, 1, t),
-       new Link(idb, ltypeb, idc, otype, otype, LinkStore.VISIBILITY_HIDDEN,
+       new Link(idb, ltypeb, idc, LinkStore.VISIBILITY_HIDDEN,
            data, 1, t - 2),
-       new Link(idb, ltypeb, idd, otype, otype, LinkStore.VISIBILITY_DEFAULT,
+       new Link(idb, ltypeb, idd, LinkStore.VISIBILITY_DEFAULT,
            data, 1, t + 3),
     };
     for (Link l: links) {
@@ -327,7 +326,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   public void testMultiget() throws IOException, Exception {
     DummyLinkStore store = getStoreHandle(true);
     long id1 = 99999999999L;
-    Link a = new Link(id1, LinkStore.DEFAULT_LINK_TYPE, 42, 0, 0,
+    Link a = new Link(id1, LinkStore.DEFAULT_LINK_TYPE, 42,
                       LinkStore.VISIBILITY_DEFAULT, new byte[0], 1,
                       System.currentTimeMillis());
     Link b = a.clone();
@@ -356,7 +355,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   @Test
   public void testHiding() throws Exception {
     DummyLinkStore store = getStoreHandle(true);
-    Link l = new Link(1, 1, 1, 1, 1, 
+    Link l = new Link(1, 1, 1,
           LinkStore.VISIBILITY_HIDDEN, new byte[] {0x1}, 1,
           System.currentTimeMillis());
     store.addLink(testDB, l, true);
@@ -384,7 +383,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   @Test
   public void testOverwrite() throws IOException, Exception {
     long id1 = 314214212421L;
-    Link orig = new Link(id1, 1, 1, 0, 0, LinkStore.VISIBILITY_DEFAULT,
+    Link orig = new Link(id1, 1, 1, LinkStore.VISIBILITY_DEFAULT,
                       new byte[] {'1','1','1'}, 0, 1);
     Link changed = orig.clone();
     changed.data = new byte[] {'2', '2', '2'}; 
@@ -425,7 +424,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    */
   @Test
   public void testSqlInjection() throws IOException, Exception {
-    Link l = new Link(1, 1, 1, 1, 1, LinkStore.VISIBILITY_DEFAULT, 
+    Link l = new Link(1, 1, 1, LinkStore.VISIBILITY_DEFAULT, 
                 "' asdfasdf".getBytes(), 1, 1);
     byte updateData[] = "';\\".getBytes();
     
@@ -485,7 +484,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       byte b = (byte)((i + startByte) % 256);
       data[i] = b;
     }
-    Link l = new Link(1, 1, 1, 1, 1, LinkStore.VISIBILITY_DEFAULT, 
+    Link l = new Link(1, 1, 1, LinkStore.VISIBILITY_DEFAULT, 
                 data, 1, 1);
     // Different length and data
     byte updateData[] = new byte[dataMaxSize/2];
@@ -803,8 +802,6 @@ public abstract class LinkStoreTestBase extends TestCase {
           assertEquals(l.id1, i);
           assertEquals(l.link_type, LinkStore.DEFAULT_LINK_TYPE);
           assertEquals(l.visibility, LinkStore.VISIBILITY_DEFAULT);
-          assertEquals(l.id1_type, LinkStore.ID1_TYPE);
-          assertEquals(l.id2_type, LinkStore.ID2_TYPE);
           // Check timestamp correc
           if (l.time > maxTimestamp) {
             System.err.println(l.time + ", " + maxTimestamp);
