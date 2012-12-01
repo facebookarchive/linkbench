@@ -106,10 +106,10 @@ public class LinkBenchDriver {
         }
       }
       Properties workloadProps = new Properties();
-      props.load(new FileInputStream(workloadConfigFile));
+      workloadProps.load(new FileInputStream(workloadConfigFile));
       // Add workload properties, but allow other values to override
       for (String key: workloadProps.stringPropertyNames()) {
-        if (!props.contains(key)) {
+        if (props.getProperty(key) == null) {
           props.setProperty(key, workloadProps.getProperty(key));
         }
       }
