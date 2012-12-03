@@ -33,9 +33,9 @@ LinkBench Architecture
 ||   | Graph      | Workload     |    ||      Open connections  +=======+
 ||   | Generator  | Generator    |    ||   /------------------> | Graph |
 ||   +---------------------------+    ||  /-------------------> | Store |
-||   |                           |<======---------------------> | Shard |
-||   |   Graph Store Adapter     |<======---------------------> |       |
-||   |   (e.g. MySQL adapter)    |<======---------------------> | e.g.  |
+||   |                           |&lt;======---------------------> | Shard |
+||   |   Graph Store Adapter     |&lt;======---------------------> |       |
+||   |   (e.g. MySQL adapter)    |&lt;======---------------------> | e.g.  |
 ||   +---------------------------+    ||  \-------------------> | MySQL |
 ||                                    ||   \------------------> | Server|
 ||   ~~~~~~~~~~~~    ~~~~~~~~~~~~     ||                        +=======+
@@ -74,7 +74,7 @@ will report a range of statistics such as latency and throughput.
 
 Getting Started
 ===============
-In this README we'll walk you through compiiling LinkBench and running
+In this README we'll walk you through compiling LinkBench and running
 a MySQL benchmark.
 
 Prerequisites:
