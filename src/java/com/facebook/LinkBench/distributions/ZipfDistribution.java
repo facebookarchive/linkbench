@@ -5,11 +5,14 @@ import java.util.Properties;
 import java.util.Random;
 
 import org.apache.commons.math3.util.FastMath;
+import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.Config;
 import com.facebook.LinkBench.ConfigUtil;
 
 public class ZipfDistribution implements ProbabilityDistribution {
+  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
+  
   private long min = 0;
   private long max = 1;
   private double shape = 0.0;
@@ -88,7 +91,7 @@ public class ZipfDistribution implements ProbabilityDistribution {
   
   private double calcZetan(long n) {
     if (n < MIN_CACHE_VALUE) {
-      return Harmonic.generalizedHarmonic(n, shape);
+      return uncachedCalcZetan(n);
     }
     
     synchronized(ZipfDistribution.class) {
@@ -99,7 +102,8 @@ public class ZipfDistribution implements ProbabilityDistribution {
         }
       }
     }
-    double calcZetan = Harmonic.generalizedHarmonic(n, shape);
+
+    double calcZetan = uncachedCalcZetan(n);
     
     synchronized (ZipfDistribution.class) {
       CacheEntry ce = new CacheEntry();
@@ -110,6 +114,26 @@ public class ZipfDistribution implements ProbabilityDistribution {
         zetanCache.remove(0);
       }
       zetanCache.add(ce);
+    }
+    return calcZetan;
+  }
+
+  private double uncachedCalcZetan(long n) {
+    double calcZetan;
+    if (shape <= 1.0) {
+      // use approximation
+      calcZetan = Harmonic.generalizedHarmonicApprox(n, shape);
+    } else {
+      // Can't use approximation
+      // If calculation will take more than 5 or so seconds, let user know
+      // what is happening
+      if (n > 20000000) {
+        logger.info("Precalculating constants for Zipf distribution over "
+                    + n + " items with shape = " + shape 
+                    + ".  Please be patient, this can take a little time.");
+      }
+      
+      calcZetan = Harmonic.generalizedHarmonic(n, shape);
     }
     return calcZetan;
   }
@@ -135,7 +159,13 @@ public class ZipfDistribution implements ProbabilityDistribution {
   public double cdf(long id) {
     if (id < min) return 0.0;
     if (id >= max) return 1.0;
-    return Harmonic.generalizedHarmonic(id + 1 - min, shape) / zetan;
+    double harm;
+    if (shape <= 1.0) {
+      harm = Harmonic.generalizedHarmonicApprox(id + 1 - min, shape);
+    } else {
+      harm = Harmonic.generalizedHarmonic(id + 1 - min, shape);
+    }
+    return harm / zetan;
   }
 
   /**
