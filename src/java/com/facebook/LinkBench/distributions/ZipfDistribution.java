@@ -33,11 +33,6 @@ public class ZipfDistribution implements ProbabilityDistribution {
       throw new IllegalArgumentException("max = " + max + " <= min = " + min +
           ": probability distribution cannot have zero or negative domain");
     }
-    if (max - min > Integer.MAX_VALUE) {
-      throw new IllegalArgumentException("Zipf distribution does not currently " +
-      		"support distributions with id range > " + Integer.MAX_VALUE +
-      		": range [" + min + ", " + max + ") is too large.");
-    }
     
     this.min = min;
     this.max = max;

@@ -12,6 +12,7 @@ import com.facebook.LinkBench.ConfigUtil;
  *
  */
 public class UniformDistribution implements ProbabilityDistribution {
+  
   private long min = 0; 
   private long max = 1;
   private double scale = 1.0;
@@ -29,6 +30,12 @@ public class UniformDistribution implements ProbabilityDistribution {
     } else {
       scale = 1.0;
     }
+  }
+  
+  public void init(long min, long max, double scale) {
+    this.min = min;
+    this.max = max;
+    this.scale = scale;
   }
   
   @Override
@@ -77,6 +84,9 @@ public class UniformDistribution implements ProbabilityDistribution {
     return i + min;
   }
   
+  // Total number of representable numbers by int
+  private static final long UINT_RANGE = Integer.MAX_VALUE - (long) Integer.MIN_VALUE;
+  
   /** Choose an id X uniformly in the range*/
   public long choose(Random rng) {
     long n = max - min;
@@ -84,10 +94,29 @@ public class UniformDistribution implements ProbabilityDistribution {
     // so just taking a mod doesn't give a good quality result.
     if (n <= Integer.MAX_VALUE) {
       return min + (long)rng.nextInt((int)n);
+    } else if (n < UINT_RANGE) {
+      return randint2(rng, n);
     } else {
-      long i = rng.nextInt();
-      long j = rng.nextInt((int)(n / Integer.MAX_VALUE));
-      return (Integer.MAX_VALUE * (long)j) + i;
+      return UINT_RANGE * rng.nextInt((int)(n / UINT_RANGE)) + 
+                          randint2(rng, n % UINT_RANGE);
+    }
+  }
+
+  /**
+   * Produce a random integer in range [0, n]
+   * n must be in range [0, MAX_INT - MIN_INT]
+   * @param rng
+   * @param n
+   * @return
+   */
+  private long randint2(Random rng, long n) {
+    assert(n < UINT_RANGE);
+    double p = Integer.MAX_VALUE / (double)n;
+    if (rng.nextDouble() < p) { 
+      return rng.nextInt(Integer.MAX_VALUE);
+    } else {
+      return Integer.MAX_VALUE + 
+          (long)(rng.nextInt((int)(n - Integer.MAX_VALUE)));
     }
   }
 }
