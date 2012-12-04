@@ -6,6 +6,8 @@ LinkBench is highly configurable and extensible.  It can be reconfigured
 to simulate a variety of workloads and plugins can be written for
 benchmarking additional database systems.
 
+LinkBench is released under the Apache License, Version 2.0.
+
 Background
 ----------
 One way of modeling social network data is as a *social graph*, where
