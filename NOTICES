@@ -1,0 +1,20 @@
+Several third party components are included with the LinkBench source
+distribution.
+
+Apache Commons CLI, Apache Commons Math, Apache log4j, Apache Hadoop,
+and Apache HBase are licensed under the Apache 2.0 license, which is
+available at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+
+JUnit is licensed under the Common Public License v1.0, which is
+available at:
+
+   http://junit.sourceforge.net/cpl-v10.html
+
+MySQL Connector/J is licensed under the General Public License v2.0 with
+the MySQL FOSS exception.  Further license information is included in
+the Connector/J source distribution.  The license can also be viewed at:
+   
+   http://www.mysql.com/about/legal/licensing/foss-exception/
