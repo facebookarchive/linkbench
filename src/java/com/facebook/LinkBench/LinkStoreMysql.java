@@ -26,6 +26,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 
@@ -168,7 +169,7 @@ public class LinkStoreMysql extends GraphStore {
   }
 
   public void clearErrors(int threadID) {
-    logger.info("Clearing region cache in threadID " + threadID);
+    logger.info("Reopening MySQL connection in threadID " + threadID);
 
     try {
       if (conn != null) {
@@ -181,7 +182,47 @@ public class LinkStoreMysql extends GraphStore {
       return;
     }
   }
+  
+  /**
+   * Set of all JDBC SQLState strings that indicate a transient MySQL error
+   * that should be handled by retrying
+   */
+  private static final HashSet<String> retrySQLStates = populateRetrySQLStates();
 
+  /**
+   *  Populate retrySQLStates
+   *  SQLState codes are defined in MySQL Connector/J documentation:
+   *  http://dev.mysql.com/doc/refman/5.6/en/connector-j-reference-error-sqlstates.html
+   */
+  private static HashSet<String> populateRetrySQLStates() {
+    HashSet<String> states = new HashSet<String>();
+    states.add("41000"); // ER_LOCK_WAIT_TIMEOUT
+    states.add("40001"); // ER_LOCK_DEADLOCK
+    return states;
+  }
+  
+  /**
+   * Handle SQL exception by logging error and selecting how to respond
+   * @param ex SQLException thrown by MySQL JDBC driver
+   * @return true if transaction should be retried
+   */
+  private boolean processSQLException(SQLException ex, String op) {
+    boolean retry = retrySQLStates.contains(ex.getSQLState());
+    String msg = "SQLException thrown by MySQL driver during execution of " +
+                 "operation: " + op + ".  ";
+    msg += "Message was: '" + ex.getMessage() + "'.  ";
+    msg += "SQLState was: " + ex.getSQLState() + ".  ";
+    
+    if (retry) {
+      msg += "Error is probably transient, retrying operation.";
+      logger.warn(msg);
+    } else {
+      msg += "Error is probably non-transient, will abort operation.";
+      logger.error(msg);
+    }
+    return retry;
+  }
+  
   // get count for testing purpose
   private void testCount(Statement stmt, String dbid,
                          String assoctable, String counttable,
@@ -215,9 +256,22 @@ public class LinkStoreMysql extends GraphStore {
     }
   }
 
-
+  @Override
   public boolean addLink(String dbid, Link l, boolean noinverse)
     throws Exception {
+    while (true) {
+      try {
+        return addLinkImpl(dbid, l, noinverse);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "addLink")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private boolean addLinkImpl(String dbid, Link l, boolean noinverse)
+      throws Exception {
 
      if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
       logger.debug("addLink " + l.id1 +
@@ -368,11 +422,24 @@ public class LinkStoreMysql extends GraphStore {
     int nrows = stmt.executeUpdate(insert);
     return nrows;
 }
-
+  
+  @Override
   public boolean deleteLink(String dbid, long id1, long link_type, long id2,
                          boolean noinverse, boolean expunge)
     throws Exception {
+    while (true) {
+      try {
+        return deleteLinkImpl(dbid, id1, link_type, id2, noinverse, expunge);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "deleteLink")) {
+          throw ex;
+        }
+      }
+    }
+  }
 
+  private boolean deleteLinkImpl(String dbid, long id1, long link_type, long id2,
+      boolean noinverse, boolean expunge) throws Exception {
     if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
       logger.debug("deleteLink " + id1 +
                          "." + id2 +
@@ -477,16 +544,31 @@ public class LinkStoreMysql extends GraphStore {
     return found;
   }
 
-
+  @Override
   public boolean updateLink(String dbid, Link l, boolean noinverse)
     throws Exception {
+    // Retry logic is in addLink 
     boolean added = addLink(dbid, l, noinverse);
-    return !added; // return rue if updated instead of added
+    return !added; // return true if updated instead of added
   }
 
 
   // lookup using id1, type, id2
+  @Override
   public Link getLink(String dbid, long id1, long link_type, long id2)
+    throws Exception {
+    while (true) {
+      try {
+        return getLinkImpl(dbid, id1, link_type, id2);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "getLink")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private Link getLinkImpl(String dbid, long id1, long link_type, long id2)
     throws Exception {
     Link res[] = multigetLinks(dbid, id1, link_type, new long[] {id2});
     if (res == null) return null;
@@ -498,6 +580,19 @@ public class LinkStoreMysql extends GraphStore {
   @Override
   public Link[] multigetLinks(String dbid, long id1, long link_type, 
                               long[] id2s) throws Exception {
+    while (true) {
+      try {
+        return multigetLinksImpl(dbid, id1, link_type, id2s);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "multigetLinks")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private Link[] multigetLinksImpl(String dbid, long id1, long link_type, 
+                                long[] id2s) throws Exception {
     StringBuilder querySB = new StringBuilder();
     querySB.append(" select id1, id2, link_type," +
         " visibility, data, time, " +
@@ -543,15 +638,34 @@ public class LinkStoreMysql extends GraphStore {
   }
 
   // lookup using just id1, type
+  @Override
   public Link[] getLinkList(String dbid, long id1, long link_type)
     throws Exception {
+    // Retry logic in getLinkList
     return getLinkList(dbid, id1, link_type, 0, Long.MAX_VALUE, 0, rangeLimit);
   }
 
+  @Override
   public Link[] getLinkList(String dbid, long id1, long link_type,
                             long minTimestamp, long maxTimestamp,
                             int offset, int limit)
     throws Exception {
+    while (true) {
+      try {
+        return getLinkListImpl(dbid, id1, link_type, minTimestamp,
+                               maxTimestamp, offset, limit);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "getLinkListImpl")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private Link[] getLinkListImpl(String dbid, long id1, long link_type,
+        long minTimestamp, long maxTimestamp,
+        int offset, int limit)
+            throws Exception {
     String query = " select id1, id2, link_type," +
     		           " visibility, data, time," +
                    " version from " + dbid + "." + linktable +
@@ -608,9 +722,22 @@ public class LinkStoreMysql extends GraphStore {
   }
 
   // count the #links
+  @Override
   public long countLinks(String dbid, long id1, long link_type)
     throws Exception {
-
+    while (true) {
+      try {
+        return countLinksImpl(dbid, id1, link_type);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "countLinks")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private long countLinksImpl(String dbid, long id1, long link_type)
+        throws Exception {
     long count = 0;
     String query = " select count from " + dbid + "." + counttable +
                    " where id = " + id1 + " and link_type = " + link_type + "; commit;";
@@ -644,6 +771,20 @@ public class LinkStoreMysql extends GraphStore {
   @Override
   public void addBulkLinks(String dbid, List<Link> links, boolean noinverse)
       throws Exception {
+    while (true) {
+      try {
+        addBulkLinksImpl(dbid, links, noinverse);
+        return;
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "addBulkLinks")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private void addBulkLinksImpl(String dbid, List<Link> links, boolean noinverse)
+      throws Exception {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("addBulkLinks: " + links.size() + " links");
     }
@@ -654,6 +795,20 @@ public class LinkStoreMysql extends GraphStore {
 
   @Override
   public void addBulkCounts(String dbid, List<LinkCount> counts)
+                                                throws Exception {
+    while (true) {
+      try {
+        addBulkCountsImpl(dbid, counts);
+        return;
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "addBulkCounts")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private void addBulkCountsImpl(String dbid, List<LinkCount> counts)
                                                 throws Exception {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("addBulkCounts: " + counts.size() + " link counts");
@@ -706,6 +861,18 @@ public class LinkStoreMysql extends GraphStore {
 
   @Override
   public long addNode(String dbid, Node node) throws Exception {
+    while (true) {
+      try {
+        return addNodeImpl(dbid, node);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "addNode")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private long addNodeImpl(String dbid, Node node) throws Exception {
     long ids[] = bulkAddNodes(dbid, Collections.singletonList(node));
     assert(ids.length == 1);
     return ids[0];
@@ -713,6 +880,18 @@ public class LinkStoreMysql extends GraphStore {
 
   @Override
   public long[] bulkAddNodes(String dbid, List<Node> nodes) throws Exception {
+    while (true) {
+      try {
+        return bulkAddNodesImpl(dbid, nodes);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "bulkAddNodes")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private long[] bulkAddNodesImpl(String dbid, List<Node> nodes) throws Exception {
     checkNodeTableConfigured();
     StringBuilder sql = new StringBuilder();
     sql.append("INSERT INTO `" + dbid + "`.`" + nodetable + "` " +
@@ -755,6 +934,18 @@ public class LinkStoreMysql extends GraphStore {
 
   @Override
   public Node getNode(String dbid, int type, long id) throws Exception {
+    while (true) {
+      try {
+        return getNodeImpl(dbid, type, id);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "getNode")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private Node getNodeImpl(String dbid, int type, long id) throws Exception {
     checkNodeTableConfigured();
     ResultSet rs = stmt.executeQuery(
       "SELECT id, type, version, time, data " +
@@ -778,6 +969,18 @@ public class LinkStoreMysql extends GraphStore {
 
   @Override
   public boolean updateNode(String dbid, Node node) throws Exception {
+    while (true) {
+      try {
+        return updateNodeImpl(dbid, node);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "updateNode")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private boolean updateNodeImpl(String dbid, Node node) throws Exception {
     checkNodeTableConfigured();
     String sql = "UPDATE `" + dbid + "`.`" + nodetable + "`" +
             " SET " + "version=" + node.version + ", time=" + node.time
@@ -798,6 +1001,18 @@ public class LinkStoreMysql extends GraphStore {
 
   @Override
   public boolean deleteNode(String dbid, int type, long id) throws Exception {
+    while (true) {
+      try {
+        return deleteNodeImpl(dbid, type, id);
+      } catch (SQLException ex) {
+        if (!processSQLException(ex, "deleteNode")) {
+          throw ex;
+        }
+      }
+    }
+  }
+  
+  private boolean deleteNodeImpl(String dbid, int type, long id) throws Exception {
     checkNodeTableConfigured();
     int rows = stmt.executeUpdate(
         "DELETE FROM `" + dbid + "`.`" + nodetable + "` " +
