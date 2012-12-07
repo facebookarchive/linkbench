@@ -183,7 +183,7 @@ You may want to set up a special database user account for benchmarking:
     -- Note: replace 'linkbench'@'localhost' with 'linkbench'@'%' to allow remote connections
     CREATE USER 'linkbench'@'localhost' IDENTIFIED BY 'mypassword';
     -- Grant all privileges on linkdb to this user
-    GRANT ALL ON linkdb2 TO 'linkbench'@'localhost'
+    GRANT ALL ON linkdb TO 'linkbench'@'localhost'
 
 If you want to obtain representative benchmark results, we highly
 recommend that you invest some time configuring and tuning MySQL.
