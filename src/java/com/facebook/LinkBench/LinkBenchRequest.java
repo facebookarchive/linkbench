@@ -509,9 +509,8 @@ public class LinkBenchRequest implements Runnable {
         long id2 = id2chooser.chooseForOp(rng, id1, link_type,
                                           ID2Chooser.P_DELETE_EXIST);
         starttime = System.nanoTime();
-        linkStore.deleteLink(dbid, id1, link_type, id2,
-         true, // no inverse
-         false);
+        linkStore.deleteLink(dbid, id1, link_type, id2, true, // no inverse
+            false);
         endtime = System.nanoTime();
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("deleteLink id1=" + id1 + " link_type=" + link_type 
@@ -678,8 +677,6 @@ public class LinkBenchRequest implements Runnable {
       linkStore.clearErrors(requesterID);
       return false;
     }
-
-
   }
 
   /**
@@ -840,6 +837,7 @@ public class LinkBenchRequest implements Runnable {
       }
     }
     
+    this.linkStore.close();
     // Do final update of statistics
     progressTracker.update(requestsSinceLastUpdate);
     displayStats(lastStatDisplay_ms, System.currentTimeMillis());

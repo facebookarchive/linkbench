@@ -205,6 +205,7 @@ public class LinkBenchLoad implements Runnable {
       LoadChunk chunk;
       try {
         chunk = chunk_q.take();
+	      //logger.info("chunk end="+chunk.end);
       } catch (InterruptedException ie) {
         logger.warn("InterruptedException not expected, try again", ie);
         continue;
@@ -468,7 +469,6 @@ public class LinkBenchLoad implements Runnable {
 
   private void loadLinks(ArrayList<Link> loadBuffer) {
     long timestart = System.nanoTime();
-    
     try {
       // no inverses for now
       int nlinks = loadBuffer.size();

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.facebook.linkbench</groupId>
+    <artifactId>linkbench</artifactId>
+    <version>0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <url>https://github.com/facebook/linkbench</url>
+    <inceptionYear>2012</inceptionYear>
+
+    <developers>
+        <developer>
+            <id>tarmstrong</id>
+            <name>Tim Armstrong</name>
+            <email>tarmstrong@fb.com</email>
+        </developer>
+        <developer>
+            <id>dhruba</id>
+            <name>Dhruba Borthakur</name>
+            <email>dhruba@fb.com</email>
+        </developer>
+        <developer>
+            <id>amayank</id>
+            <name>Mayank Agarwal</name>
+            <email>amayank@fb.com</email>
+        </developer>
+        <developer>
+            <id>andrewcox</id>
+            <name>Andrew Cox</name>
+            <email>andrewcox@fb.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/facebook/linkbench.git</connection>
+        <developerConnection>scm:git@github.com:facebook/linkbench.git</developerConnection>
+        <url>https://github.com/facebook/linkbench</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <dependencies>
+      <dependency>
+        <groupId>com.facebook.swift</groupId>
+        <artifactId>swift-codec</artifactId>
+        <version>0.2.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.facebook.swift</groupId>
+        <artifactId>swift-service</artifactId>
+        <version>0.2.0</version>
+      </dependency>
+    </dependencies>
+
+  <profiles>
+    <profile>
+      <id>nexus</id>
+      <!--Enable snapshots for the built in central repo to direct -->
+      <!--all requests to nexus via the mirror -->
+      <repositories>
+        <repository>
+          <id>central</id>
+          <url>http://repo1.maven.org/maven2</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>central</id>
+          <url>http://repo1.maven.org/maven2</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+
+</project>

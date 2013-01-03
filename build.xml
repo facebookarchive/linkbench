@@ -1,19 +1,24 @@
-<project name="FacebookLinkBench" default="dist" basedir=".">
+<project name="FacebookLinkBench" default="dist" basedir="."
+         xmlns:artifact="antlib:org.apache.maven.artifact.ant">
   <property name="linkbench.version" value="0.1"/>
 
     <description>
         simple example build file
     </description>
+
   <!-- set global properties for this build -->
+  <property file="${basedir}/build.properties" />
   <property name="src" location="src"/>
   <property name="build" location="build"/>
+  <property name="build.lib" location="build/lib"/>
+  <property name="build.tools" location="build/tools"/>
   <property name="dist"  location="dist"/>
   <property name="lib"  location="lib"/>
   <property name="test.output"  location="test-output"/>
   <property name="test.rawoutput"  location="${test.output}/raw"/>
   <property name="test.tmp"  location="${test.output}/tmp"/>
   <property name="test.report"  location="${test.output}/report"/>
-  <property name="linkbench.jar" 
+  <property name="linkbench.jar"
             value="${dist}/FacebookLinkBench-${linkbench.version}.jar"/>
   <property name="linkbench.latest.jar" value="${dist}/FacebookLinkBench.jar"/>
 
@@ -26,16 +31,22 @@
     <tstamp/>
     <!-- Create the build directory structure used by compile -->
     <mkdir dir="${build}"/>
+    <mkdir dir="${build.lib}"/>
+    <mkdir dir="${build.tools}"/>
   </target>
 
-  <target name="compile" depends="init"
+  <target name="compile" depends="init,mvn.init"
         description="compile the source " >
     <!-- Compile the java code from ${src} into ${build} -->
     <javac includeantruntime="false" srcdir="${src}" destdir="${build}"
+           source="1.7" target="1.7"
            debug="${debug}">
       <classpath>
         <pathelement path="${classpath}"/>
-        <fileset dir="lib">
+        <fileset dir="${lib}">
+          <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${build.lib}">
           <include name="**/*.jar"/>
         </fileset>
         <pathelement location="classes"/>
@@ -73,7 +84,7 @@
 
       <assertions> <enable /> </assertions>
       <batchtest todir="${test.rawoutput}">
-        <fileset dir="${build}"> 
+        <fileset dir="${build}">
           <include name="**/*Test*.class"/>
           <exclude name="**/LinkStoreHBaseGeneralAtomicityTesting.class"/>
           <exclude name="**/*TestBase.class"/>
@@ -100,4 +111,41 @@
     <delete dir="${dist}"/>
     <delete dir="${test.output}"/>
   </target>
+
+  <target name="proxy" if="proxy.enabled">
+    <setproxy proxyhost="${proxy.host}" proxyport="${proxy.port}"
+      proxyuser="${proxy.user}" proxypassword="${proxy.pass}"/>
+  </target>
+
+  <target name="mvn.ant.tasks.download" depends="init,mvn.ant.tasks.check,proxy" unless="mvn.ant.tasks.found">
+    <get src="${mvn.ant.task.url}/${mvn.ant.task.jar}" dest="${build.tools}/${mvn.ant.task.jar}" usetimestamp="true"/>
+  </target>
+
+  <target name="mvn.ant.tasks.check">
+    <condition property="mvn.ant.tasks.found">
+      <typefound uri="antlib:org.apache.maven.artifact.ant" name="artifact"/>
+    </condition>
+  </target>
+
+  <target name="mvn.init" depends="mvn.ant.tasks.download" unless="mvn.finished">
+    <!-- Download mvn ant tasks, download dependencies, and setup pom file -->
+    <typedef uri="antlib:org.apache.maven.artifact.ant" classpath="${build.tools}/${mvn.ant.task.jar}"/>
+
+    <!-- remote repositories used to download dependencies from -->
+    <artifact:remoteRepository id="fbnexus" url="${mvn.fb.repo}"/>
+
+    <!-- Download the dependencies -->
+    <artifact:dependencies filesetId="build-dependency-jars" settingsFile="${basedir}/settings.xml">
+      <pom file="pom.xml"/>
+    </artifact:dependencies>
+
+    <!-- Copy the dependencies to the build/lib dir -->
+    <copy todir="${build}/lib">
+      <fileset refid="build-dependency-jars"/>
+      <mapper type="flatten"/>
+    </copy>
+
+    <property name="mvn.finished" value="true"/>
+  </target>
+
 </project>

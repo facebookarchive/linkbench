@@ -215,7 +215,6 @@ public class LinkBenchDriver {
       logger.info("Skipping load data per the cmdline arg");
       return;
     }
-
     // load data
     int nLinkLoaders = ConfigUtil.getInt(props, Config.NUM_LOADERS);
     
@@ -259,10 +258,8 @@ public class LinkBenchDriver {
       loaders.add(new NodeLoader(props, logger, nodeStore, rng,
           latencyStats, csvStreamFile, loaderId));
     }
-    
     enqueueLoadWork(chunk_q, startid1, maxid1, nLinkLoaders, 
                     new Random(masterRandom.nextLong()));
-
     // run loaders
     loadTracker.startTimer();
     long loadTime = concurrentExec(loaders);
@@ -289,7 +286,7 @@ public class LinkBenchDriver {
     logger.info(String.format("LOAD PHASE COMPLETED. " +
         " Loaded %d nodes (Expected %d)." +
         " Loaded %d links (%.2f links per node). " + 
-        " Took %.1f seconds.  Links/second = %d", 
+        " Took %.1f seconds.  Links/second = %d",
         actualNodes, expectedNodes, actualLinks,
         actualLinks / (double) actualNodes, loadTime_s,
         (long) Math.round(actualLinks / loadTime_s)));
@@ -382,7 +379,6 @@ public class LinkBenchDriver {
               progress, new Random(masterRandom.nextLong()), i, nrequesters);
       requesters.add(l);
     }
-
     progress.startTimer();
     // run requesters
     concurrentExec(requesters);
@@ -464,7 +460,6 @@ public class LinkBenchDriver {
   public static void main(String[] args)
     throws IOException, InterruptedException, Throwable {
     processArgs(args);
-    
     LinkBenchDriver d = new LinkBenchDriver(configFile, 
                                 cmdLineProps, logFile);
     try {

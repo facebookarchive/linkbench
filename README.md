@@ -84,7 +84,7 @@ Prerequisites:
 These instructions assume you are using a UNIX-like system such as a Linux distribution
 or Mac OS X.
 
-**Java**: You will need a Java 6+ runtime environment.  LinkBench by default
+**Java**: You will need a Java 7+ runtime environment.  LinkBench by default
       uses the version of Java on your path.  You can override this by setting the
       JAVA\_HOME environment variable to the directory of the desired
       Java runtime version.  You will also need a Java JDK to compile from source.
