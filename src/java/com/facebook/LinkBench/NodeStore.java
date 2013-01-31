@@ -92,4 +92,9 @@ public interface NodeStore {
   public boolean deleteNode(String dbid, int type, long id) throws Exception;
 
   public void clearErrors(int loaderId);
+  
+  /**
+   * Close the node store and clean up any resources
+   */
+  public void close();
 }

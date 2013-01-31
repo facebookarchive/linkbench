@@ -760,6 +760,7 @@ public class LinkBenchRequest implements Runnable {
                          e.getMessage(), e);
         aborted = true;
       }
+      closeStores();
       return;
     }
     
@@ -779,7 +780,7 @@ public class LinkBenchRequest implements Runnable {
           logger.error(String.format("Requester #%d aborting: %d failed requests" +
           		" (out of %d total) ", requesterID, errors, requestsDone));
           aborted = true;
-          return;
+          break;
         }
       }
       
@@ -852,7 +853,17 @@ public class LinkBenchRequest implements Runnable {
                        " not found = " + numnotfound +
                        " history queries = " + numHistoryQueries + "/" +
                                    stats.getCount(LinkBenchOp.GET_LINKS_LIST));
+    closeStores();
+  }
 
+  /**
+   * Close datastores before finishing
+   */
+  private void closeStores() {
+    linkStore.close();
+    if (nodeStore != null && nodeStore != linkStore) {
+      nodeStore.close();
+    }
   }
 
   private void displayStats(long lastStatDisplay_ms, long now_ms) {

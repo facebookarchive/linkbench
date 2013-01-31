@@ -148,6 +148,7 @@ public class NodeLoader implements Runnable {
     
     logger.info("Loading of nodes [" + startId + "," + maxId + ") done");
     displayAndResetStats();
+    nodeStore.close();
   }
 
   private void displayAndResetStats() {
