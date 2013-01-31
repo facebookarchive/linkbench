@@ -90,7 +90,7 @@ or Mac OS X.
       Java runtime version.  You will also need a Java JDK to compile from source.
 
 **Ant**: To build LinkBench, you will need the Apache Ant build tool. If
-    you do not have it already, it is available from http://ant.apache.org
+    you do not have it already, it is available from http://ant.apache.org .
 
 **MySQL Connector**:  To benchmark MySQL with LinkBench, you need MySQL
     Connector/J, A version of the MySQL connector is bundled with
@@ -115,6 +115,10 @@ If the build is successful, you should get a message like this at the end of the
 
     BUILD SUCCESSFUL
     Total time: 3 seconds
+
+If the build fails while downloading required files, you may need to configure Maven,
+for example to use a proxy.  Example Maven proxy configuration is shown here:
+http://maven.apache.org/guides/mini/guide-proxies.html
 
 Now you can run the LinkBench command line tool:
 

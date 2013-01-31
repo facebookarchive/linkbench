@@ -135,7 +135,7 @@
     <artifact:remoteRepository id="fbnexus" url="${mvn.fb.repo}"/>
 
     <!-- Download the dependencies -->
-    <artifact:dependencies filesetId="build-dependency-jars" settingsFile="${basedir}/settings.xml">
+    <artifact:dependencies filesetId="build-dependency-jars">
       <pom file="pom.xml"/>
     </artifact:dependencies>
 
