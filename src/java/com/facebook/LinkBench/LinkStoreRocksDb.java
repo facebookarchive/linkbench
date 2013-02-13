@@ -68,6 +68,8 @@ public class LinkStoreRocksDb extends GraphStore {
   public static final int DEFAULT_BULKINSERT_SIZE = 1024;
   private static final boolean INTERNAL_TESTING = false;
  
+  private static int totalThreads = 0;
+
   String host;
   String user;
   String pwd;
@@ -92,9 +94,24 @@ public class LinkStoreRocksDb extends GraphStore {
     }
   }
 
+  static synchronized void incrThreads() {
+     totalThreads++; 
+  }
+
+  static synchronized boolean isLastThread() {
+    if (--totalThreads == 0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   @Override
   public void close() {
     try {
+      if (!isLastThread()) {
+        return;
+      }
       if (assocClient != null)
         assocClient.close();
       if (nodeClient != null)
@@ -109,6 +126,7 @@ public class LinkStoreRocksDb extends GraphStore {
   @Override
   public void initialize(Properties p, Phase currentPhase, int threadId)
       throws IOException, Exception {
+    incrThreads();
     host = ConfigUtil.getPropertyRequired(p, CONFIG_HOST);
     port = ConfigUtil.getPropertyRequired(p, CONFIG_PORT);
     openConnection();
