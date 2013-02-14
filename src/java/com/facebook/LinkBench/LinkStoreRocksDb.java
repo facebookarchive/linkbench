@@ -316,6 +316,7 @@ public class LinkStoreRocksDb extends GraphStore {
       results[i] = new Link(id1, link_type, tar.getId2(),
           LinkStore.VISIBILITY_DEFAULT, tar.getData(),
           (int)(tar.getDataVersion()), tar.getTime());
+      i++;
     }
     return results;
   }
