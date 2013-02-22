@@ -441,7 +441,7 @@ public class LinkBenchDriver {
             Logger threadLog = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
             threadLog.error("Unrecoverable exception in" +
             		" worker thread:", e);
-            System.exit(1);
+            Runtime.getRuntime().halt(1);
           }
           doneSignal.countDown();
         }

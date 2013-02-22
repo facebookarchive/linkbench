@@ -72,7 +72,7 @@ for f in $LINKBENCH_HOME/lib/*.jar; do
 done
 
 # add libs to CLASSPATH
-for f in $LINKBENCH_HOME/lib/build/lib/*.jar; do
+for f in $LINKBENCH_HOME/build/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 

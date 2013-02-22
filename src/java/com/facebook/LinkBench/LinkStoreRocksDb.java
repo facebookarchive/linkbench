@@ -81,7 +81,7 @@ public class LinkStoreRocksDb extends GraphStore {
 
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
-  private void openConnection() { 
+  private void openConnection() throws Exception { 
     try {
       assocClient = clientManager.createClient(
       new FramedClientConnector(fromParts(host, Integer.parseInt(port))),
@@ -90,7 +90,9 @@ public class LinkStoreRocksDb extends GraphStore {
       new FramedClientConnector(fromParts(host, Integer.parseInt(port) + 1)),
       RocksService.class).get();
     } catch (Exception e) {
-      logger.error("Error in open!");
+      logger.error("Error in open! Host " + host + " port " + port + 
+                   " " + e);
+      throw e;
     }
   }
 
@@ -148,7 +150,7 @@ public class LinkStoreRocksDb extends GraphStore {
       close();                                                 
       openConnection();                                               
     } catch (Throwable e) {                                           
-      logger.error("Error in Reopen!");
+      logger.error("Error in Reopen!" + e);
       e.printStackTrace();                                            
     }
   }
@@ -158,7 +160,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return addLinkImpl(dbid, l, noinverse);
     } catch (Exception ex) {
-      logger.error("addlink failed!");
+      logger.error("addlink failed! " + ex);
       return false;
     }
   }
@@ -205,7 +207,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return deleteLinkImpl(dbid, id1, link_type, id2, noinverse, expunge);
     } catch (Exception ex) {
-      logger.error("deletelink failed!");
+      logger.error("deletelink failed! " + ex);
       return false;
     }
   }
@@ -238,7 +240,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return getLinkImpl(dbid, id1, link_type, id2);
     } catch (Exception ex) {
-      logger.error("getLink failed!");
+      logger.error("getLink failed! " + ex);
       return null;
     }
   }
@@ -259,7 +261,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return multigetLinksImpl(dbid, id1, link_type, id2s);
     } catch (Exception ex) {
-      logger.error("multigetlinks failed!");
+      logger.error("multigetlinks failed! " + ex);
       return null;
     }
   }
@@ -298,7 +300,7 @@ public class LinkStoreRocksDb extends GraphStore {
       return getLinkListImpl(dbid, id1, link_type, minTimestamp,
                              maxTimestamp, offset, limit);
     } catch (Exception ex) {
-      logger.error("getLinkList failed!");
+      logger.error("getLinkList failed! " + ex);
       return null;
     }
   }
@@ -327,7 +329,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return countLinksImpl(dbid, id1, link_type);
     } catch (Exception ex) {
-      logger.error("countLinks failed!");
+      logger.error("countLinks failed! " + ex);
       return -1;
     }
   }
@@ -358,7 +360,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       addBulkLinksImpl(dbid, links, noinverse);
     } catch (Exception ex) {
-      logger.error("addBulkLinks failed!");
+      logger.error("addBulkLinks failed! " + ex);
     }
   }
   
@@ -375,7 +377,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       addBulkCountsImpl(dbid, counts);
     } catch (Exception ex) {
-      logger.error("addbulkCounts failed!");
+      logger.error("addbulkCounts failed! " + ex);
     }
   }
   
@@ -423,7 +425,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return addNodeImpl(dbid, node);
     } catch (Exception ex) {
-      logger.error("addNode failed!");
+      logger.error("addNode failed! " + ex);
       return -1;
     }
   }
@@ -439,7 +441,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return bulkAddNodesImpl(dbid, nodes);
     } catch (Exception ex) {
-      logger.error("bulkAddNodes failed!");
+      logger.error("bulkAddNodes failed! " + ex);
       return null;
     }
   }
@@ -473,7 +475,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return getNodeImpl(dbid, type, id);
     } catch (Exception ex) {
-      logger.error("getnode failed!");
+      logger.error("getnode failed! " + ex);
       return null;
     }
   }
@@ -509,7 +511,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return updateNodeImpl(dbid, node);
     } catch (Exception ex) {
-      logger.error("updateNode failed!");
+      logger.error("updateNode failed! " + ex);
       return false;
     }
   }
@@ -523,7 +525,7 @@ public class LinkStoreRocksDb extends GraphStore {
     try {
       return deleteNodeImpl(dbid, type, id);
     } catch (Exception ex) {
-      logger.error("deleteNode failed!");
+      logger.error("deleteNode failed! " + ex);
       return false;
     }
   }
