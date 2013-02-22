@@ -837,7 +837,6 @@ public class LinkBenchRequest implements Runnable {
       }
     }
     
-    this.linkStore.close();
     // Do final update of statistics
     progressTracker.update(requestsSinceLastUpdate);
     displayStats(lastStatDisplay_ms, System.currentTimeMillis());
