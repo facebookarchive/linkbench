@@ -440,5 +440,14 @@ comprehensive verification of your implementation.  In particular,
 they do not try to verify the atomicity, consistency or durability
 properties of the implementation.
 
+The MySQL related unit tests are run against a test database that needs
+setting up before running the unit tests. The default settings for this
+test database are hardcoded in src/test/java/com/facebook/LinkBench/MySqlTestConfig.java.
+The default settings uses localhost:3306 to connect to the database and
+uses username "linkbench" and password "linkbench".  The unit test code 
+creates all the required tables, so the developer needs to setup a 
+MySql database called "linkbench_unittestdb" to which the linkbench user 
+has permissions to create and drop tables.
+
 **If you implement a plugin for a new database, please consider contributing
 it back to the main LinkBench distribution with a pull request.**
