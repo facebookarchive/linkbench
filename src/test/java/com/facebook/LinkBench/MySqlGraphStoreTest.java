@@ -23,7 +23,7 @@ public class MySqlGraphStoreTest extends GraphStoreTestBase {
 
   private Properties props;
   private Connection conn;
-  
+
   @Override
   protected void initStore(Properties props) throws IOException, Exception {
     this.props = props;

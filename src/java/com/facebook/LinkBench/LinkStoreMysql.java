@@ -34,7 +34,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 public class LinkStoreMysql extends GraphStore {
-  
+
   /* MySql database server configuration keys */
   public static final String CONFIG_HOST = "host";
   public static final String CONFIG_PORT = "port";
@@ -42,15 +42,15 @@ public class LinkStoreMysql extends GraphStore {
   public static final String CONFIG_PASSWORD = "password";
   public static final String CONFIG_BULK_INSERT_BATCH = "mysql_bulk_insert_batch";
   public static final String CONFIG_DISABLE_BINLOG_LOAD = "mysql_disable_binlog_load";
-  
+
   public static final int DEFAULT_BULKINSERT_SIZE = 1024;
-  
+
   private static final boolean INTERNAL_TESTING = false;
-  
+
   String linktable;
   String counttable;
   String nodetable;
-  
+
   String host;
   String user;
   String pwd;
@@ -60,7 +60,7 @@ public class LinkStoreMysql extends GraphStore {
   Level debuglevel;
   Connection conn;
   Statement stmt;
-  
+
   private Phase phase;
 
   int bulkInsertSize = DEFAULT_BULKINSERT_SIZE;
@@ -87,7 +87,7 @@ public class LinkStoreMysql extends GraphStore {
       logger.error(msg);
       throw new RuntimeException(msg);
     }
-    
+
     nodetable = props.getProperty(Config.NODE_TABLE);
     if (nodetable.equals("")) {
       // For now, don't assume that nodetable is provided
@@ -96,13 +96,13 @@ public class LinkStoreMysql extends GraphStore {
       logger.error(msg);
       throw new RuntimeException(msg);
     }
-    
+
     host = ConfigUtil.getPropertyRequired(props, CONFIG_HOST);
     user = ConfigUtil.getPropertyRequired(props, CONFIG_USER);
     pwd = ConfigUtil.getPropertyRequired(props, CONFIG_PASSWORD);
     port = props.getProperty(CONFIG_PORT);
     defaultDB = ConfigUtil.getPropertyRequired(props, Config.DBID);
-    
+
     if (port == null || port.equals("")) port = "3306"; //use default port
     debuglevel = ConfigUtil.getDebugLevel(props);
     phase = currentPhase;
@@ -114,7 +114,7 @@ public class LinkStoreMysql extends GraphStore {
       disableBinLogForLoad = ConfigUtil.getBool(props,
                                       CONFIG_DISABLE_BINLOG_LOAD);
     }
-    
+
     // connect
     try {
       openConnection();
@@ -130,7 +130,7 @@ public class LinkStoreMysql extends GraphStore {
   private void openConnection() throws Exception {
     conn = null;
     stmt = null;
-    
+
     String jdbcUrl = "jdbc:mysql://"+ host + ":" + port + "/";
     if (defaultDB != null) {
       jdbcUrl += defaultDB;
@@ -151,13 +151,13 @@ public class LinkStoreMysql extends GraphStore {
     conn.setAutoCommit(false);
     stmt = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
                                 ResultSet.CONCUR_READ_ONLY);
-    
+
     if (phase == Phase.LOAD && disableBinLogForLoad) {
       // Turn binary logging off for duration of connection
       stmt.executeUpdate("SET SESSION sql_log_bin=0");
     }
   }
-  
+
   @Override
   public void close() {
     try {
@@ -182,7 +182,7 @@ public class LinkStoreMysql extends GraphStore {
       return;
     }
   }
-  
+
   /**
    * Set of all JDBC SQLState strings that indicate a transient MySQL error
    * that should be handled by retrying
@@ -200,7 +200,7 @@ public class LinkStoreMysql extends GraphStore {
     states.add("40001"); // ER_LOCK_DEADLOCK
     return states;
   }
-  
+
   /**
    * Handle SQL exception by logging error and selecting how to respond
    * @param ex SQLException thrown by MySQL JDBC driver
@@ -212,7 +212,7 @@ public class LinkStoreMysql extends GraphStore {
                  "operation: " + op + ".  ";
     msg += "Message was: '" + ex.getMessage() + "'.  ";
     msg += "SQLState was: " + ex.getSQLState() + ".  ";
-    
+
     if (retry) {
       msg += "Error is probably transient, retrying operation.";
       logger.warn(msg);
@@ -222,7 +222,7 @@ public class LinkStoreMysql extends GraphStore {
     }
     return retry;
   }
-  
+
   // get count for testing purpose
   private void testCount(Statement stmt, String dbid,
                          String assoctable, String counttable,
@@ -269,7 +269,7 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private boolean addLinkImpl(String dbid, Link l, boolean noinverse)
       throws Exception {
 
@@ -284,7 +284,7 @@ public class LinkStoreMysql extends GraphStore {
 
     // if the link is already there then update its visibility
     // only update visibility; skip updating time, version, etc.
-    
+
     int nrows = addLinksNoCount(dbid, Collections.singletonList(l));
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
@@ -314,7 +314,7 @@ public class LinkStoreMysql extends GraphStore {
         break;
 
       case 2:
-        // a visibility was changed from VISIBILITY_HIDDEN to DEFAULT 
+        // a visibility was changed from VISIBILITY_HIDDEN to DEFAULT
         // or vice-versa
         // --> need to update both counttable and other data
         if (l.visibility == VISIBILITY_DEFAULT) {
@@ -405,10 +405,10 @@ public class LinkStoreMysql extends GraphStore {
       } else {
         sb.append(',');
       }
-      sb.append("(" + l.id1 + 
-          ", " + l.id2 + 
-          ", " + l.link_type + 
-          ", " + l.visibility + 
+      sb.append("(" + l.id1 +
+          ", " + l.id2 +
+          ", " + l.link_type +
+          ", " + l.visibility +
           ", " + stringLiteral(l.data) +
           ", " + l.time + ", " +
           l.version + ")");
@@ -422,7 +422,7 @@ public class LinkStoreMysql extends GraphStore {
     int nrows = stmt.executeUpdate(insert);
     return nrows;
 }
-  
+
   @Override
   public boolean deleteLink(String dbid, long id1, long link_type, long id2,
                          boolean noinverse, boolean expunge)
@@ -547,7 +547,7 @@ public class LinkStoreMysql extends GraphStore {
   @Override
   public boolean updateLink(String dbid, Link l, boolean noinverse)
     throws Exception {
-    // Retry logic is in addLink 
+    // Retry logic is in addLink
     boolean added = addLink(dbid, l, noinverse);
     return !added; // return true if updated instead of added
   }
@@ -567,7 +567,7 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private Link getLinkImpl(String dbid, long id1, long link_type, long id2)
     throws Exception {
     Link res[] = multigetLinks(dbid, id1, link_type, new long[] {id2});
@@ -578,7 +578,7 @@ public class LinkStoreMysql extends GraphStore {
 
 
   @Override
-  public Link[] multigetLinks(String dbid, long id1, long link_type, 
+  public Link[] multigetLinks(String dbid, long id1, long link_type,
                               long[] id2s) throws Exception {
     while (true) {
       try {
@@ -590,8 +590,8 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
-  private Link[] multigetLinksImpl(String dbid, long id1, long link_type, 
+
+  private Link[] multigetLinksImpl(String dbid, long id1, long link_type,
                                 long[] id2s) throws Exception {
     StringBuilder querySB = new StringBuilder();
     querySB.append(" select id1, id2, link_type," +
@@ -608,22 +608,22 @@ public class LinkStoreMysql extends GraphStore {
       }
       querySB.append(id2);
     }
-    
+
     querySB.append("); commit;");
     String query = querySB.toString();
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Query is " + query);
     }
-    
+
     ResultSet rs = stmt.executeQuery(query);
-    
+
     // Get the row count to allocate result array
     assert(rs.getType() != ResultSet.TYPE_FORWARD_ONLY);
     rs.last();
     int count = rs.getRow();
     rs.beforeFirst();
-    
+
     Link results[] = new Link[count];
     int i = 0;
     while (rs.next()) {
@@ -661,13 +661,13 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private Link[] getLinkListImpl(String dbid, long id1, long link_type,
         long minTimestamp, long maxTimestamp,
         int offset, int limit)
             throws Exception {
     String query = " select id1, id2, link_type," +
-    		           " visibility, data, time," +
+                   " visibility, data, time," +
                    " version from " + dbid + "." + linktable +
                    " where id1 = " + id1 + " and link_type = " + link_type +
                    " and time >= " + minTimestamp +
@@ -681,7 +681,7 @@ public class LinkStoreMysql extends GraphStore {
     }
 
     ResultSet rs = stmt.executeQuery(query);
-    
+
     // Find result set size
     // be sure we fast forward to find result set size
     assert(rs.getType() != ResultSet.TYPE_FORWARD_ONLY);
@@ -696,7 +696,7 @@ public class LinkStoreMysql extends GraphStore {
     if (count == 0) {
       return null;
     }
-    
+
     // Fetch the link data
     Link links[] = new Link[count];
     int i = 0;
@@ -735,7 +735,7 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private long countLinksImpl(String dbid, long id1, long link_type)
         throws Exception {
     long count = 0;
@@ -782,13 +782,13 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private void addBulkLinksImpl(String dbid, List<Link> links, boolean noinverse)
       throws Exception {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("addBulkLinks: " + links.size() + " links");
     }
-    
+
     addLinksNoCount(dbid, links);
     conn.commit();
   }
@@ -807,7 +807,7 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private void addBulkCountsImpl(String dbid, List<LinkCount> counts)
                                                 throws Exception {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
@@ -815,8 +815,8 @@ public class LinkStoreMysql extends GraphStore {
     }
     if (counts.size() == 0)
       return;
-    
-    StringBuilder sqlSB = new StringBuilder(); 
+
+    StringBuilder sqlSB = new StringBuilder();
     sqlSB.append("REPLACE INTO " + dbid + "." + counttable +
         "(id, link_type, count, time, version) " +
         "VALUES ");
@@ -833,7 +833,7 @@ public class LinkStoreMysql extends GraphStore {
         ", " + count.time +
         ", " + count.version + ")");
     }
-        
+
     String sql = sqlSB.toString();
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(sql);
@@ -841,11 +841,11 @@ public class LinkStoreMysql extends GraphStore {
     stmt.executeUpdate(sql);
     conn.commit();
   }
-  
+
   private void checkNodeTableConfigured() throws Exception {
     if (this.nodetable == null) {
       throw new Exception("Nodetable not specified: cannot perform node" +
-      		" operation");
+          " operation");
     }
   }
 
@@ -856,7 +856,7 @@ public class LinkStoreMysql extends GraphStore {
     stmt.execute(String.format("TRUNCATE TABLE `%s`.`%s`;",
                  dbid, nodetable));
     stmt.execute(String.format("ALTER TABLE `%s`.`%s` " +
-    		"AUTO_INCREMENT = %d;", dbid, nodetable, startID));
+        "AUTO_INCREMENT = %d;", dbid, nodetable, startID));
   }
 
   @Override
@@ -871,7 +871,7 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private long addNodeImpl(String dbid, Node node) throws Exception {
     long ids[] = bulkAddNodes(dbid, Collections.singletonList(node));
     assert(ids.length == 1);
@@ -890,7 +890,7 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private long[] bulkAddNodesImpl(String dbid, List<Node> nodes) throws Exception {
     checkNodeTableConfigured();
     StringBuilder sql = new StringBuilder();
@@ -904,7 +904,7 @@ public class LinkStoreMysql extends GraphStore {
       } else {
         sql.append(",");
       }
-      sql.append("(" + node.type + "," + node.version + 
+      sql.append("(" + node.type + "," + node.version +
           "," + node.time + "," + stringLiteral(node.data) + ")");
     }
     sql.append("; commit;");
@@ -913,22 +913,22 @@ public class LinkStoreMysql extends GraphStore {
     }
     stmt.executeUpdate(sql.toString(), Statement.RETURN_GENERATED_KEYS);
     ResultSet rs = stmt.getGeneratedKeys();
-    
+
     long newIds[] = new long[nodes.size()];
     // Find the generated id
     int i = 0;
     while (rs.next() && i < nodes.size()) {
       newIds[i++] = rs.getLong(1);
     }
-    
+
     if (i != nodes.size()) {
       throw new Exception("Wrong number of generated keys on insert: "
           + " expected " + nodes.size() + " actual " + i);
     }
-    
+
     assert(!rs.next()); // check done
     rs.close();
-    
+
     return newIds;
   }
 
@@ -944,7 +944,7 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private Node getNodeImpl(String dbid, int type, long id) throws Exception {
     checkNodeTableConfigured();
     ResultSet rs = stmt.executeQuery(
@@ -979,20 +979,20 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private boolean updateNodeImpl(String dbid, Node node) throws Exception {
     checkNodeTableConfigured();
     String sql = "UPDATE `" + dbid + "`.`" + nodetable + "`" +
             " SET " + "version=" + node.version + ", time=" + node.time
-                   + ", data=" + stringLiteral(node.data) + 
+                   + ", data=" + stringLiteral(node.data) +
             " WHERE id=" + node.id + " AND type=" + node.type + "; commit;";
-    
+
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(sql);
-    }    
-    
+    }
+
     int rows = stmt.executeUpdate(sql);
-    
+
     if (rows == 1) return true;
     else if (rows == 0) return false;
     else throw new Exception("Did not expect " + rows +  "affected rows: only "
@@ -1011,27 +1011,27 @@ public class LinkStoreMysql extends GraphStore {
       }
     }
   }
-  
+
   private boolean deleteNodeImpl(String dbid, int type, long id) throws Exception {
     checkNodeTableConfigured();
     int rows = stmt.executeUpdate(
         "DELETE FROM `" + dbid + "`.`" + nodetable + "` " +
         "WHERE id=" + id + " and type =" + type + "; commit;");
-    
+
     if (rows == 0) {
       return false;
     } else if (rows == 1) {
       return true;
     } else {
       throw new Exception(rows + " rows modified on delete: should delete " +
-      		            "at most one");
+                      "at most one");
     }
   }
-  
-  /** 
+
+  /**
    * Convert a byte array into a valid mysql string literal, assuming that
    * it will be inserted into a column with latin-1 encoding.
-   * Based on information at 
+   * Based on information at
    * http://dev.mysql.com/doc/refman/5.1/en/string-literals.html
    * @param arr
    * @return
@@ -1079,7 +1079,7 @@ public class LinkStoreMysql extends GraphStore {
 
   /**
    * Create a mysql hex string literal from array:
-   * E.g. [0xf, bc, 4c, 4] converts to x'0fbc4c03' 
+   * E.g. [0xf, bc, 4c, 4] converts to x'0fbc4c03'
    * @param arr
    * @return the mysql hex literal including quotes
    */

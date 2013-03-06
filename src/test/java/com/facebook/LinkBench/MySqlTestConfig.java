@@ -27,7 +27,7 @@ import java.util.Properties;
  * @author tarmstrong
  */
 public class MySqlTestConfig {
-  
+
   // Hardcoded parameters for now
   static String host = "localhost";
   static int port = 3306;
@@ -36,7 +36,7 @@ public class MySqlTestConfig {
   static String linktable = "test_linktable";
   static String counttable = "test_counttable";
   static String nodetable = "test_nodetable";
-  
+
   public static void fillMySqlTestServerProps(Properties props) {
     props.setProperty(Config.LINKSTORE_CLASS, LinkStoreMysql.class.getName());
     props.setProperty(Config.NODESTORE_CLASS, LinkStoreMysql.class.getName());
@@ -49,12 +49,12 @@ public class MySqlTestConfig {
     props.setProperty(Config.NODE_TABLE, nodetable);
   }
 
-  static Connection createConnection(String testDB) 
+  static Connection createConnection(String testDB)
      throws InstantiationException,
       IllegalAccessException, ClassNotFoundException, SQLException {
     Class.forName("com.mysql.jdbc.Driver").newInstance();
     return DriverManager.getConnection(
-            "jdbc:mysql://"+ MySqlTestConfig.host + ":" + 
+            "jdbc:mysql://"+ MySqlTestConfig.host + ":" +
                     MySqlTestConfig.port + "/" + testDB +
             "?elideSetAutoCommits=true" +
             "&useLocalTransactionState=true" +
@@ -62,13 +62,13 @@ public class MySqlTestConfig {
             "&useLocalSessionState=true",
             MySqlTestConfig.user, MySqlTestConfig.pass);
   }
-  
 
-  static void createTestTables(Connection conn, String testDB) 
+
+  static void createTestTables(Connection conn, String testDB)
                                           throws SQLException {
     Statement stmt = conn.createStatement();
     stmt.executeUpdate(String.format(
-        "CREATE TABLE `%s`.`%s` (" + 
+        "CREATE TABLE `%s`.`%s` (" +
         "`id1` bigint(20) unsigned NOT NULL DEFAULT '0'," +
         "`id2` bigint(20) unsigned NOT NULL DEFAULT '0'," +
         "`link_type` bigint(20) unsigned NOT NULL DEFAULT '0'," +
@@ -78,7 +78,7 @@ public class MySqlTestConfig {
         "`version` int(11) unsigned NOT NULL DEFAULT '0'," +
         "PRIMARY KEY (`id1`,`id2`,`link_type`)," +
         "KEY `id1_type` (`id1`,`link_type`,`visibility`,`time`,`version`,`data`)" +
-        ") ENGINE=InnoDB DEFAULT CHARSET=latin1;", 
+        ") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
         testDB, MySqlTestConfig.linktable));
     stmt.executeUpdate(String.format("CREATE TABLE `%s`.`%s` (" +
         "`id` bigint(20) unsigned NOT NULL DEFAULT '0'," +
@@ -90,18 +90,18 @@ public class MySqlTestConfig {
         ") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
         testDB, MySqlTestConfig.counttable));
     stmt.executeUpdate(String.format(
-        "CREATE TABLE `%s`.`%s` (" + 
+        "CREATE TABLE `%s`.`%s` (" +
         "`id` bigint(20) unsigned NOT NULL AUTO_INCREMENT," +
         "`type` int(10) unsigned NOT NULL," +
         "`version` bigint(20) unsigned NOT NULL," +
         "`time` int(10) unsigned NOT NULL," +
         "`data` mediumtext NOT NULL," +
         "primary key(`id`)" +
-        ") ENGINE=InnoDB DEFAULT CHARSET=latin1;", 
+        ") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
         testDB, MySqlTestConfig.nodetable));
   }
 
-  static void dropTestTables(Connection conn, String testDB) 
+  static void dropTestTables(Connection conn, String testDB)
                                                     throws SQLException {
     Statement stmt = conn.createStatement();
     stmt.executeUpdate(String.format("DROP TABLE IF EXISTS `%s`.`%s`;",

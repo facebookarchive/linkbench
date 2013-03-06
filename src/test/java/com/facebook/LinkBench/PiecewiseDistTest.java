@@ -46,7 +46,7 @@ public class PiecewiseDistTest extends DistributionTestBase {
     testDistribution.add(new Point(110, 0.92));
     testDistribution.add(new Point(120, 1.0));
   }
-  
+
   @Override
   protected int cdfChecks() {
     return 50;
@@ -62,25 +62,25 @@ public class PiecewiseDistTest extends DistributionTestBase {
       }
     };
   }
-  
+
   @Override
   public void testCDFSanity() {
     System.err.println("CDF not implemented");
   }
-  
+
   @Override
   public void testCDFChooseConsistency() {
     System.err.println("CDF not implemented");
   }
-  
+
   @Override
   public void testCDFPDFConsistency() {
     System.err.println("CDF not implemented");
   }
-  
+
   @Override
   public void testQuantileSanity() {
     System.err.println("Quantile not implemented");
   }
-  
+
 }

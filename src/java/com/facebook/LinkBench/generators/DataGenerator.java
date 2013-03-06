@@ -19,9 +19,9 @@ import java.util.Properties;
 import java.util.Random;
 
 public interface DataGenerator {
-  
-  public void init(Properties props, String keyPrefix); 
-  
+
+  public void init(Properties props, String keyPrefix);
+
   /**
    * Fill the provided array with randomly generated data
    * @param data

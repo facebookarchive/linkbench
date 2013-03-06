@@ -23,7 +23,7 @@ import org.junit.Test;
 import com.facebook.LinkBench.stats.LatencyStats;
 
 public class TestStats extends TestCase {
-  
+
   @Test
   public void testBucketing() {
     // 0 microseconds until 100 seconds

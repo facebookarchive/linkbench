@@ -49,9 +49,9 @@ import static com.google.common.net.HostAndPort.fromParts;
  * This file implements Linkbench methods for loading/requesting data to rocksDb
  * database server by calling thrift apis after creating 2 java thrift clients
  * through swift : assocClient for the link operations and nodeClient for the
- * node operations. assocClient interacts on port 'port' on the database = 
+ * node operations. assocClient interacts on port 'port' on the database =
  * dbid + "assocs" AND nodeClient interacts on port 'port'+1 on the database=
- * dbid + "nodes" 
+ * dbid + "nodes"
  */
 
 public class LinkStoreRocksDb extends GraphStore {
@@ -64,10 +64,10 @@ public class LinkStoreRocksDb extends GraphStore {
   public static final String CONFIG_PORT = "port";
   public static final String CONFIG_USER = "user";
   public static final String CONFIG_PASSWORD = "password";
-  
+
   public static final int DEFAULT_BULKINSERT_SIZE = 1024;
   private static final boolean INTERNAL_TESTING = false;
- 
+
   private static int totalThreads = 0;
 
   String host;
@@ -76,12 +76,12 @@ public class LinkStoreRocksDb extends GraphStore {
   String port;
 
   Level debuglevel;
-  
+
   int bulkInsertSize = DEFAULT_BULKINSERT_SIZE;
 
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
-  private void openConnection() throws Exception { 
+  private void openConnection() throws Exception {
     try {
       assocClient = clientManager.createClient(
       new FramedClientConnector(fromParts(host, Integer.parseInt(port))),
@@ -121,7 +121,7 @@ public class LinkStoreRocksDb extends GraphStore {
       if (clientManager != null)
         clientManager.close();
     } catch (IOException ioex) {
-      logger.error("Error while closing client connection: " + ioex); 
+      logger.error("Error while closing client connection: " + ioex);
     }
   }
 
@@ -143,18 +143,18 @@ public class LinkStoreRocksDb extends GraphStore {
     super();
     initialize(props, Phase.LOAD, 0);
   }
-  
+
   public void clearErrors(int threadID) {
     logger.warn("Reopening Rocksdb connection in threadID " + threadID);
-    try {                                                             
-      close();                                                 
-      openConnection();                                               
-    } catch (Throwable e) {                                           
+    try {
+      close();
+      openConnection();
+    } catch (Throwable e) {
       logger.error("Error in Reopen!" + e);
-      e.printStackTrace();                                            
+      e.printStackTrace();
     }
   }
-  
+
   @Override
   public boolean addLink(String dbid, Link l, boolean noinverse) {
     try {
@@ -164,7 +164,7 @@ public class LinkStoreRocksDb extends GraphStore {
       return false;
     }
   }
-  
+
   private boolean addLinkImpl(String dbid, Link l, boolean noinverse)
       throws Exception {
 
@@ -200,7 +200,7 @@ public class LinkStoreRocksDb extends GraphStore {
     }
     return true;
 }
-  
+
   @Override
   public boolean deleteLink(String dbid, long id1, long link_type, long id2,
                          boolean noinverse, boolean expunge) {
@@ -228,7 +228,7 @@ public class LinkStoreRocksDb extends GraphStore {
   @Override
   public boolean updateLink(String dbid, Link l, boolean noinverse)
     throws Exception {
-    // Retry logic is in addLink 
+    // Retry logic is in addLink
     boolean added = addLink(dbid, l, noinverse);
     return !added; // return true if updated instead of added
   }
@@ -244,7 +244,7 @@ public class LinkStoreRocksDb extends GraphStore {
       return null;
     }
   }
-  
+
   private Link getLinkImpl(String dbid, long id1, long link_type, long id2)
     throws Exception {
     Link res[] = multigetLinks(dbid, id1, link_type, new long[] {id2});
@@ -256,7 +256,7 @@ public class LinkStoreRocksDb extends GraphStore {
 
 
   @Override
-  public Link[] multigetLinks(String dbid, long id1, long link_type, 
+  public Link[] multigetLinks(String dbid, long id1, long link_type,
     long[] id2s) {
     try {
       return multigetLinksImpl(dbid, id1, link_type, id2s);
@@ -265,9 +265,9 @@ public class LinkStoreRocksDb extends GraphStore {
       return null;
     }
   }
-  
-  private Link[] multigetLinksImpl(String dbid, long id1, long link_type, 
-    long[] id2s) throws Exception { 
+
+  private Link[] multigetLinksImpl(String dbid, long id1, long link_type,
+    long[] id2s) throws Exception {
     List<Long> l = new ArrayList<Long>();
     for (int i = 0; i < id2s.length; i++) {
       l.add(new Long(id2s[i]));
@@ -304,14 +304,14 @@ public class LinkStoreRocksDb extends GraphStore {
       return null;
     }
   }
-  
+
   private Link[] getLinkListImpl(String dbid, long id1, long link_type,
     long minTimestamp, long maxTimestamp, int offset, int limit)
     throws Exception {
     dbid += "assocs";
     List<TaoAssocGetResult> tr = assocClient.TaoAssocRangeGet(
         dbid.getBytes(), link_type, id1, maxTimestamp, minTimestamp,
-        Long.valueOf(offset), Long.valueOf(limit));  
+        Long.valueOf(offset), Long.valueOf(limit));
     Link results[] = new Link[tr.size()];
     int i = 0;
     for (TaoAssocGetResult tar : tr) {
@@ -333,7 +333,7 @@ public class LinkStoreRocksDb extends GraphStore {
       return -1;
     }
   }
-  
+
   private long countLinksImpl(String dbid, long id1, long link_type)
     throws Exception {
     long count = 0;
@@ -363,7 +363,7 @@ public class LinkStoreRocksDb extends GraphStore {
       logger.error("addBulkLinks failed! " + ex);
     }
   }
-  
+
   private void addBulkLinksImpl(String dbid, List<Link> links,
     boolean noinverse) throws Exception {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
@@ -380,7 +380,7 @@ public class LinkStoreRocksDb extends GraphStore {
       logger.error("addbulkCounts failed! " + ex);
     }
   }
-  
+
   private void addBulkCountsImpl(String dbid, List<LinkCount> counts)
     throws Exception {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
@@ -388,7 +388,7 @@ public class LinkStoreRocksDb extends GraphStore {
     }
     if (counts.size() == 0)
       return;
-    
+
     WriteOptions wopts = new WriteOptions();
     wopts.setSync(false);
     List<Kv> batchCounts = new ArrayList<Kv>();
@@ -402,17 +402,17 @@ public class LinkStoreRocksDb extends GraphStore {
       System.arraycopy(linkType, 0, ckey, id1.length, linkType.length);
       char c = 'c';
       ckey[ckey.length - 1] = (byte)c;
-    
+
       byte[] countValue = ByteBuffer.allocate(8).putLong(
         count.count).array();
-      
+
       Kv keyvalue = new Kv();
       keyvalue.setKey(ckey);
       keyvalue.setValue(countValue);
       batchCounts.add(keyvalue);
-    }     
+    }
     dbid += "assocs";
-    assocClient.Write(dbid.getBytes(), batchCounts, wopts); 
+    assocClient.Write(dbid.getBytes(), batchCounts, wopts);
   }
 
   @Override
@@ -429,7 +429,7 @@ public class LinkStoreRocksDb extends GraphStore {
       return -1;
     }
   }
-  
+
   private long addNodeImpl(String dbid, Node node) throws Exception {
     long ids[] = bulkAddNodes(dbid, Collections.singletonList(node));
     assert(ids.length == 1);
@@ -445,7 +445,7 @@ public class LinkStoreRocksDb extends GraphStore {
       return null;
     }
   }
- 
+
   private long[] bulkAddNodesImpl(String dbid, List<Node> nodes)
     throws Exception {
     long newIds[] = new long[nodes.size()];
@@ -479,11 +479,11 @@ public class LinkStoreRocksDb extends GraphStore {
       return null;
     }
   }
-  
+
   private Node getNodeImpl(String dbid, int type, long id) throws Exception {
     ReadOptions ropts = new ReadOptions();
     dbid += "nodes";
-    RocksGetResponse rgr = 
+    RocksGetResponse rgr =
       nodeClient.Get(
         dbid.getBytes(), ByteBuffer.allocate(8).putLong(id).array(), ropts);
     if (rgr.getRetCode().getState() == (Code.K_NOT_FOUND)) {
@@ -515,7 +515,7 @@ public class LinkStoreRocksDb extends GraphStore {
       return false;
     }
   }
-  
+
   private boolean updateNodeImpl(String dbid, Node node) throws Exception {
     return addNode(dbid, node) == 1;
   }
@@ -529,7 +529,7 @@ public class LinkStoreRocksDb extends GraphStore {
       return false;
     }
   }
-  
+
   private boolean deleteNodeImpl(String dbid, int type, long id)
     throws Exception {
     WriteOptions wopts = new WriteOptions();

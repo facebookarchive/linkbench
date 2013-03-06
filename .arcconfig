@@ -1,6 +1,8 @@
 {
   "project_id" : "linkbench",
   "conduit_uri" : "https://reviews.facebook.net/",
-  "copyright_holder" : ""
+  "copyright_holder" : "",
+  "lint.engine" : "ArcanistSingleLintEngine",
+  "lint.engine.single.linter" : "ArcanistTextLinter"
 }
 

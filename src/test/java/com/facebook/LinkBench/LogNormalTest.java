@@ -39,7 +39,7 @@ public class LogNormalTest extends DistributionTestBase {
   protected double tolerance() {
     return 0.05;
   }
-  
+
   /**
    * Sanity check values
    */
@@ -49,8 +49,8 @@ public class LogNormalTest extends DistributionTestBase {
     d.init(0, 100, median, 1);
     // CDF of median should be 0.5 by def.
     assertEquals(0.5, d.cdf(median), 0.01);
-    
-    
+
+
     // Precomputed points
     d.init(0, 1000, 100, 1);
     assertEquals(0.033434, d.cdf(16), 0.0001);

@@ -43,7 +43,7 @@ public abstract class GraphStoreTestBase extends TestCase {
    */
   protected abstract void initStore(Properties props)
                                     throws IOException, Exception;
-  
+
   /**
    * Override to vary size of test
    * @return number of ids to use in testing
@@ -51,34 +51,34 @@ public abstract class GraphStoreTestBase extends TestCase {
   protected long getIDCount() {
     return 50000;
   }
-  
+
   /**
    * Override to vary number of requests in test
    */
   protected int getRequestCount() {
     return 100000;
   }
-  
+
   /**
    * Override to vary maximum number of threads
    */
   protected int maxConcurrentThreads() {
     return Integer.MAX_VALUE;
   }
-  
+
   /** Get a new handle to the initialized store, wrapped in
    * DummyLinkStore
    * @return new handle to linkstore
    */
-  protected abstract DummyLinkStore getStoreHandle(boolean initialized) 
+  protected abstract DummyLinkStore getStoreHandle(boolean initialized)
                                     throws IOException, Exception;
-  
+
   @Override
   protected void setUp() throws Exception {
     super.setUp();
     initStore(basicProps());
   }
-  
+
   /**
    * Provide properties for basic test store
    * @return
@@ -88,17 +88,17 @@ public abstract class GraphStoreTestBase extends TestCase {
     props.setProperty(Config.DBID, testDB);
     return props;
   }
-  
-  
+
+
   public static void fillLoadProps(Properties props, long startId, long idCount,
       int linksPerId) {
     LinkStoreTestBase.fillLoadProps(props, startId, idCount, linksPerId);
     props.setProperty(Config.NODE_DATASIZE, "512.0");
     props.setProperty(Config.NODE_ADD_DATAGEN,
                       UniformDataGenerator.class.getName());
-    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX + 
+    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX +
                       Config.UNIFORM_GEN_STARTBYTE, "0");
-    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX + 
+    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX +
                       Config.UNIFORM_GEN_ENDBYTE, "255");
   }
 
@@ -115,8 +115,8 @@ public abstract class GraphStoreTestBase extends TestCase {
     props.setProperty(Config.PR_UPDATE_NODE, Double.toString(p_updatenode));
     props.setProperty(Config.PR_DELETE_NODE, Double.toString(p_deletenode));
     props.setProperty(Config.PR_GET_NODE, Double.toString(p_getnode));
-    
-    props.setProperty(Config.NODE_READ_CONFIG_PREFIX + 
+
+    props.setProperty(Config.NODE_READ_CONFIG_PREFIX +
           Config.ACCESS_FUNCTION_SUFFIX, UniformDistribution.class.getName());
     props.setProperty(Config.NODE_UPDATE_CONFIG_PREFIX +
         Config.ACCESS_FUNCTION_SUFFIX, AccessDistMode.ROUND_ROBIN.name());
@@ -124,107 +124,107 @@ public abstract class GraphStoreTestBase extends TestCase {
         Config.ACCESS_CONFIG_SUFFIX, "0");
     props.setProperty(Config.NODE_DELETE_CONFIG_PREFIX +
         Config.ACCESS_FUNCTION_SUFFIX, UniformDistribution.class.getName());
-    
+
     props.setProperty(Config.NODE_DATASIZE, "1024");
     props.setProperty(Config.NODE_ADD_DATAGEN,
                       UniformDataGenerator.class.getName());
-    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX + 
+    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX +
                       Config.UNIFORM_GEN_STARTBYTE, "0");
-    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX + 
+    props.setProperty(Config.NODE_ADD_DATAGEN_PREFIX +
                       Config.UNIFORM_GEN_ENDBYTE, "255");
-    
+
     props.setProperty(Config.NODE_DATASIZE, "1024");
     props.setProperty(Config.NODE_UP_DATAGEN,
                       UniformDataGenerator.class.getName());
-    props.setProperty(Config.NODE_UP_DATAGEN_PREFIX + 
+    props.setProperty(Config.NODE_UP_DATAGEN_PREFIX +
                       Config.UNIFORM_GEN_STARTBYTE, "0");
-    props.setProperty(Config.NODE_UP_DATAGEN_PREFIX + 
+    props.setProperty(Config.NODE_UP_DATAGEN_PREFIX +
                       Config.UNIFORM_GEN_ENDBYTE, "255");
   }
-  
-  
+
+
   /**
    * Test the full workload with node and link ops to exercise the
    * requester
-   * @throws Exception 
-   * @throws IOException 
+   * @throws Exception
+   * @throws IOException
    */
   @Test
   public void testFullWorkload() throws IOException, Exception {
     long startId = 532;
     long idCount = getIDCount();
     int linksPerId = 5;
-    
+
     int requests = getRequestCount();
     long timeLimit = requests;
 
 
     Properties props = basicProps();
     fillLoadProps(props, startId, idCount, linksPerId);
-    
-    double p_add = 0.1, p_del = 0.05, p_up = 0.05, p_count = 0.05, 
+
+    double p_add = 0.1, p_del = 0.05, p_up = 0.05, p_count = 0.05,
            p_multiget = 0.05, p_getlinks = 0.1,
-           p_add_node = 0.2, p_up_node = 0.05, 
+           p_add_node = 0.2, p_up_node = 0.05,
            p_del_node = 0.05, p_get_node = 0.3;
     fillReqProps(props, startId, idCount, requests, timeLimit,
         p_add * 100, p_del * 100, p_up * 100, p_count * 100, p_multiget * 100,
         p_getlinks * 100, p_add_node * 100, p_up_node * 100,
         p_del_node * 100, p_get_node * 100);
-    
+
     try {
       Random rng = LinkStoreTestBase.createRNG();
-      
+
       LinkStoreTestBase.serialLoad(rng, logger, props, getStoreHandle(false));
       serialLoadNodes(rng, logger, props, getStoreHandle(false));
-  
+
       DummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1, 10000);
-      
+
       // Test both link and node requests
       LinkBenchRequest requester = new LinkBenchRequest(reqStore,
                reqStore, props, latencyStats, System.out, tracker, rng, 0, 1);
       tracker.startTimer();
-      
+
       requester.run();
-      
+
       latencyStats.displayLatencyStats();
       latencyStats.printCSVStats(System.out, true);
-      
+
       assertEquals(requests, reqStore.adds + reqStore.updates + reqStore.deletes +
           reqStore.countLinks + reqStore.multigetLinks + reqStore.getLinkLists +
           reqStore.addNodes + reqStore.updateNodes + reqStore.deleteNodes +
           reqStore.getNodes);
       // Check that the proportion of operations is roughly right - within 1%
       // For now, updates are actually implemented as add operations
-      assertTrue(Math.abs(reqStore.adds / (double)requests - 
+      assertTrue(Math.abs(reqStore.adds / (double)requests -
           (p_add + p_up)) < 0.01);
-      assertTrue(Math.abs(reqStore.updates / 
+      assertTrue(Math.abs(reqStore.updates /
                       (double)requests - 0.0) < 0.01);
       assertTrue(Math.abs(reqStore.deletes /
                        (double)requests - p_del) < 0.01);
-      assertTrue(Math.abs(reqStore.countLinks / 
+      assertTrue(Math.abs(reqStore.countLinks /
                        (double)requests - p_count) < 0.01);
       assertTrue(Math.abs(reqStore.multigetLinks /
                        (double)requests - p_multiget) < 0.01);
-      assertTrue(Math.abs(reqStore.getLinkLists / 
+      assertTrue(Math.abs(reqStore.getLinkLists /
                        (double)requests - p_getlinks) < 0.01);
-      assertTrue(Math.abs(reqStore.addNodes / 
+      assertTrue(Math.abs(reqStore.addNodes /
                       (double)requests - p_add_node) < 0.01);
-      assertTrue(Math.abs(reqStore.updateNodes / 
+      assertTrue(Math.abs(reqStore.updateNodes /
                       (double)requests - p_up_node) < 0.01);
       assertTrue(Math.abs(reqStore.deleteNodes /
                       (double)requests - p_del_node) < 0.01);
       assertTrue(Math.abs(reqStore.getNodes /
                       (double)requests - p_get_node) < 0.01);
-      
+
       assertEquals(0, reqStore.bulkLoadCountOps);
       assertEquals(0, reqStore.bulkLoadLinkOps);
     } finally {
       try {
         LinkStoreTestBase.deleteIDRange(testDB, getStoreHandle(true),
                                         startId, idCount);
-        deleteNodeIDRange(testDB, LinkStore.DEFAULT_NODE_TYPE, 
+        deleteNodeIDRange(testDB, LinkStore.DEFAULT_NODE_TYPE,
                           getStoreHandle(true), startId, idCount);
       } catch (Throwable t) {
         System.err.println("Error during cleanup:");
@@ -247,12 +247,12 @@ public abstract class GraphStoreTestBase extends TestCase {
   private void serialLoadNodes(Random rng, Logger logger, Properties props,
       DummyLinkStore storeHandle) throws Exception {
     storeHandle.initialize(props, Phase.LOAD, 0);
-    storeHandle.resetNodeStore(testDB, ConfigUtil.getLong(props, 
+    storeHandle.resetNodeStore(testDB, ConfigUtil.getLong(props,
                                                   Config.MIN_ID));
     storeHandle.close(); // Close before passing to loader
-    
+
     LatencyStats stats = new LatencyStats(1);
-    NodeLoader loader = new NodeLoader(props, logger, storeHandle, rng, 
+    NodeLoader loader = new NodeLoader(props, logger, storeHandle, rng,
                                        stats, System.out, 0);
     loader.run();
   }

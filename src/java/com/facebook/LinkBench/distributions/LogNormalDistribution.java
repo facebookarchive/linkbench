@@ -27,19 +27,19 @@ public class LogNormalDistribution implements ProbabilityDistribution {
   private long max;
   private double mu; // mean of the natural log of random variable
   private double sigma; // standard deviation of natural log of random variable
-  
+
   public static final String CONFIG_MEDIAN = "median";
   public static final String CONFIG_SIGMA = "sigma";
-  
+
   @Override
   public void init(long min, long max, Properties props, String keyPrefix) {
     double sigma = ConfigUtil.getDouble(props, CONFIG_SIGMA);
     double median = ConfigUtil.getDouble(props, CONFIG_MEDIAN);
     init(min, max, median, sigma);
   }
-  
+
   /**
-   * 
+   *
    * @param min
    * @param max
    * @param median the median value of the distribution
@@ -67,7 +67,7 @@ public class LogNormalDistribution implements ProbabilityDistribution {
   public double cdf(long id) {
     if (id < min) return 0.0;
     if (id >= max) return 1.0;
-    org.apache.commons.math3.distribution.LogNormalDistribution d = 
+    org.apache.commons.math3.distribution.LogNormalDistribution d =
         new org.apache.commons.math3.distribution.LogNormalDistribution(mu, sigma);
     return d.cumulativeProbability(id);
   }
@@ -75,11 +75,11 @@ public class LogNormalDistribution implements ProbabilityDistribution {
   @Override
   public long choose(Random rng) {
     long choice = (long) Math.round(FastMath.exp((rng.nextGaussian() * sigma) + mu));
-    if (choice < min) 
+    if (choice < min)
       return min;
-    else if (choice >= max) 
+    else if (choice >= max)
       return max - 1;
-    else 
+    else
       return choice;
   }
 

@@ -18,7 +18,7 @@ package com.facebook.LinkBench.distributions;
 /**
  * This code was derived and modified from the Apache Commons
  * Math 3.0 source release and modified for use in LinkBench
- * 
+ *
  *  @author tarmstrong
  */
 import org.apache.commons.math3.util.FastMath;

@@ -33,10 +33,10 @@ import com.facebook.LinkBench.LinkStore;
  * This class is used to keep track of statistics.  It collects a sample of the
  * total data (controlled by maxsamples) and can then compute statistics based
  * on that sample.
- * 
+ *
  * The overall idea is to compute reasonably accurate statistics using bounded
  * space.
- * 
+ *
  * Currently the class is used to print out stats at given intervals, with the
  * sample taken over a given time interval and printed at the end of the interval.
  */
@@ -51,7 +51,7 @@ public class SampledStats {
   // samples for various optypes
   private long[][] samples;
 
-  /** Number of operations that the sample is drawn from */ 
+  /** Number of operations that the sample is drawn from */
   private int opsSinceReset[];
 
   // minimums encounetered per operation type
@@ -62,15 +62,15 @@ public class SampledStats {
 
   // #errors encountered per type
   private long errors[];
-  
+
   // Displayed along with stats
   private int threadID;
-  
+
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
   /** Stream to write csv output to ( null if no csv output ) */
   private final PrintStream csvOutput;
-  
+
   /** Random number generator used to decide which to include in sample */
   private Random rng;
 
@@ -85,9 +85,9 @@ public class SampledStats {
     maximums = new long[LinkStore.MAX_OPTYPES];
     numops = new long[LinkStore.MAX_OPTYPES];
     errors = new long[LinkStore.MAX_OPTYPES];
-    
+
     rng = new Random();
-    
+
     csvOutput = null;
   }
 
@@ -117,7 +117,7 @@ public class SampledStats {
       double pReplace = ((double)maxsamples) / opIndex;
       if (rng.nextDouble() < pReplace) {
         // Select sample to replace randomly
-        samples[type.ordinal()][rng.nextInt(maxsamples)] = timetaken; 
+        samples[type.ordinal()][rng.nextInt(maxsamples)] = timetaken;
       }
     }
   }
@@ -142,17 +142,17 @@ public class SampledStats {
     int elems = end - start;
     long timestamp = nowTime_ms / 1000;
     long sampleDuration = nowTime_ms - sampleStartTime_ms;
-    
+
     if (elems <= 0) {
         logger.info("ThreadID = " + threadID +
                          " " + type.displayName() +
                          " totalops = " + numops[type.ordinal()] +
                          " totalErrors = " + errors[type.ordinal()] +
-                         " ops = " + opsSinceReset[type.ordinal()] + 
+                         " ops = " + opsSinceReset[type.ordinal()] +
                          " sampleDuration = " + sampleDuration + "ms" +
                          " samples = " + elems);
         if (csvOutput != null) {
-          csvOutput.println(threadID + "," + timestamp + "," + type.name() + 
+          csvOutput.println(threadID + "," + timestamp + "," + type.name() +
             "," + numops[type.ordinal()] + "," + errors[type.ordinal()] +
             "," + 0 + "," + sampleDuration +
             ",0,,,,,,,,,");
@@ -167,7 +167,7 @@ public class SampledStats {
     for (int i = start + 1; i < end; i++) {
       meanCalc.addSample(samples[type.ordinal()][i]);
     }
-    
+
     long min = samples[type.ordinal()][start];
     long p25 = samples[type.ordinal()][start + elems/4];
     long p50 = samples[type.ordinal()][start + elems/2];
@@ -177,8 +177,8 @@ public class SampledStats {
     long p99 = samples[type.ordinal()][end - 1 - elems/100];
     long max = samples[type.ordinal()][end - 1];
     double mean = meanCalc.mean();
-        
-    
+
+
     DecimalFormat df = new DecimalFormat("#.##");
     logger.info("ThreadID = " + threadID +
                      " " + type.displayName() +
@@ -197,16 +197,16 @@ public class SampledStats {
                      " 99% = " + p99 +
                      " max = " + max);
     if (csvOutput != null) {
-      csvOutput.println(threadID + "," + timestamp + "," + type.name() + 
+      csvOutput.println(threadID + "," + timestamp + "," + type.name() +
         "," + numops[type.ordinal()] + "," + errors[type.ordinal()] +
         "," + opsSinceReset[type.ordinal()] + "," + sampleDuration +
         "," + elems + "," + mean + "," + min + "," + p25 + "," + p50 +
         "," + p75 + "," + p90 + "," + p95 + "," + p99 + "," + max);
     }
   }
-  
+
   /**
-   * Write a header with column names for a csv file showing progress 
+   * Write a header with column names for a csv file showing progress
    * @param out
    */
   public static void writeCSVHeader(PrintStream out) {
@@ -219,7 +219,7 @@ public class SampledStats {
     displayStats(sampleStartTime_ms, nowTime_ms,
                  Arrays.asList(LinkBenchOp.values()));
   }
-  
+
   public void displayStats(long sampleStartTime_ms, long nowTime_ms,
                            Collection<LinkBenchOp> ops) {
     for (LinkBenchOp op: ops) {

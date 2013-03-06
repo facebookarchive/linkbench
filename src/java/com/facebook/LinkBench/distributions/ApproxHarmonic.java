@@ -25,7 +25,7 @@ public class ApproxHarmonic {
   private static final double EULER_MASCHERONI =
                   0.5772156649015328606065120900824024310421;
 
-  
+
   /**
    * Approximation to generalized harmonic for 0 >= m >= 1.
    * Designed to not take more than a couple of seconds to calculate,
@@ -55,9 +55,9 @@ public class ApproxHarmonic {
     } else {
       // Rough approximation for generalized harmonic for
       // m >= 0 and m <= 1
-      
+
       // Standard integral of 1/(n^k)
-      double integral = (1 / (1 - m)) * Math.pow(n, 1 - m);  
+      double integral = (1 / (1 - m)) * Math.pow(n, 1 - m);
 
       // Empirically derived correction factor that is good enough
       // to get to within 0.2% or so of exact number

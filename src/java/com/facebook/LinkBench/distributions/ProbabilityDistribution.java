@@ -37,16 +37,16 @@ public interface ProbabilityDistribution {
    *          different parameters in properties, this prefix can be
    *          provided to distinguish when looking up keys
    */
-  public abstract void init(long min, long max, 
+  public abstract void init(long min, long max,
                           Properties props, String keyPrefix);
-  
+
   /**
    * Probability density function, i.e. P(X = id)
    * @param id
    * @return
    */
   public abstract double pdf(long id);
-  
+
   /**
    * Probability density function scaled by an implementation-defined
    * factor (e.g. the number of trials, giving the expected number of values)
@@ -54,7 +54,7 @@ public interface ProbabilityDistribution {
    * @return
    */
   public abstract double expectedCount(long id);
-  
+
   /**
    * Cumulative distribution function, i.e. for a random variable
    * X chosen accord to the distribution P(X <= id).
@@ -63,7 +63,7 @@ public interface ProbabilityDistribution {
    * @return a probability in range [0.0, 1.0]
    */
   public abstract double cdf(long id);
-  
+
   /**
    * Choose a random id in range [min, max) according to the probability
    * distribution.
@@ -71,8 +71,8 @@ public interface ProbabilityDistribution {
    * @return the chosen id
    */
   public abstract long choose(Random rng);
-  
-  
+
+
   /**
    * Quantile function for the distribution
    * @return x such that Pr(X <= x) = p

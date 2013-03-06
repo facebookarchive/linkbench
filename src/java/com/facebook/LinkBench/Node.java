@@ -27,7 +27,7 @@ public class Node {
   public long version;
   public int time;
   public byte data[];
-  
+
   public Node(long id, int type, long version, int time,
       byte data[]) {
     super();
@@ -50,7 +50,7 @@ public class Node {
     return id == o.id && type == o.type && version == o.version
         && time == o.time && Arrays.equals(data, o.data);
   }
-  
+
   public String toString() {
     return "Node(" + "id=" + id + ",type=" + type + ",version=" + version + ","
                    + "timestamp=" + time + ",data="

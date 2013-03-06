@@ -44,7 +44,7 @@ public class AccessDistributions {
      * @return
      */
     public abstract long nextID(Random rng, long previousId);
-    
+
     /**
      * A shuffler to shuffle the results, or
      * null if the results shouldn't be shuffled
@@ -52,16 +52,16 @@ public class AccessDistributions {
      */
     public abstract InvertibleShuffler getShuffler();
   }
-  
+
   public static class BuiltinAccessDistribution implements AccessDistribution {
     private AccessDistMode mode;
     protected long minid;
     protected long maxid;
     private long config;
-    
+
     /** Use to generate decent quality random longs in range */
-    UniformDistribution uniform;  
-    
+    UniformDistribution uniform;
+
     public BuiltinAccessDistribution(AccessDistMode mode,
                             long minid, long maxid, long config) {
       this.mode = mode;
@@ -76,7 +76,7 @@ public class AccessDistributions {
     public long nextID(Random rng, long previousid) {
       long newid;
       double drange = (double)(maxid - minid);
-      
+
       switch(mode) {
       case ROUND_ROBIN: //sequential from startid1 to maxid1 (circular)
         if (previousid <= minid) {
@@ -120,12 +120,12 @@ public class AccessDistributions {
       return null;
     }
   }
-  
+
   public static class ProbAccessDistribution implements AccessDistribution {
     private final ProbabilityDistribution dist;
-    private InvertibleShuffler shuffler; 
-    
-    public ProbAccessDistribution(ProbabilityDistribution dist, 
+    private InvertibleShuffler shuffler;
+
+    public ProbAccessDistribution(ProbabilityDistribution dist,
                                   InvertibleShuffler shuffler) {
       super();
       this.dist = dist;
@@ -143,17 +143,17 @@ public class AccessDistributions {
     }
 
   }
-  
+
   public static enum AccessDistMode {
     REAL, // Real empirical distribution
     ROUND_ROBIN, // Cycle through ids
-    RECIPROCAL, // Pick with probability 
+    RECIPROCAL, // Pick with probability
     MULTIPLE, // Pick a multiple of config parameter
     POWER, // Pick a power of config parameter
     PERFECT_POWER // Pick a perfect power (square, cube, etc) with exponent
                   // as configured
   }
-  
+
   public static AccessDistribution loadAccessDistribution(Properties props,
       long minid, long maxid, DistributionType kind) throws LinkBenchConfigError {
     Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
@@ -183,10 +183,10 @@ public class AccessDistributions {
     default:
       throw new RuntimeException("Bad kind " + kind);
     }
-    
+
     String func_key = keyPrefix + Config.ACCESS_FUNCTION_SUFFIX;
     String access_func = ConfigUtil.getPropertyRequired(props, func_key);
-    
+
     try {
       AccessDistMode mode = AccessDistMode.valueOf(access_func.toUpperCase());
 
@@ -212,7 +212,7 @@ public class AccessDistributions {
   }
 
   /**
-   * 
+   *
    * @param className ProbabilityDistribution class name
    * @param props
    * @param keyPrefix prefix to use for looking up keys in props

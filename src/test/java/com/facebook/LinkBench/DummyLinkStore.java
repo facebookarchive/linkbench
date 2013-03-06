@@ -32,16 +32,16 @@ import com.facebook.LinkBench.Phase;
 public class DummyLinkStore extends GraphStore {
 
   public LinkStore wrappedStore;
-  public GraphStore wrappedGraphStore; 
-  
+  public GraphStore wrappedGraphStore;
+
   public DummyLinkStore() {
     this(null);
   }
-  
+
   public DummyLinkStore(LinkStore wrappedStore) {
     this(wrappedStore, false);
   }
-  
+
   public DummyLinkStore(LinkStore wrappedStore, boolean alreadyInitialized) {
     this.wrappedStore = wrappedStore;
     if (wrappedStore instanceof GraphStore) {
@@ -49,23 +49,23 @@ public class DummyLinkStore extends GraphStore {
     }
     this.initialized = alreadyInitialized;
   }
-  
+
   /**
    * @return true if real data is written and can be queried
    */
   public boolean isRealLinkStore() {
     return wrappedStore != null;
   }
-  
+
   /**
    * @return true if real node data is written and can be queried
    */
   public boolean isRealGraphStore() {
     return wrappedGraphStore != null;
   }
-  
+
   public boolean initialized = false;
-  
+
   public long adds = 0;
   public long deletes = 0;
   public long updates = 0;
@@ -74,7 +74,7 @@ public class DummyLinkStore extends GraphStore {
   public long getLinkLists = 0;
   public long getLinkListsHistory = 0;
   public long countLinks = 0;
-  
+
   public long addNodes = 0;
   public long updateNodes = 0;
   public long deleteNodes = 0;
@@ -85,7 +85,7 @@ public class DummyLinkStore extends GraphStore {
   public long bulkLoadLinkRows;
   public long bulkLoadCountOps;
   public long bulkLoadCountRows;
-  
+
   @Override
   public void initialize(Properties p, Phase currentPhase, int threadId)
       throws IOException, Exception {

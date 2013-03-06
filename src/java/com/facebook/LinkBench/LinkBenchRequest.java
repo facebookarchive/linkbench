@@ -43,22 +43,22 @@ public class LinkBenchRequest implements Runnable {
   Properties props;
   LinkStore linkStore;
   NodeStore nodeStore;
-  
+
   RequestProgress progressTracker;
 
   long numRequests;
   /** Requests per second: <= 0 for unlimited rate */
   private long requestrate;
-  
+
   /** Maximum number of failed requests: < 0 for unlimited */
   private long maxFailedRequests;
-  
-  /** 
+
+  /**
    * Time to run benchmark for before collecting stats. Allows
    * caches, etc to warm up.
    */
   private long warmupTime;
-  
+
   /** Maximum time to run benchmark for, not including warmup time */
   long maxTime;
   int nrequesters;
@@ -78,7 +78,7 @@ public class LinkBenchRequest implements Runnable {
   private LogNormalDistribution nodeDataSize;
   private DataGenerator nodeAddDataGen;
   private DataGenerator nodeUpDataGen;
-  
+
   // cummulative percentages
   double pc_addlink;
   double pc_deletelink;
@@ -90,10 +90,10 @@ public class LinkBenchRequest implements Runnable {
   double pc_deletenode;
   double pc_updatenode;
   double pc_getnode;
-  
+
   // Chance of doing historical range query
   double p_historical_getlinklist;
-  
+
   private static class HistoryKey {
     public final long id1;
     public final long link_type;
@@ -102,11 +102,11 @@ public class LinkBenchRequest implements Runnable {
       this.id1 = id1;
       this.link_type = link_type;
     }
-    
+
     public HistoryKey(Link l) {
       this(l.id1, l.link_type);
     }
-    
+
     @Override
     public int hashCode() {
       final int prime = 31;
@@ -115,7 +115,7 @@ public class LinkBenchRequest implements Runnable {
       result = prime * result + (int) (link_type ^ (link_type >>> 32));
       return result;
     }
-    
+
     @Override
     public boolean equals(Object obj) {
       if (!(obj instanceof HistoryKey))
@@ -123,21 +123,21 @@ public class LinkBenchRequest implements Runnable {
       HistoryKey other = (HistoryKey) obj;
       return id1 == other.id1 && link_type == other.link_type;
     }
-    
+
   }
-  
+
   // Cache of last link in lists where full list wasn't retrieved
   ArrayList<Link> listTailHistory;
-  
+
   // Index of history to avoid duplicates
   HashMap<HistoryKey, Integer> listTailHistoryIndex;
-  
+
   // Limit of cache size
   private int listTailHistoryLimit;
-  
+
   // Probability distribution for ids in multiget
   ProbabilityDistribution multigetDist;
-  
+
   // Statistics
   SampledStats stats;
   LatencyStats latencyStats;
@@ -146,17 +146,17 @@ public class LinkBenchRequest implements Runnable {
   long numfound = 0;
   long numnotfound = 0;
   long numHistoryQueries = 0;
-  
-  /** 
+
+  /**
    * Random number generator use for generating workload.  If
    * initialized with same seed, should generate same sequence of requests
-   * so that tests and benchmarks are repeatable.  
+   * so that tests and benchmarks are repeatable.
    */
   Random rng;
-  
+
   // Last node id accessed
   long lastNodeId;
-  
+
   long requestsDone = 0;
   long errors = 0;
   boolean aborted;
@@ -171,7 +171,7 @@ public class LinkBenchRequest implements Runnable {
   private AccessDistribution nodeReadDist; // node reads
   private AccessDistribution nodeUpdateDist; // node writes
   private AccessDistribution nodeDeleteDist; // node deletes
-  
+
   private ID2Chooser id2chooser;
   public LinkBenchRequest(LinkStore linkStore,
                           NodeStore nodeStore,
@@ -184,10 +184,10 @@ public class LinkBenchRequest implements Runnable {
                           int nrequesters) {
     assert(linkStore != null);
     if (requesterID < 0 ||  requesterID >= nrequesters) {
-      throw new IllegalArgumentException("Bad requester id " 
+      throw new IllegalArgumentException("Bad requester id "
           + requesterID + "/" + nrequesters);
     }
-    
+
     this.linkStore = linkStore;
     this.nodeStore = nodeStore;
     this.props = props;
@@ -238,13 +238,13 @@ public class LinkBenchRequest implements Runnable {
     progressFreq_ms = ConfigUtil.getLong(props, Config.PROGRESS_FREQ, 6L) * 1000;
     int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
     stats = new SampledStats(requesterID, maxsamples, csvStreamOut);
-   
+
     listTailHistoryLimit = 2048; // Hardcoded limit for now
     listTailHistory = new ArrayList<Link>(listTailHistoryLimit);
     listTailHistoryIndex = new HashMap<HistoryKey, Integer>();
     p_historical_getlinklist = ConfigUtil.getDouble(props,
-                        Config.PR_GETLINKLIST_HISTORY, 0.0) / 100; 
-    
+                        Config.PR_GETLINKLIST_HISTORY, 0.0) / 100;
+
     lastNodeId = startid1;
   }
 
@@ -255,49 +255,49 @@ public class LinkBenchRequest implements Runnable {
     pc_countlink = pc_updatelink + ConfigUtil.getDouble(props, Config.PR_COUNT_LINKS);
     pc_getlink = pc_countlink + ConfigUtil.getDouble(props, Config.PR_GET_LINK);
     pc_getlinklist = pc_getlink + ConfigUtil.getDouble(props, Config.PR_GET_LINK_LIST);
-    
+
     pc_addnode = pc_getlinklist + ConfigUtil.getDouble(props, Config.PR_ADD_NODE, 0.0);
     pc_updatenode = pc_addnode + ConfigUtil.getDouble(props, Config.PR_UPDATE_NODE, 0.0);
     pc_deletenode = pc_updatenode + ConfigUtil.getDouble(props, Config.PR_DELETE_NODE, 0.0);
     pc_getnode = pc_deletenode + ConfigUtil.getDouble(props, Config.PR_GET_NODE, 0.0);
-    
+
     if (Math.abs(pc_getnode - 100.0) > 1e-5) {//compare real numbers
-      throw new LinkBenchConfigError("Percentages of request types do not " + 
+      throw new LinkBenchConfigError("Percentages of request types do not " +
                   "add to 100, only " + pc_getnode + "!");
     }
   }
 
   private void initLinkRequestDistributions(Properties props, int requesterID,
       int nrequesters) {
-    writeDist = AccessDistributions.loadAccessDistribution(props, 
+    writeDist = AccessDistributions.loadAccessDistribution(props,
             startid1, maxid1, DistributionType.LINK_WRITES);
-    readDist = AccessDistributions.loadAccessDistribution(props, 
+    readDist = AccessDistributions.loadAccessDistribution(props,
         startid1, maxid1, DistributionType.LINK_READS);
-    
+
     // Load uncorrelated distributions for blending if needed
     writeDistUncorr = null;
     if (props.containsKey(Config.WRITE_UNCORR_BLEND)) {
       // Ratio of queries to use uncorrelated.  Convert from percentage
-      writeDistUncorrBlend = ConfigUtil.getDouble(props, 
+      writeDistUncorrBlend = ConfigUtil.getDouble(props,
                 Config.WRITE_UNCORR_BLEND) / 100.0;
       if (writeDistUncorrBlend > 0.0) {
-        writeDistUncorr = AccessDistributions.loadAccessDistribution(props, 
+        writeDistUncorr = AccessDistributions.loadAccessDistribution(props,
             startid1, maxid1, DistributionType.LINK_WRITES_UNCORR);
       }
     }
-    
+
     readDistUncorr = null;
     if (props.containsKey(Config.READ_UNCORR_BLEND)) {
       // Ratio of queries to use uncorrelated.  Convert from percentage
-      readDistUncorrBlend = ConfigUtil.getDouble(props, 
+      readDistUncorrBlend = ConfigUtil.getDouble(props,
                 Config.READ_UNCORR_BLEND) / 100.0;
       if (readDistUncorrBlend > 0.0) {
-        readDistUncorr = AccessDistributions.loadAccessDistribution(props, 
+        readDistUncorr = AccessDistributions.loadAccessDistribution(props,
             startid1, maxid1, DistributionType.LINK_READS_UNCORR);
       }
     }
-    
-    id2chooser = new ID2Chooser(props, startid1, maxid1, 
+
+    id2chooser = new ID2Chooser(props, startid1, maxid1,
                                 nrequesters, requesterID);
 
     // Distribution of #id2s per multiget
@@ -308,11 +308,11 @@ public class LinkBenchRequest implements Runnable {
       try {
         multigetDist = ClassLoadUtil.newInstance(multigetDistClass,
                                             ProbabilityDistribution.class);
-        multigetDist.init(multigetMin, multigetMax, props, 
+        multigetDist.init(multigetMin, multigetMax, props,
                                              Config.LINK_MULTIGET_DIST_PREFIX);
       } catch (ClassNotFoundException e) {
         logger.error(e);
-        throw new LinkBenchConfigError("Class" + multigetDistClass + 
+        throw new LinkBenchConfigError("Class" + multigetDistClass +
             " could not be loaded as ProbabilityDistribution");
       }
     } else {
@@ -322,7 +322,7 @@ public class LinkBenchRequest implements Runnable {
 
   private void initLinkDataGeneration(Properties props) {
     try {
-      double medLinkDataSize = ConfigUtil.getDouble(props, 
+      double medLinkDataSize = ConfigUtil.getDouble(props,
                                             Config.LINK_DATASIZE);
       linkDataSize = new LogNormalDistribution();
       linkDataSize.init(0, LinkStore.MAX_LINK_DATA, medLinkDataSize,
@@ -331,21 +331,21 @@ public class LinkBenchRequest implements Runnable {
           ConfigUtil.getPropertyRequired(props, Config.LINK_ADD_DATAGEN),
           DataGenerator.class);
       linkAddDataGen.init(props, Config.LINK_ADD_DATAGEN_PREFIX);
-      
+
       linkUpDataGen = ClassLoadUtil.newInstance(
           ConfigUtil.getPropertyRequired(props, Config.LINK_UP_DATAGEN),
           DataGenerator.class);
       linkUpDataGen.init(props, Config.LINK_UP_DATAGEN_PREFIX);
     } catch (ClassNotFoundException ex) {
       logger.error(ex);
-      throw new LinkBenchConfigError("Error loading data generator class: " 
+      throw new LinkBenchConfigError("Error loading data generator class: "
             + ex.getMessage());
     }
   }
 
   private void initNodeRequestDistributions(Properties props) {
     try {
-      nodeReadDist  = AccessDistributions.loadAccessDistribution(props, 
+      nodeReadDist  = AccessDistributions.loadAccessDistribution(props,
         startid1, maxid1, DistributionType.NODE_READS);
     } catch (LinkBenchConfigError e) {
       // Not defined
@@ -354,9 +354,9 @@ public class LinkBenchRequest implements Runnable {
       throw new LinkBenchConfigError("Node read distribution not " +
             "configured but node read operations have non-zero probability");
     }
-    
+
     try {
-      nodeUpdateDist  = AccessDistributions.loadAccessDistribution(props, 
+      nodeUpdateDist  = AccessDistributions.loadAccessDistribution(props,
         startid1, maxid1, DistributionType.NODE_UPDATES);
     } catch (LinkBenchConfigError e) {
       // Not defined
@@ -365,9 +365,9 @@ public class LinkBenchRequest implements Runnable {
       throw new LinkBenchConfigError("Node write distribution not " +
             "configured but node write operations have non-zero probability");
     }
-    
+
     try {
-      nodeDeleteDist = AccessDistributions.loadAccessDistribution(props, 
+      nodeDeleteDist = AccessDistributions.loadAccessDistribution(props,
         startid1, maxid1, DistributionType.NODE_DELETES);
     } catch (LinkBenchConfigError e) {
       // Not defined
@@ -379,27 +379,27 @@ public class LinkBenchRequest implements Runnable {
   }
 
   private void initNodeDataGeneration(Properties props) {
-    try {  
-      double medNodeDataSize = ConfigUtil.getDouble(props, 
+    try {
+      double medNodeDataSize = ConfigUtil.getDouble(props,
                                               Config.NODE_DATASIZE);
       nodeDataSize = new LogNormalDistribution();
       nodeDataSize.init(0, NodeStore.MAX_NODE_DATA, medNodeDataSize,
                         Config.NODE_DATASIZE_SIGMA);
 
-      String dataGenClass = ConfigUtil.getPropertyRequired(props, 
+      String dataGenClass = ConfigUtil.getPropertyRequired(props,
                                          Config.NODE_ADD_DATAGEN);
       nodeAddDataGen = ClassLoadUtil.newInstance(dataGenClass,
                                                  DataGenerator.class);
       nodeAddDataGen.init(props, Config.NODE_ADD_DATAGEN_PREFIX);
-      
-      dataGenClass = ConfigUtil.getPropertyRequired(props, 
+
+      dataGenClass = ConfigUtil.getPropertyRequired(props,
                         Config.NODE_UP_DATAGEN);
       nodeUpDataGen = ClassLoadUtil.newInstance(dataGenClass,
                                                  DataGenerator.class);
       nodeUpDataGen.init(props, Config.NODE_UP_DATAGEN_PREFIX);
     } catch (ClassNotFoundException ex) {
       logger.error(ex);
-      throw new LinkBenchConfigError("Error loading data generator class: " 
+      throw new LinkBenchConfigError("Error loading data generator class: "
             + ex.getMessage());
     }
   }
@@ -407,7 +407,7 @@ public class LinkBenchRequest implements Runnable {
   public long getRequestsDone() {
     return requestsDone;
   }
-  
+
   public boolean didAbort() {
     return aborted;
   }
@@ -455,7 +455,7 @@ public class LinkBenchRequest implements Runnable {
          " for access distribution: " + dist.getClass().getName() + ": " +
          dist.toString());
     }
-    
+
     if (dist.getShuffler() != null) {
       // Shuffle to go from position in space ranked from most to least accessed,
       // to the real id space
@@ -490,7 +490,7 @@ public class LinkBenchRequest implements Runnable {
         link.visibility = LinkStore.VISIBILITY_DEFAULT;
         link.version = 0;
         link.time = System.currentTimeMillis();
-        link.data = linkAddDataGen.fill(rng, 
+        link.data = linkAddDataGen.fill(rng,
                                       new byte[(int)linkDataSize.choose(rng)]);
 
         starttime = System.nanoTime();
@@ -499,9 +499,9 @@ public class LinkBenchRequest implements Runnable {
         boolean added = !alreadyExists;
         endtime = System.nanoTime();
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-          logger.trace("addLink id1=" + link.id1 + " link_type=" 
+          logger.trace("addLink id1=" + link.id1 + " link_type="
                     + link.link_type + " id2=" + link.id2 + " added=" + added);
-        } 
+        }
       } else if (r <= pc_deletelink) {
         type = LinkBenchOp.DELETE_LINK;
         long id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
@@ -513,9 +513,9 @@ public class LinkBenchRequest implements Runnable {
             false);
         endtime = System.nanoTime();
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-          logger.trace("deleteLink id1=" + id1 + " link_type=" + link_type 
+          logger.trace("deleteLink id1=" + id1 + " link_type=" + link_type
                      + " id2=" + id2);
-        } 
+        }
       } else if (r <= pc_updatelink) {
         type = LinkBenchOp.UPDATE_LINK;
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
@@ -526,8 +526,8 @@ public class LinkBenchRequest implements Runnable {
         link.visibility = LinkStore.VISIBILITY_DEFAULT;
         link.version = 0;
         link.time = System.currentTimeMillis();
-        link.data = linkUpDataGen.fill(rng, 
-                            new byte[(int)linkDataSize.choose(rng)]);   
+        link.data = linkUpDataGen.fill(rng,
+                            new byte[(int)linkDataSize.choose(rng)]);
 
         starttime = System.nanoTime();
         // no inverses for now
@@ -535,9 +535,9 @@ public class LinkBenchRequest implements Runnable {
         boolean found = found1;
         endtime = System.nanoTime();
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-          logger.trace("updateLink id1=" + link.id1 + " link_type=" 
+          logger.trace("updateLink id1=" + link.id1 + " link_type="
                 + link.link_type + " id2=" + link.id2 + " found=" + found);
-        } 
+        }
       } else if (r <= pc_countlink) {
 
         type = LinkBenchOp.COUNT_LINK;
@@ -548,9 +548,9 @@ public class LinkBenchRequest implements Runnable {
         long count = linkStore.countLinks(dbid, id1, link_type);
         endtime = System.nanoTime();
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-          logger.trace("countLink id1=" + id1 + " link_type=" + link_type 
+          logger.trace("countLink id1=" + id1 + " link_type=" + link_type
                      + " count=" + count);
-        } 
+        }
       } else if (r <= pc_getlink) {
 
         type = LinkBenchOp.MULTIGET_LINK;
@@ -558,7 +558,7 @@ public class LinkBenchRequest implements Runnable {
         long id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
         long link_type = id2chooser.chooseRandomLinkType(rng);
         int nid2s = 1;
-        if (multigetDist != null) { 
+        if (multigetDist != null) {
           nid2s = (int)multigetDist.choose(rng);
         }
         long id2s[] = id2chooser.chooseMultipleForOp(rng, id1, link_type, nid2s,
@@ -579,7 +579,7 @@ public class LinkBenchRequest implements Runnable {
 
         type = LinkBenchOp.GET_LINKS_LIST;
         Link links[];
-        
+
         if (rng.nextDouble() < p_historical_getlinklist &&
                     !this.listTailHistory.isEmpty()) {
           links = getLinkListTail();
@@ -590,7 +590,7 @@ public class LinkBenchRequest implements Runnable {
           links = getLinkList(id1, link_type);
           endtime = System.nanoTime();
         }
-        
+
         int count = ((links == null) ? 0 : links.length);
         if (recordStats) {
           stats.addStats(LinkBenchOp.RANGE_SIZE, count, false);
@@ -608,21 +608,21 @@ public class LinkBenchRequest implements Runnable {
         type = LinkBenchOp.UPDATE_NODE;
         // Choose an id that has previously been created (but might have
         // been since deleted
-        long upId = chooseRequestID(DistributionType.NODE_UPDATES, 
+        long upId = chooseRequestID(DistributionType.NODE_UPDATES,
                                      lastNodeId);
         // Generate new data randomly
         Node newNode = createUpdateNode(upId);
-        
+
         starttime = System.nanoTime();
         boolean changed = nodeStore.updateNode(dbid, newNode);
         endtime = System.nanoTime();
         lastNodeId = upId;
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("updateNode " + newNode + " changed=" + changed);
-        } 
+        }
       } else if (r <= pc_deletenode) {
         type = LinkBenchOp.DELETE_NODE;
-        long idToDelete = chooseRequestID(DistributionType.NODE_DELETES, 
+        long idToDelete = chooseRequestID(DistributionType.NODE_DELETES,
                                           lastNodeId);
         starttime = System.nanoTime();
         boolean deleted = nodeStore.deleteNode(dbid, LinkStore.DEFAULT_NODE_TYPE,
@@ -635,7 +635,7 @@ public class LinkBenchRequest implements Runnable {
       } else if (r <= pc_getnode) {
         type = LinkBenchOp.GET_NODE;
         starttime = System.nanoTime();
-        long idToFetch = chooseRequestID(DistributionType.NODE_READS, 
+        long idToFetch = chooseRequestID(DistributionType.NODE_READS,
                                          lastNodeId);
         Node fetched = nodeStore.getNode(dbid, LinkStore.DEFAULT_NODE_TYPE, idToFetch);
         endtime = System.nanoTime();
@@ -661,7 +661,7 @@ public class LinkBenchRequest implements Runnable {
         stats.addStats(type, timetaken, false);
         latencyStats.recordLatency(requesterID, type, timetaken);
       }
-      
+
       return true;
     } catch (Throwable e){//Catch exception if any
 
@@ -685,16 +685,16 @@ public class LinkBenchRequest implements Runnable {
    */
   private Node createAddNode() {
     byte data[] = nodeAddDataGen.fill(rng, new byte[(int)nodeDataSize.choose(rng)]);
-    return new Node(-1, LinkStore.DEFAULT_NODE_TYPE, 1, 
+    return new Node(-1, LinkStore.DEFAULT_NODE_TYPE, 1,
                     (int)(System.currentTimeMillis()/1000), data);
   }
-  
+
   /**
    * Create new node for updating in database
    */
   private Node createUpdateNode(long id) {
     byte data[] = nodeUpDataGen.fill(rng, new byte[(int)nodeDataSize.choose(rng)]);
-    return new Node(id, LinkStore.DEFAULT_NODE_TYPE, 2, 
+    return new Node(id, LinkStore.DEFAULT_NODE_TYPE, 2,
                     (int)(System.currentTimeMillis()/1000), data);
   }
 
@@ -704,7 +704,7 @@ public class LinkBenchRequest implements Runnable {
         + numRequests + " ops after " + warmupTime + " second warmup");
     logger.debug("Requester thread #" + requesterID + " first random number "
                   + rng.nextLong());
-    
+
     try {
       this.linkStore.initialize(props, Phase.REQUEST, requesterID);
       if (this.nodeStore != null && this.nodeStore != this.linkStore) {
@@ -714,10 +714,10 @@ public class LinkBenchRequest implements Runnable {
       logger.error("Error while initializing store", e);
       throw new RuntimeException(e);
     }
-    
+
     long warmupStartTime = System.currentTimeMillis();
     boolean warmupDone = warmupTime <= 0;
-    long benchmarkStartTime; 
+    long benchmarkStartTime;
     if (!warmupDone) {
       benchmarkStartTime = warmupStartTime + warmupTime * 1000;
     } else {
@@ -726,7 +726,7 @@ public class LinkBenchRequest implements Runnable {
     long endTime = benchmarkStartTime + maxTime * 1000;
     long lastUpdate = warmupStartTime;
     long curTime = warmupStartTime;
-    
+
     long i;
 
     if (singleAssoc) {
@@ -760,7 +760,7 @@ public class LinkBenchRequest implements Runnable {
       closeStores();
       return;
     }
-    
+
     long warmupRequests = 0;
     long requestsSinceLastUpdate = 0;
     long lastStatDisplay_ms = curTime;
@@ -775,14 +775,14 @@ public class LinkBenchRequest implements Runnable {
         errors++;
         if (maxFailedRequests >= 0 && errors > maxFailedRequests) {
           logger.error(String.format("Requester #%d aborting: %d failed requests" +
-          		" (out of %d total) ", requesterID, errors, requestsDone));
+              " (out of %d total) ", requesterID, errors, requestsDone));
           aborted = true;
           break;
         }
       }
-      
+
       curTime = System.currentTimeMillis();
-      
+
       // Track requests done
       if (warmupDone) {
         requestsDone++;
@@ -794,7 +794,7 @@ public class LinkBenchRequest implements Runnable {
       } else {
         warmupRequests++;
       }
-      
+
       // Per-thread periodic progress updates
       if (curTime > lastUpdate + progressFreq_ms) {
         if (warmupDone) {
@@ -803,13 +803,13 @@ public class LinkBenchRequest implements Runnable {
           lastUpdate = curTime;
         } else {
           logger.info(String.format("Requester #%d warming up.  " +
-          		" %d warmup requests done. %d/%d seconds of warmup done",
+              " %d warmup requests done. %d/%d seconds of warmup done",
               requesterID, warmupRequests, (curTime - warmupStartTime) / 1000,
               warmupTime));
           lastUpdate = curTime;
         }
       }
-      
+
       // Per-thread periodic stat dumps after warmup done
       if (warmupDone && (lastStatDisplay_ms + displayFreq_ms) <= curTime) {
         displayStats(lastStatDisplay_ms, curTime);
@@ -824,11 +824,11 @@ public class LinkBenchRequest implements Runnable {
         lastStatDisplay_ms = curTime;
         requestsSinceLastUpdate = 0;
         logger.info(String.format("Requester #%d warmup finished " +
-        		" after %d warmup requests.  0/%d requests done",
+            " after %d warmup requests.  0/%d requests done",
             requesterID, warmupRequests, numRequests));
         lastUpdate = curTime;
       }
-      
+
       // Enforce time limit
       if (curTime > endTime) {
         logger.info(String.format("Requester #%d: time limit of %ds elapsed" +
@@ -836,11 +836,11 @@ public class LinkBenchRequest implements Runnable {
         break;
       }
     }
-    
+
     // Do final update of statistics
     progressTracker.update(requestsSinceLastUpdate);
     displayStats(lastStatDisplay_ms, System.currentTimeMillis());
-    
+
     // Report final stats
     logger.info("ThreadID = " + requesterID +
                        " total requests = " + requestsDone +
@@ -868,7 +868,7 @@ public class LinkBenchRequest implements Runnable {
         Arrays.asList(
         LinkBenchOp.MULTIGET_LINK, LinkBenchOp.GET_LINKS_LIST,
         LinkBenchOp.COUNT_LINK,
-        LinkBenchOp.UPDATE_LINK, LinkBenchOp.ADD_LINK, 
+        LinkBenchOp.UPDATE_LINK, LinkBenchOp.ADD_LINK,
         LinkBenchOp.RANGE_SIZE, LinkBenchOp.ADD_NODE,
         LinkBenchOp.UPDATE_NODE, LinkBenchOp.DELETE_NODE,
         LinkBenchOp.GET_NODE));
@@ -889,10 +889,10 @@ public class LinkBenchRequest implements Runnable {
     if (links != null && links.length >= linkStore.getRangeLimit()) {
       Link lastLink = links[links.length-1];
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-        logger.trace("Maybe more history for (" + id1 +"," + 
+        logger.trace("Maybe more history for (" + id1 +"," +
                       link_type + " older than " + lastLink.time);
       }
-      
+
       addTailCacheEntry(lastLink);
     }
     return links;
@@ -903,13 +903,13 @@ public class LinkBenchRequest implements Runnable {
     assert(!listTailHistory.isEmpty());
     int choice = rng.nextInt(listTailHistory.size());
     Link prevLast = listTailHistory.get(choice);
-    
+
     // Get links past the oldest last retrieved
     Link links[] = linkStore.getLinkList(dbid, prevLast.id1,
         prevLast.link_type, 0, prevLast.time, 1, linkStore.getRangeLimit());
-    
+
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-      logger.trace("getLinkListTail(id1=" + prevLast.id1 + ", link_type=" 
+      logger.trace("getLinkListTail(id1=" + prevLast.id1 + ", link_type="
                 + prevLast.link_type + ", max_time=" + prevLast.time
                 + " => count=" + (links == null ? 0 : links.length));
    }
@@ -918,7 +918,7 @@ public class LinkBenchRequest implements Runnable {
                     prevLast.link_type + " older than " + prevLast.time +
                     ": " + (links == null ? 0 : links.length) + " results");
     }
-    
+
     if (links != null && links.length == linkStore.getRangeLimit()) {
       // There might be yet more history
       Link last = links[links.length-1];
@@ -930,7 +930,7 @@ public class LinkBenchRequest implements Runnable {
       listTailHistory.set(choice, last.clone());
     } else {
       // No more history after this, remove from cache
-      removeTailCacheEntry(choice, null); 
+      removeTailCacheEntry(choice, null);
     }
     numHistoryQueries++;
     return links;
@@ -938,7 +938,7 @@ public class LinkBenchRequest implements Runnable {
 
   /**
    * Add a new link to the history cache, unless already present
-   * @param lastLink the last (i.e. lowest timestamp) link retrieved 
+   * @param lastLink the last (i.e. lowest timestamp) link retrieved
    */
   private void addTailCacheEntry(Link lastLink) {
     HistoryKey key = new HistoryKey(lastLink);
@@ -946,7 +946,7 @@ public class LinkBenchRequest implements Runnable {
       // Already present
       return;
     }
-    
+
     if (listTailHistory.size() < listTailHistoryLimit) {
       listTailHistory.add(lastLink.clone());
       listTailHistoryIndex.put(key, listTailHistory.size() - 1);
@@ -974,7 +974,7 @@ public class LinkBenchRequest implements Runnable {
         listTailHistory.set(lastIx, repl);
         listTailHistoryIndex.put(new HistoryKey(repl), lastIx);
       }
-    } else { 
+    } else {
       if (repl == null) {
         // Replace with last entry in cache to fill gap
         repl = listTailHistory.get(listTailHistory.size() - 1);
@@ -990,12 +990,12 @@ public class LinkBenchRequest implements Runnable {
     static final int THREAD_REPORT_INTERVAL = 250;
     /** How many ops before a progress update should be printed to console */
     private final long interval;
-    
+
     private final Logger progressLogger;
-    
+
     private long totalRequests;
     private final AtomicLong requestsDone;
-    
+
     private long benchmarkStartTime;
     private long warmupTime_s;
     private long timeLimit_s;
@@ -1009,11 +1009,11 @@ public class LinkBenchRequest implements Runnable {
       this.timeLimit_s = timeLimit_s;
       this.warmupTime_s = warmupTime_s;
     }
-    
+
     public void startTimer() {
       benchmarkStartTime = System.currentTimeMillis() + warmupTime_s * 1000;
     }
-    
+
     public long getBenchmarkStartTime() {
       return benchmarkStartTime;
     }
@@ -1021,7 +1021,7 @@ public class LinkBenchRequest implements Runnable {
     public void update(long requestIncr) {
       long curr = requestsDone.addAndGet(requestIncr);
       long prev = curr - requestIncr;
-      
+
       if ((curr / interval) > (prev / interval) || curr == totalRequests) {
         float progressPercent = ((float) curr) / totalRequests * 100;
         long now = System.currentTimeMillis();
@@ -1034,7 +1034,7 @@ public class LinkBenchRequest implements Runnable {
             " %.1f/%d secs elapsed: %.1f%% of time limit used",
             curr, totalRequests, progressPercent, rate,
             elapsed_s, timeLimit_s, limitPercent));
-            
+
       }
     }
   }

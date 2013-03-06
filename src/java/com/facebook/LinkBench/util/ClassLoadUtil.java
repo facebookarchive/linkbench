@@ -23,14 +23,14 @@ import java.lang.reflect.Constructor;
 public class ClassLoadUtil {
 
   private static final Class<?>[] EMPTY_ARRAY = new Class[]{};
-  
+
   /**
    * Load a class by name.
    * @param name the class name.
    * @return the class object.
    * @throws ClassNotFoundException if the class is not found.
    */
-  public static Class<?> getClassByName(String name) 
+  public static Class<?> getClassByName(String name)
                             throws ClassNotFoundException {
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     return Class.forName(name, true, classLoader);
@@ -47,7 +47,7 @@ public class ClassLoadUtil {
     try {
       if (!expected.isAssignableFrom(theClass)) {
         throw new Exception("Specified class " + theClass.getName() + "" +
-        		"does not extend/implement " + expected.getName());
+            "does not extend/implement " + expected.getName());
       }
       Class<? extends T> clazz = (Class<? extends T>)theClass;
       Constructor<? extends T> meth = clazz.getDeclaredConstructor(EMPTY_ARRAY);
@@ -58,7 +58,7 @@ public class ClassLoadUtil {
     }
     return result;
   }
-  
+
   public static <T> T newInstance(String className, Class<T> expected)
                                         throws ClassNotFoundException {
     return newInstance(getClassByName(className), expected);

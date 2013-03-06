@@ -15,9 +15,9 @@
  */
 package com.facebook.LinkBench.stats;
 
-/** 
+/**
  * Keep track of mean in numerically stable way
- * See "Comparison of Several Algorithms for Computing Sample Means and 
+ * See "Comparison of Several Algorithms for Computing Sample Means and
  *      Variances", Ling, 1974, J. American Stat. Assoc.
  */
 public class RunningMean {
@@ -26,10 +26,10 @@ public class RunningMean {
 
   /** First sample */
   private final double v1;
-  
+
   /** sum of difference */
   private double running;
-  
+
   /** initialize with first sample */
   public RunningMean(double v1) {
     super();
@@ -42,7 +42,7 @@ public class RunningMean {
     n++;
     running += (vi - v1);
   }
-  
+
   public double mean() {
     return v1 + running / n;
   }

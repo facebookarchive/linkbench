@@ -48,14 +48,14 @@ public class Link {
       return false;
     }
   }
-  
+
   public String toString() {
     return String.format("Link(id1=%d, id2=%d, link_type=%d," +
-    		"visibility=%d, version=%d," +
-    		"time=%d, data=%s", id1, id2, link_type,
-    		visibility, version, time, data.toString());
+        "visibility=%d, version=%d," +
+        "time=%d, data=%s", id1, id2, link_type,
+        visibility, version, time, data.toString());
   }
-  
+
   /**
    * Clone an existing link
    * @param l

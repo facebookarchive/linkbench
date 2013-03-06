@@ -34,35 +34,35 @@ import com.facebook.LinkBench.distributions.PiecewiseLinearDistribution;
 
 public class RealDistribution extends PiecewiseLinearDistribution {
   public static final String DISTRIBUTION_CONFIG = "realdist";
-  private static final Logger logger = 
-                      Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
+  private static final Logger logger =
+                      Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   /* params to shuffler for link degree */
   public static final long NLINKS_SHUFFLER_SEED = 20343988438726021L;
   public static final int NLINKS_SHUFFLER_GROUPS = 1024;
-  
+
   /* shufflers to generate distributions uncorrelated to above */
   public static final long UNCORR_SHUFFLER_SEED = 53238253823453L;
   public static final int UNCORR_SHUFFLER_GROUPS = 1024;
-  
-  /* Shufflers for requests that are correlated with link degree */ 
+
+  /* Shufflers for requests that are correlated with link degree */
   public static final long WRITE_CORR_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
   public static final int WRITE_CORR_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
   public static final long READ_CORR_SHUFFLER_SEED = NLINKS_SHUFFLER_SEED;
   public static final int READ_CORR_SHUFFLER_GROUPS = NLINKS_SHUFFLER_GROUPS;
-  
+
   /* Shufflers for requests that are uncorrelated with link degree */
   public static final long WRITE_UNCORR_SHUFFLER_SEED = UNCORR_SHUFFLER_SEED;
   public static final int WRITE_UNCORR_SHUFFLER_GROUPS = UNCORR_SHUFFLER_GROUPS;
   public static final long READ_UNCORR_SHUFFLER_SEED = UNCORR_SHUFFLER_SEED;
   public static final int READ_UNCORR_SHUFFLER_GROUPS = UNCORR_SHUFFLER_GROUPS;
-  
+
   public static final long NODE_READ_SHUFFLER_SEED = 4766565305853767165L;
   public static final int NODE_READ_SHUFFLER_GROUPS = 1024;
   public static final long NODE_UPDATE_SHUFFLER_SEED = NODE_READ_SHUFFLER_SEED;
-  public static final int NODE_UPDATE_SHUFFLER_GROUPS = 
+  public static final int NODE_UPDATE_SHUFFLER_GROUPS =
                                                     NODE_READ_SHUFFLER_GROUPS;
   public static final long NODE_DELETE_SHUFFLER_SEED = NODE_READ_SHUFFLER_SEED;
-  public static final int NODE_DELETE_SHUFFLER_GROUPS = 
+  public static final int NODE_DELETE_SHUFFLER_GROUPS =
                                                     NODE_READ_SHUFFLER_GROUPS;
 
   public static enum DistributionType {
@@ -77,18 +77,18 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   }
 
   private DistributionType type = null;
-  
+
   public RealDistribution() {
     this.type = null;
   }
-  
+
   @Override
   public void init(long min, long max, Properties props, String keyPrefix) {
     this.min = min;
-    this.max = max; 
+    this.max = max;
     String dist = ConfigUtil.getPropertyRequired(props,
                               keyPrefix + DISTRIBUTION_CONFIG);
-    
+
     DistributionType configuredType;
     if (dist.equals("link_reads")) {
       configuredType = DistributionType.LINK_READS;
@@ -104,7 +104,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
       throw new RuntimeException("Invalid distribution type for "
           + "RealDistribution: " + dist);
     }
-      
+
     init(props, min, max, configuredType);
   }
 
@@ -139,7 +139,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
       throw new RuntimeException("Unknown distribution type: " + type);
     }
   }
-  
+
   private static ArrayList<Point> nlinks_cdf, link_nreads_cdf, link_nwrites_cdf,
                   node_nreads_cdf, node_nwrites_cdf;
   private static double[] link_nreads_cs, nwrites_cs, node_nreads_cs, node_nwrites_cs;
@@ -148,7 +148,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
    * the id1 generation, with each cell holding the next id to
    * return.  These are shared between RealDistribution instances
    * and different threads.
-   * 
+   *
    * It is not clear that this works entirely as intended and it
    * certainly is non-deterministic when multiple threads are
    * involved.
@@ -228,10 +228,10 @@ public class RealDistribution extends PiecewiseLinearDistribution {
 
   //convert CDF from ArrayList<Point> to Map
   static NavigableMap<Integer, Double> getCDF(DistributionType dist) {
-    ArrayList<Point> points = 
+    ArrayList<Point> points =
       dist == DistributionType.LINKS ? nlinks_cdf :
       dist == DistributionType.LINK_READS? link_nreads_cdf :
-      dist == DistributionType.LINK_WRITES ? link_nwrites_cdf : 
+      dist == DistributionType.LINK_WRITES ? link_nwrites_cdf :
       dist == DistributionType.NODE_READS ? node_nreads_cdf :
       dist == DistributionType.NODE_UPDATES ? node_nwrites_cdf :
                                                           null;
@@ -243,7 +243,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     }
     return map;
   }
-  
+
   /*
    * This method reads from data_file nlinks, nreads, nwrites discreate
    * cumulative distribution function (CDF) and produces corresponding
@@ -258,7 +258,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   private static void getStatisticalData(Properties props) throws FileNotFoundException {
     String filename = ConfigUtil.getPropertyRequired(props,
                             Config.DISTRIBUTION_DATA_FILE);
-    
+
     // If relative path, should be relative to linkbench home directory
     String fileAbsPath;
     if (new File(filename).isAbsolute()) {
@@ -277,7 +277,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     }
 
     logger.info("Loading real distribution data from " + fileAbsPath);
-    
+
     Scanner scanner = new Scanner(new File(fileAbsPath));
     while (scanner.hasNext()) {
       String type = scanner.next();
@@ -341,7 +341,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     // simple workload balancing
     return (long)expectedCount(startid1, maxid1, id1, nlinks_cdf);
   }
- 
+
   @Override
   public long choose(Random rng) {
     if (type == DistributionType.LINKS) {

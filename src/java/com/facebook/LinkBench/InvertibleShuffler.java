@@ -21,13 +21,13 @@ import java.util.Random;
  * Shuffler designed to make computing permutation and inverse easy
  */
 public class InvertibleShuffler {
-  private final long[] params;  
+  private final long[] params;
   private final int shuffleGroups;
   long n;
   long nRoundedUp; // n rounded up to next multiple of shuffleGroups
   long nRoundedDown; // n rounded down to next multiple of shuffleGroups
   int minGroupSize;
-  
+
   public InvertibleShuffler(long seed, int shuffleGroups, long n) {
     this(new Random(seed), shuffleGroups, n);
   }
@@ -40,23 +40,23 @@ public class InvertibleShuffler {
     this.n = n;
     this.params = new long[shuffleGroups];
     this.minGroupSize = (int)n / shuffleGroups;
-    
+
     for (int i = 0; i < shuffleGroups; i++) {
       // Positive long
       params[i] = Math.abs(rng.nextInt(minGroupSize));
     }
-    this.nRoundedDown = (n / shuffleGroups) * shuffleGroups; 
+    this.nRoundedDown = (n / shuffleGroups) * shuffleGroups;
     this.nRoundedUp = n == nRoundedDown ? n : nRoundedDown + shuffleGroups;
   }
-  
+
   public long permute(long i) {
     return permute(i, false);
   }
-  
+
   public long invertPermute(long i) {
     return permute(i, true);
   }
-  
+
   public long permute(long i, boolean inverse) {
     if (i < 0 || i >= n) {
       throw new IllegalArgumentException("Bad index to permute: " + i
@@ -64,10 +64,10 @@ public class InvertibleShuffler {
     }
     // Number of the group
     int group = (int) (i % shuffleGroups);
-    
+
     // Whether this is a big or small group
     boolean bigGroup = group < n % shuffleGroups;
-    
+
     // Calculate the (positive) rotation
     long rotate = params[group];
     if (inverse) {
@@ -79,7 +79,7 @@ public class InvertibleShuffler {
       }
       assert(rotate >= 0);
     }
-    
+
     long j = (i + shuffleGroups * rotate);
     long result;
     if (j < n) {

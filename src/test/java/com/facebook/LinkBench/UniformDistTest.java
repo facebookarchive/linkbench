@@ -28,14 +28,14 @@ public class UniformDistTest extends DistributionTestBase {
   public ProbabilityDistribution getDist() {
     return new UniformDistribution();
   }
-  
+
   @Test
   public void testInRange() {
     // Check 2^31 < n < 2^32 and n > 2^32
     long maxes[] = {(long)Math.pow(2, 31.5), (long)Math.pow(2, 34.23)};
     int trials = 10000;
     Random rng = new Random();
-    
+
     for (long max: maxes) {
       UniformDistribution dist = new UniformDistribution();
       dist.init(0, max, 1);

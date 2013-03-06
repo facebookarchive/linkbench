@@ -60,10 +60,10 @@ import com.facebook.LinkBench.util.ClassLoadUtil;
  */
 
 public class LinkBenchDriver {
-  
+
   public static final int EXIT_BADARGS = 1;
   public static final int EXIT_BADCONFIG = 2;
-  
+
   /* Command line arguments */
   private static String configFile = null;
   private static String workloadConfigFile = null;
@@ -75,10 +75,10 @@ public class LinkBenchDriver {
   private static PrintStream csvStreamFile = null;
   private static boolean doLoad = false;
   private static boolean doRequest = false;
-  
+
   private Properties props;
-  
-  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
+
+  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
   LinkBenchDriver(String configfile, Properties
                   overrideProps, String logFile)
@@ -89,9 +89,9 @@ public class LinkBenchDriver {
     for (String key: overrideProps.stringPropertyNames()) {
       props.setProperty(key, overrideProps.getProperty(key));
     }
-    
+
     loadWorkloadProps();
-    
+
     ConfigUtil.setupLogging(props, logFile);
 
     logger.info("Config file: " + configfile);
@@ -146,7 +146,7 @@ public class LinkBenchDriver {
     throws Exception {
     LinkStore linkStore = createLinkStore();
     NodeStore nodeStore = createNodeStore(linkStore);
-    
+
     return new Stores(linkStore, nodeStore);
   }
 
@@ -156,20 +156,20 @@ public class LinkBenchDriver {
     // for easy access:
     //   LinkStoreMysql :  run benchmark on  mySQL
     //   LinkStoreHBaseGeneralAtomicityTesting : atomicity testing on HBase.
-    
-    String linkStoreClassName = ConfigUtil.getPropertyRequired(props, 
+
+    String linkStoreClassName = ConfigUtil.getPropertyRequired(props,
                                             Config.LINKSTORE_CLASS);
-    
+
     logger.debug("Using LinkStore implementation: " + linkStoreClassName);
-    
+
     LinkStore linkStore;
     try {
-      linkStore = ClassLoadUtil.newInstance(linkStoreClassName, 
+      linkStore = ClassLoadUtil.newInstance(linkStoreClassName,
                                             LinkStore.class);
     } catch (ClassNotFoundException nfe) {
       throw new IOException("Cound not find class for " + linkStoreClassName);
     }
-  
+
     return linkStore;
   }
 
@@ -188,12 +188,12 @@ public class LinkBenchDriver {
     } else {
       logger.debug("Using NodeStore implementation: " + nodeStoreClassName);
     }
-    
+
     if (linkStore != null && linkStore.getClass().getName().equals(
                                                 nodeStoreClassName)) {
       // Same class, reuse object
       if (!NodeStore.class.isAssignableFrom(linkStore.getClass())) {
-        throw new Exception("Specified NodeStore class " + nodeStoreClassName 
+        throw new Exception("Specified NodeStore class " + nodeStoreClassName
                           + " is not a subclass of NodeStore");
       }
       return (NodeStore)linkStore;
@@ -217,39 +217,39 @@ public class LinkBenchDriver {
     }
     // load data
     int nLinkLoaders = ConfigUtil.getInt(props, Config.NUM_LOADERS);
-    
+
 
     boolean bulkLoad = true;
     BlockingQueue<LoadChunk> chunk_q = new LinkedBlockingQueue<LoadChunk>();
-    
+
     // max id1 to generate
     long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
     // id1 at which to start
     long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
-    
+
     // Create loaders
     logger.info("Starting loaders " + nLinkLoaders);
     logger.debug("Bulk Load setting: " + bulkLoad);
-    
+
     Random masterRandom = createMasterRNG(props, Config.LOAD_RANDOM_SEED);
-    
+
 
     boolean genNodes = ConfigUtil.getBool(props, Config.GENERATE_NODES);
     int nTotalLoaders = genNodes ? nLinkLoaders + 1 : nLinkLoaders;
-    
+
     LatencyStats latencyStats = new LatencyStats(nTotalLoaders);
     List<Runnable> loaders = new ArrayList<Runnable>(nTotalLoaders);
-    
-    LoadProgress loadTracker = LoadProgress.create(logger, props); 
+
+    LoadProgress loadTracker = LoadProgress.create(logger, props);
     for (int i = 0; i < nLinkLoaders; i++) {
       LinkStore linkStore = createLinkStore();
-      
+
       bulkLoad = bulkLoad && linkStore.bulkLoadBatchSize() > 0;
-      LinkBenchLoad l = new LinkBenchLoad(linkStore, props, latencyStats, 
+      LinkBenchLoad l = new LinkBenchLoad(linkStore, props, latencyStats,
               csvStreamFile, i, maxid1 == startid1 + 1, chunk_q, loadTracker);
       loaders.add(l);
     }
-    
+
     if (genNodes) {
       logger.info("Will generate graph nodes during loading");
       int loaderId = nTotalLoaders - 1;
@@ -258,7 +258,7 @@ public class LinkBenchDriver {
       loaders.add(new NodeLoader(props, logger, nodeStore, rng,
           latencyStats, csvStreamFile, loaderId));
     }
-    enqueueLoadWork(chunk_q, startid1, maxid1, nLinkLoaders, 
+    enqueueLoadWork(chunk_q, startid1, maxid1, nLinkLoaders,
                     new Random(masterRandom.nextLong()));
     // run loaders
     loadTracker.startTimer();
@@ -277,15 +277,15 @@ public class LinkBenchDriver {
     }
 
     latencyStats.displayLatencyStats();
-    
+
     if (csvStatsFile != null) {
       latencyStats.printCSVStats(csvStatsFile, true);
     }
-    
+
     double loadTime_s = (loadTime/1000.0);
     logger.info(String.format("LOAD PHASE COMPLETED. " +
         " Loaded %d nodes (Expected %d)." +
-        " Loaded %d links (%.2f links per node). " + 
+        " Loaded %d links (%.2f links per node). " +
         " Took %.1f seconds.  Links/second = %d",
         actualNodes, expectedNodes, actualLinks,
         actualLinks / (double) actualNodes, loadTime_s,
@@ -307,22 +307,22 @@ public class LinkBenchDriver {
       logger.info("Using configured random seed " + configKey + "=" + seed);
     } else {
       seed = System.nanoTime() ^ (long)configKey.hashCode();
-      logger.info("Using random seed " + seed + " since " + configKey 
+      logger.info("Using random seed " + seed + " since " + configKey
           + " not specified");
     }
-    
+
     SecureRandom masterRandom;
     try {
       masterRandom = SecureRandom.getInstance("SHA1PRNG");
     } catch (NoSuchAlgorithmException e) {
       logger.warn("SHA1PRNG not available, defaulting to default SecureRandom" +
-      		" implementation");
+          " implementation");
       masterRandom = new SecureRandom();
     }
     masterRandom.setSeed(ByteBuffer.allocate(8).putLong(seed).array());
-    
+
     // Can be used to check that rng is behaving as expected
-    logger.debug("First number generated by master " + configKey + 
+    logger.debug("First number generated by master " + configKey +
                  ": " + masterRandom.nextLong());
     return masterRandom;
   }
@@ -331,20 +331,20 @@ public class LinkBenchDriver {
       long maxid1, int nloaders, Random rng) {
     // Enqueue work chunks.  Do it in reverse order as a heuristic to improve
     // load balancing, since queue is FIFO and later chunks tend to be larger
-    
+
     int chunkSize = ConfigUtil.getInt(props, Config.LOADER_CHUNK_SIZE, 2048);
     long chunk_num = 0;
     ArrayList<LoadChunk> stack = new ArrayList<LoadChunk>();
     for (long id1 = startid1; id1 < maxid1; id1 += chunkSize) {
-      stack.add(new LoadChunk(chunk_num, id1, 
+      stack.add(new LoadChunk(chunk_num, id1,
                     Math.min(id1 + chunkSize, maxid1), rng));
       chunk_num++;
     }
-    
+
     for (int i = stack.size() - 1; i >= 0; i--) {
       chunk_q.add(stack.get(i));
     }
-    
+
     for (int i = 0; i < nloaders; i++) {
       // Add a shutdown signal for each loader
       chunk_q.add(LoadChunk.SHUTDOWN);
@@ -368,14 +368,14 @@ public class LinkBenchDriver {
     List<LinkBenchRequest> requesters = new LinkedList<LinkBenchRequest>();
 
     RequestProgress progress = LinkBenchRequest.createProgress(logger, props);
-    
+
     Random masterRandom = createMasterRNG(props, Config.REQUEST_RANDOM_SEED);
-    
+
     // create requesters
     for (int i = 0; i < nrequesters; i++) {
       Stores stores = initStores();
       LinkBenchRequest l = new LinkBenchRequest(stores.linkStore,
-              stores.nodeStore, props, latencyStats, csvStreamFile, 
+              stores.nodeStore, props, latencyStats, csvStreamFile,
               progress, new Random(masterRandom.nextLong()), i, nrequesters);
       requesters.add(l);
     }
@@ -384,8 +384,8 @@ public class LinkBenchDriver {
     concurrentExec(requesters);
     long finishTime = System.currentTimeMillis();
     // Calculate duration accounting for warmup time
-    long benchmarkTime = finishTime - progress.getBenchmarkStartTime(); 
-    
+    long benchmarkTime = finishTime - progress.getBenchmarkStartTime();
+
     long requestsdone = 0;
     int abortedRequesters = 0;
     // wait for requesters
@@ -397,18 +397,18 @@ public class LinkBenchDriver {
     }
 
     latencyStats.displayLatencyStats();
-    
+
     if (csvStatsFile != null) {
       latencyStats.printCSVStats(csvStatsFile, true);
     }
-    
+
     logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
                  " requests done in " + (benchmarkTime/1000) + " seconds." +
                  " Requests/second = " + (1000*requestsdone)/benchmarkTime);
     if (abortedRequesters > 0) {
       logger.error(String.format("Benchmark did not complete cleanly: %d/%d " +
-      		"request threads aborted.  See error log entries for details.",
-      		abortedRequesters, nrequesters));  
+          "request threads aborted.  See error log entries for details.",
+          abortedRequesters, nrequesters));
     }
   }
 
@@ -439,8 +439,7 @@ public class LinkBenchDriver {
             task.run();
           } catch (Throwable e) {
             Logger threadLog = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
-            threadLog.error("Unrecoverable exception in" +
-            		" worker thread:", e);
+            threadLog.error("Unrecoverable exception in worker thread:", e);
             Runtime.getRuntime().halt(1);
           }
           doneSignal.countDown();
@@ -460,7 +459,7 @@ public class LinkBenchDriver {
   public static void main(String[] args)
     throws IOException, InterruptedException, Throwable {
     processArgs(args);
-    LinkBenchDriver d = new LinkBenchDriver(configFile, 
+    LinkBenchDriver d = new LinkBenchDriver(configFile,
                                 cmdLineProps, logFile);
     try {
       d.drive();
@@ -481,26 +480,26 @@ public class LinkBenchDriver {
     Option config = new Option("c", true, "Linkbench config file");
     config.setArgName("file");
     options.addOption(config);
-    
+
     Option log = new Option("L", true, "Log to this file");
     log.setArgName("file");
     options.addOption(log);
-    
-    Option csvStats = new Option("csvstats", "csvstats", true, 
+
+    Option csvStats = new Option("csvstats", "csvstats", true,
                                  "CSV stats output");
     csvStats.setArgName("file");
     options.addOption(csvStats);
-    
-    Option csvStream = new Option("csvstream", "csvstream", true, 
+
+    Option csvStream = new Option("csvstream", "csvstream", true,
         "CSV streaming stats output");
     csvStream.setArgName("file");
     options.addOption(csvStream);
-    
+
     options.addOption("l", false,
                "Execute loading stage of benchmark");
     options.addOption("r", false,
                "Execute request stage of benchmark");
-    
+
     // Java-style properties to override config file
     // -Dkey=value
     Option property = new Option("D", "Override a config setting");
@@ -508,10 +507,10 @@ public class LinkBenchDriver {
     property.setArgName("property=value");
     property.setValueSeparator('=');
     options.addOption(property);
-    
+
     return options;
   }
-  
+
   /**
    * Process command line arguments and set static variables
    * exits program if invalid arguments provided
@@ -522,7 +521,7 @@ public class LinkBenchDriver {
   private static void processArgs(String[] args)
               throws ParseException {
     Options options = initializeOptions();
-    
+
     CommandLine cmd = null;
     try {
       CommandLineParser parser = new GnuParser();
@@ -533,8 +532,8 @@ public class LinkBenchDriver {
       printUsage(options);
       System.exit(EXIT_BADARGS);
     }
-    
-    /* 
+
+    /*
      * Apache CLI validates arguments, so can now assume
      * all required options are present, etc
      */
@@ -547,14 +546,14 @@ public class LinkBenchDriver {
       System.err.println();
       printUsage(options);
       System.exit(EXIT_BADARGS);
-    }   
+    }
 
     // Set static option variables
     doLoad = cmd.hasOption('l');
     doRequest = cmd.hasOption('r');
-    
+
     logFile = cmd.getOptionValue('L'); // May be null
-    
+
     configFile = cmd.getOptionValue('c');
     if (configFile == null) {
       // Try to find in usual location
@@ -570,7 +569,7 @@ public class LinkBenchDriver {
         System.exit(EXIT_BADARGS);
       }
     }
-    
+
     String csvStatsFileName = cmd.getOptionValue("csvstats"); // May be null
     if (csvStatsFileName != null) {
       try {
@@ -582,7 +581,7 @@ public class LinkBenchDriver {
         System.exit(EXIT_BADARGS);
       }
     }
-    
+
     String csvStreamFileName = cmd.getOptionValue("csvstream"); // May be null
     if (csvStreamFileName != null) {
       try {
@@ -597,9 +596,9 @@ public class LinkBenchDriver {
         System.exit(EXIT_BADARGS);
       }
     }
-    
+
     cmdLineProps = cmd.getOptionProperties("D");
-    
+
     if (!(doLoad || doRequest)) {
       System.err.println("Did not select benchmark mode");
       printUsage(options);

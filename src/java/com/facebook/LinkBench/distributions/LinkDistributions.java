@@ -29,7 +29,7 @@ import com.facebook.LinkBench.util.ClassLoadUtil;
 public class LinkDistributions {
   public static interface LinkDistribution {
     public abstract long getNlinks(long id1);
-    
+
     /**
      * Let caller know it should shuffle IDs
      * @return
@@ -56,7 +56,7 @@ public class LinkDistributions {
     }
   }
 
-  /** 
+  /**
    * Built-in distributions
    */
   public static enum LinkDistMode {
@@ -67,7 +67,7 @@ public class LinkDistributions {
     PERFECT_SQUARES,
     EXPONENTIAL
   }
-  
+
   /**
    * Some link distributions using arithmetic tricks
    */
@@ -78,7 +78,7 @@ public class LinkDistributions {
     private long nlinks_default;
 
     private long minid1, maxid1;
-    
+
     public ArithLinkDistribution(long minid1, long maxid1, LinkDistMode mode,
         long nlinks_config, long nlinks_default) {
       this.minid1 = minid1;
@@ -157,7 +157,7 @@ public class LinkDistributions {
       // If not built-in, assume it's a class name
       return tryDynamicLoad(nlinks_func, props, minid1, maxid1);
     }
-    
+
     // real distribution has it own initialization
     if (mode == LinkDistMode.REAL) {
       logger.debug("Using real link distribution");

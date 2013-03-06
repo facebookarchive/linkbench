@@ -72,7 +72,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
 
   private static final Logger logger =
               Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
-  
+
   static enum Counters { LINK_LOADED, REQUEST_DONE }
 
   private static Properties props;
@@ -324,15 +324,15 @@ public class LinkBenchDriverMR extends Configured implements Tool {
 
       long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
       long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
-      
+
       LoadProgress prog_tracker = LoadProgress.create(
             Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER), props);
-      
-      LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats, 
+
+      LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats,
                                null,
                                loaderid.get(), maxid1 == startid1 + 1,
                                nloaders.get(), prog_tracker, new Random());
-      
+
       LinkedList<LinkBenchLoad> tasks = new LinkedList<LinkBenchLoad>();
       tasks.add(loader);
       long linksloaded = 0;
@@ -367,13 +367,13 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       LatencyStats latencyStats = new LatencyStats(nrequesters.get());
       RequestProgress progress =
                               LinkBenchRequest.createProgress(logger, props);
-      progress.startTimer();    
+      progress.startTimer();
       // TODO: Don't support NodeStore yet
       final LinkBenchRequest requester =
         new LinkBenchRequest(store, null, props, latencyStats, null, progress,
                 new Random(), requesterid.get(), nrequesters.get());
-      
-      
+
+
       // Wrap in runnable to handle error
       Thread t = new Thread(new Runnable() {
         public void run() {

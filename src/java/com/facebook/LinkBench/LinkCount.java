@@ -22,7 +22,7 @@ public class LinkCount {
   public long time;
   public long version;
   public long count;
-  public LinkCount(long id1, long link_type, 
+  public LinkCount(long id1, long link_type,
       long time, long version, long init_count) {
     super();
     this.id1 = id1;

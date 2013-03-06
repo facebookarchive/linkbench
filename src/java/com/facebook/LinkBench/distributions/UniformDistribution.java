@@ -27,11 +27,11 @@ import com.facebook.LinkBench.ConfigUtil;
  *
  */
 public class UniformDistribution implements ProbabilityDistribution {
-  
-  private long min = 0; 
+
+  private long min = 0;
   private long max = 1;
   private double scale = 1.0;
-  
+
   public void init(long min, long max, Properties props, String keyPrefix) {
     if (max <= min) {
       throw new IllegalArgumentException("max = " + max + " <= min = " + min +
@@ -40,24 +40,24 @@ public class UniformDistribution implements ProbabilityDistribution {
     this.min = min;
     this.max = max;
     if (props != null && props.containsKey(keyPrefix + Config.PROB_MEAN)) {
-      scale = (max - min) * ConfigUtil.getDouble(props, 
+      scale = (max - min) * ConfigUtil.getDouble(props,
                                   keyPrefix + Config.PROB_MEAN);
     } else {
       scale = 1.0;
     }
   }
-  
+
   public void init(long min, long max, double scale) {
     this.min = min;
     this.max = max;
     this.scale = scale;
   }
-  
+
   @Override
   public double pdf(long id) {
     return scaledPDF(id, 1.0);
   }
-  
+
   @Override
   public double expectedCount(long id) {
     return scaledPDF(id, scale);
@@ -84,10 +84,10 @@ public class UniformDistribution implements ProbabilityDistribution {
     }
     long n = max - min;
     long rank = id - min + 1;
-    
+
     return rank / (double)n;
   }
-  
+
   /**
    * Quantile function
    */
@@ -98,10 +98,10 @@ public class UniformDistribution implements ProbabilityDistribution {
     if (i == n) return max - 1;
     return i + min;
   }
-  
+
   // Total number of representable numbers by int
   private static final long UINT_RANGE = Integer.MAX_VALUE - (long) Integer.MIN_VALUE;
-  
+
   /** Choose an id X uniformly in the range*/
   public long choose(Random rng) {
     long n = max - min;
@@ -112,7 +112,7 @@ public class UniformDistribution implements ProbabilityDistribution {
     } else if (n < UINT_RANGE) {
       return randint2(rng, n);
     } else {
-      return UINT_RANGE * rng.nextInt((int)(n / UINT_RANGE)) + 
+      return UINT_RANGE * rng.nextInt((int)(n / UINT_RANGE)) +
                           randint2(rng, n % UINT_RANGE);
     }
   }
@@ -127,10 +127,10 @@ public class UniformDistribution implements ProbabilityDistribution {
   private long randint2(Random rng, long n) {
     assert(n < UINT_RANGE);
     double p = Integer.MAX_VALUE / (double)n;
-    if (rng.nextDouble() < p) { 
+    if (rng.nextDouble() < p) {
       return rng.nextInt(Integer.MAX_VALUE);
     } else {
-      return Integer.MAX_VALUE + 
+      return Integer.MAX_VALUE +
           (long)(rng.nextInt((int)(n - Integer.MAX_VALUE)));
     }
   }

@@ -20,7 +20,7 @@ import java.util.Arrays;
 import org.junit.Test;
 
 import junit.framework.TestCase;
-/** 
+/**
  * Check that the shuffler obeys expected invariants
  */
 public class InvertibleShufflerTest extends TestCase {
@@ -38,18 +38,18 @@ public class InvertibleShufflerTest extends TestCase {
     testShuffle(0, 10, true, seed, 15);
     testShuffle(0, 100, true, seed, 11);
   }
-  
+
   @Test
   public void testShuffleMedRange() {
     testShuffle(512, 10543, false, 13, 7);
     testShuffle(512, 10543, false, 13, 7, 27, 140);
   }
-  
+
   @Test
   public void testShuffleLargeRange() {
     testShuffle(12345, 123456, false, 13, 7, 27, 140);
   }
-  
+
   /**
    * Check that result is a valid permutation (i.e. a 1->1 mapping)
    * @param minId
@@ -61,22 +61,22 @@ public class InvertibleShufflerTest extends TestCase {
     String shuffleDesc = String.format(
           "Permuting range [%d,%d) with params %s", minId, maxId,
           Arrays.toString(params));
-        
+
     if (print) {
       System.err.println(shuffleDesc);
     }
-    
-    
+
+
     int n = maxId - minId;
-    
+
 
     //ProbDistShuffler shuf = new ProbDistShuffler(params[0], (int)params[1], n);
     InvertibleShuffler shuf = new InvertibleShuffler(params[0], (int)params[1], n);
-    
+
     long reverse[] = new long[n]; // Store the reverse permutation
     // Store if ID has appeared (inited to false)
     boolean exists[] = new boolean[n];
-    
+
     for (int i = minId; i < maxId; i++) {
       //long lj = Shuffler.getPermutationValue(i, minId, maxId, params);
       long lj = minId + shuf.permute(i - minId);
@@ -87,11 +87,11 @@ public class InvertibleShufflerTest extends TestCase {
       }
       assertTrue(lj >= minId);
       assertTrue(lj < maxId);
-      int j = (int)lj; // Must be in integer range 
+      int j = (int)lj; // Must be in integer range
       if (exists[j - minId]) {
         fail(String.format(
-            "Error with test %s: collision. p(%d) = p(%d) = %d", 
-            shuffleDesc, i, reverse[j - minId], j)); 
+            "Error with test %s: collision. p(%d) = p(%d) = %d",
+            shuffleDesc, i, reverse[j - minId], j));
       }
       reverse[j - minId] = i;
       exists[j - minId] = true;

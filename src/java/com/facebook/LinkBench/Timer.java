@@ -18,7 +18,7 @@ package com.facebook.LinkBench;
 import java.util.Random;
 
 public class Timer {
-  
+
   /**
    * Wait an amount of time since the last event determined by the
    * exponential distribution
@@ -34,7 +34,7 @@ public class Timer {
     Timer.waitUntil(nextTime_ns);
     return nextTime_ns;
   }
-  
+
   /**
    * Wait until System.nanoTime() is > the argument
    * @param time_ns

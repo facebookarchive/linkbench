@@ -27,7 +27,7 @@ import java.util.TreeSet;
 /**
  * Simple in-memory implementation of GraphStore
  * Not efficient or optimized at all, just for testing purposes.
- * 
+ *
  * MemoryLinkStore instances sharing the same data can be created
  * using the newInstance() method.
  * MemoryLinkStore can be accessed concurrently from multiple threads,
@@ -38,7 +38,7 @@ public class MemoryLinkStore extends GraphStore {
   private static class LinkLookupKey {
     final long id1;
     final long link_type;
-    
+
     public LinkLookupKey(long id1, long link_type) {
       super();
       this.id1 = id1;
@@ -50,7 +50,7 @@ public class MemoryLinkStore extends GraphStore {
       if (!(other instanceof LinkLookupKey)) {
         return false;
       }
-      LinkLookupKey other2 = (LinkLookupKey)other; 
+      LinkLookupKey other2 = (LinkLookupKey)other;
       return id1 == other2.id1 && link_type == other2.link_type;
     }
 
@@ -59,7 +59,7 @@ public class MemoryLinkStore extends GraphStore {
       return Long.valueOf(id1).hashCode() ^ Long.valueOf(link_type).hashCode();
     }
   }
-  
+
   /** Order links from most to least recent */
   private static class LinkTimeStampComparator implements Comparator<Link> {
 
@@ -68,7 +68,7 @@ public class MemoryLinkStore extends GraphStore {
       // ascending order of id1
       if (l1.id1 != l2.id1) {
         if (l1.id1 < l2.id2) {
-          return -1; 
+          return -1;
         } else {
           return 1;
         }
@@ -76,12 +76,12 @@ public class MemoryLinkStore extends GraphStore {
       if (l1.time != l2.time) {
         // descending order of time
         if (l1.time < l2.time) {
-          return 1; 
+          return 1;
         } else {
           return -1;
         }
       }
-      
+
       // ascending order of id2
       if (l1.id2 == l2.id2) {
         return 0;
@@ -92,66 +92,66 @@ public class MemoryLinkStore extends GraphStore {
       }
     }
   }
-  
+
   /**
    * Class for allocating IDs and storing objects
    */
   private static class NodeDB {
     private long nextID; // Next id to allocate
     Map<Long, Node> data = new HashMap<Long, Node>();
-    
+
     /** Construct a new instance allocating ids from 1 */
     NodeDB() {
       this(1);
     }
-    
+
     NodeDB(long startID) {
       this.nextID = startID;
     }
-    
+
     long allocateID() {
       return nextID++;
     }
-    
+
     void reset(long startID) {
       nextID = startID;
       data.clear();
     }
   }
-  
-  
+
+
   /** Simple implementation of LinkStore with nested maps and a set of
-   * links sorted by timestamp: 
+   * links sorted by timestamp:
    * dbid ->  (id1, assoc_type) -> links */
   private final Map<String, Map<LinkLookupKey, SortedSet<Link>>> linkdbs;
-  
+
   private final Map<String, NodeDB> nodedbs;
-  
+
   /**
    * Storage for objects
    */
 
   private static final Comparator<Link> LINK_COMPARATOR = new LinkTimeStampComparator();
-  
-  /** 
-   * Create a new MemoryLinkStore instance with fresh data 
+
+  /**
+   * Create a new MemoryLinkStore instance with fresh data
    */
   public MemoryLinkStore() {
     this(new HashMap<String, Map<LinkLookupKey, SortedSet<Link>>>(),
          new HashMap<String, NodeDB>());
   }
-  
-  /** 
-   * Create a new MemoryLinkStore handle sharing data with existing instance 
+
+  /**
+   * Create a new MemoryLinkStore handle sharing data with existing instance
    */
   private MemoryLinkStore(Map<String, Map<LinkLookupKey, SortedSet<Link>>> linkdbs,
                           Map<String, NodeDB> nodedbs) {
     this.linkdbs = linkdbs;
     this.nodedbs = nodedbs;
   }
-  
+
   /**
-   * Find a list of links based on 
+   * Find a list of links based on
    * @param dbid
    * @param id1
    * @param link_type
@@ -195,7 +195,7 @@ public class MemoryLinkStore extends GraphStore {
   public MemoryLinkStore newHandle() {
     return new MemoryLinkStore(linkdbs, nodedbs);
   }
-  
+
   @Override
   public void initialize(Properties p, Phase currentPhase, int threadId)
       throws IOException, Exception {
@@ -213,7 +213,7 @@ public class MemoryLinkStore extends GraphStore {
   public boolean addLink(String dbid, Link a, boolean noinverse) throws Exception {
     synchronized (linkdbs) {
       SortedSet<Link> links = findLinkByKey(dbid, a.id1, a.link_type, true);
-  
+
       boolean exists = false;
       // Check for duplicates
       Iterator<Link> it = links.iterator();
@@ -226,7 +226,7 @@ public class MemoryLinkStore extends GraphStore {
       }
       // Clone argument before inserting
       links.add(a.clone());
-  
+
       /*System.err.println(String.format("added link (%d, %d, %d), %d in list",
                 a.id1, a.link_type, a.id2, links.size()));*/
       return !exists;
@@ -273,7 +273,7 @@ public class MemoryLinkStore extends GraphStore {
           }
         }
       }
-      
+
       // Throw error if updating non-existing link
       throw new Exception(String.format("Link not found: (%d, %d, %d)", a.id1,
                                                           a.link_type, a.id2));
@@ -315,7 +315,7 @@ public class MemoryLinkStore extends GraphStore {
         // Do a first pass to find size of result array
         int matching = 0;
         for (Link l: linkSet) {
-          if (l.visibility == VISIBILITY_DEFAULT && 
+          if (l.visibility == VISIBILITY_DEFAULT &&
                 l.time >= minTimestamp && l.time <= maxTimestamp) {
             if (skipped < offset) {
               skipped++;
@@ -331,19 +331,19 @@ public class MemoryLinkStore extends GraphStore {
           return null;
         }
         Link res[] = new Link[matching];
-        
+
         // Iterate in desc order of timestamp, break ties by id2
         int i = 0;
         skipped = 0;
         for (Link l: linkSet) {
-          if (l.visibility == VISIBILITY_DEFAULT && 
+          if (l.visibility == VISIBILITY_DEFAULT &&
                 l.time >= minTimestamp && l.time <= maxTimestamp) {
             if (skipped < offset) {
               skipped++;
               continue;
             }
             res[i++] = l;
-  
+
             if (i >= limit) {
               break;
             }
@@ -369,7 +369,7 @@ public class MemoryLinkStore extends GraphStore {
             visible++;
           }
         }
-  
+
         /*System.err.println(
              String.format("Lookup (%d, %d): %d visible, %d total", id1, link_type,
                  visible, linkSet.size()));*/

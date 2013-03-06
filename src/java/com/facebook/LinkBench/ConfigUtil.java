@@ -29,9 +29,9 @@ import org.apache.log4j.Logger;
 public class ConfigUtil {
   public static final String linkbenchHomeEnvVar = "LINKBENCH_HOME";
   public static final String LINKBENCH_LOGGER = "com.facebook.linkbench";
-  
+
   /**
-   * @return null if not set, or if not valid path 
+   * @return null if not set, or if not valid path
    */
   public static String findLinkBenchHome() {
     String linkBenchHome = System.getenv("LINKBENCH_HOME");
@@ -43,18 +43,18 @@ public class ConfigUtil {
     }
     return null;
   }
-  
+
   public static Level getDebugLevel(Properties props)
                                     throws LinkBenchConfigError {
     if (props == null) {
       return Level.DEBUG;
     }
     String levStr = props.getProperty(Config.DEBUGLEVEL);
-    
+
     if (levStr == null) {
       return Level.DEBUG;
     }
-    
+
     try {
       int level = Integer.parseInt(levStr);
       if (level <= 0) {
@@ -69,19 +69,19 @@ public class ConfigUtil {
       if (lev != null) {
         return lev;
       } else {
-        throw new LinkBenchConfigError("Invalid setting for debug level: " + 
+        throw new LinkBenchConfigError("Invalid setting for debug level: " +
                                        levStr);
-      } 
+      }
     }
   }
-  
+
   /**
    * Setup log4j to log to stderr with a timestamp and thread id
    * Could add in configuration from file later if it was really necessary
-   * @param props 
+   * @param props
    * @param logFile if not null, info logging will be diverted to this file
-   * @throws IOException 
-   * @throws Exception 
+   * @throws IOException
+   * @throws Exception
    */
   public static void setupLogging(Properties props, String logFile)
                                     throws LinkBenchConfigError, IOException {
@@ -91,9 +91,9 @@ public class ConfigUtil {
     Logger lbLogger = Logger.getLogger(LINKBENCH_LOGGER);
     lbLogger.setLevel(logLevel);
     ConsoleAppender console = new ConsoleAppender(fmt, "System.err");
-    
-    /* If logfile is specified, put full stream in logfile and only 
-     * print important messages to terminal 
+
+    /* If logfile is specified, put full stream in logfile and only
+     * print important messages to terminal
      */
     if (logFile != null) {
       console.setThreshold(Level.WARN); // Only print salient messages
@@ -101,7 +101,7 @@ public class ConfigUtil {
     }
     lbLogger.addAppender(console);
   }
-  
+
   /**
    * Look up key in props, failing if not present
    * @param props
@@ -118,12 +118,12 @@ public class ConfigUtil {
     }
     return v;
   }
-  
+
   public static int getInt(Properties props, String key)
       throws LinkBenchConfigError {
     return getInt(props, key, null);
   }
-  
+
   /**
    * Retrieve a config key and convert to integer
    * @param props
@@ -137,19 +137,19 @@ public class ConfigUtil {
       return defaultVal;
     }
     String v = getPropertyRequired(props, key);
-    try { 
+    try {
       return Integer.parseInt(v);
     } catch (NumberFormatException e) {
-      throw new LinkBenchConfigError("Expected configuration key " + key + 
+      throw new LinkBenchConfigError("Expected configuration key " + key +
                 " to be integer, but was '" + v + "'");
     }
   }
-  
+
   public static long getLong(Properties props, String key)
       throws LinkBenchConfigError {
-    return getLong(props, key, null); 
+    return getLong(props, key, null);
   }
-  
+
   /**
    * Retrieve a config key and convert to long integer
    * @param props
@@ -164,20 +164,20 @@ public class ConfigUtil {
       return defaultVal;
     }
     String v = getPropertyRequired(props, key);
-    try { 
+    try {
       return Long.parseLong(v);
     } catch (NumberFormatException e) {
-      throw new LinkBenchConfigError("Expected configuration key " + key + 
+      throw new LinkBenchConfigError("Expected configuration key " + key +
                 " to be long integer, but was '" + v + "'");
     }
   }
-  
-  
-  public static double getDouble(Properties props, String key) 
+
+
+  public static double getDouble(Properties props, String key)
                 throws LinkBenchConfigError {
     return getDouble(props, key, null);
   }
-  
+
   /**
    * Retrieve a config key and convert to double
    * @param props
@@ -192,17 +192,17 @@ public class ConfigUtil {
       return defaultVal;
     }
     String v = getPropertyRequired(props, key);
-    try { 
+    try {
       return Double.parseDouble(v);
     } catch (NumberFormatException e) {
-      throw new LinkBenchConfigError("Expected configuration key " + key + 
+      throw new LinkBenchConfigError("Expected configuration key " + key +
                 " to be double, but was '" + v + "'");
     }
   }
-  
+
   /**
    * Retrieve a config key and convert to boolean.
-   * Valid boolean strings are "true" or "false", case insensitive 
+   * Valid boolean strings are "true" or "false", case insensitive
    * @param props
    * @param key
    * @return
@@ -217,7 +217,7 @@ public class ConfigUtil {
     } else if (v.equals("false")) {
       return false;
     } else {
-      throw new LinkBenchConfigError("Expected configuration key " + key + 
+      throw new LinkBenchConfigError("Expected configuration key " + key +
                 " to be true or false, but was '" + v + "'");
     }
   }

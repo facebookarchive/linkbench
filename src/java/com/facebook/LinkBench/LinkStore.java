@@ -29,10 +29,10 @@ public abstract class LinkStore {
   // visibility
   public static final byte VISIBILITY_HIDDEN = 0;
   public static final byte VISIBILITY_DEFAULT = 1;
-  
+
   public static final int MAX_OPTYPES = LinkBenchOp.values().length;
   public static final int DEFAULT_LIMIT = 10000;
-  
+
   public static final long MAX_LINK_DATA = 255;
 
   /** Controls the current setting for range limit */
@@ -41,8 +41,8 @@ public abstract class LinkStore {
   /** The default constructor */
   public LinkStore() {
     this.rangeLimit = DEFAULT_LIMIT;
-  } 
-  
+  }
+
   public int getRangeLimit() {
     return rangeLimit;
   }
@@ -61,7 +61,7 @@ public abstract class LinkStore {
   public abstract void close();
 
   // this is invoked when an error happens in case connection needs to be
-  // cleaned up, reset, reopened, whatever 
+  // cleaned up, reset, reopened, whatever
   public abstract void clearErrors(int threadID);
 
   /**
@@ -74,7 +74,7 @@ public abstract class LinkStore {
    * @throws Exception
    */
   public abstract boolean addLink(String dbid, Link a, boolean noinverse) throws Exception;
-  
+
   /**
    * Delete link identified by parameters from store
    * @param dbid
@@ -87,9 +87,9 @@ public abstract class LinkStore {
    *         purposes only.
    * @throws Exception
    */
-  public abstract boolean deleteLink(String dbid, long id1, long link_type, long id2, 
-                   boolean noinverse, boolean expunge) throws Exception;
- 
+  public abstract boolean deleteLink(String dbid, long id1, long link_type,
+         long id2, boolean noinverse, boolean expunge) throws Exception;
+
   /**
    * Update a link in the database, or add if not found
    * @param dbid
@@ -99,7 +99,7 @@ public abstract class LinkStore {
    *      optional, for informational purposes only.
    * @throws Exception
    */
-  public abstract boolean updateLink(String dbid, Link a, boolean noinverse) 
+  public abstract boolean updateLink(String dbid, Link a, boolean noinverse)
     throws Exception;
 
   /**
@@ -112,16 +112,16 @@ public abstract class LinkStore {
    * @return
    * @throws Exception
    */
-  public abstract Link getLink(String dbid, long id1, long link_type, long id2) 
+  public abstract Link getLink(String dbid, long id1, long link_type, long id2)
     throws Exception;
-  
+
   /**
    * Lookup multiple links: same as getlink but retrieve
-   * multiple ids 
+   * multiple ids
    * @return list of matching links found, in any order
    */
   public Link[] multigetLinks(String dbid, long id1, long link_type,
-                                                      long id2s[]) 
+                                                      long id2s[])
     throws Exception {
     // Default implementation
     ArrayList<Link> res = new ArrayList<Link>(id2s.length);
@@ -144,7 +144,7 @@ public abstract class LinkStore {
    *                                       if no matching links
    * @throws Exception
    */
-  public abstract Link[] getLinkList(String dbid, long id1, long link_type) 
+  public abstract Link[] getLinkList(String dbid, long id1, long link_type)
     throws Exception;
 
 
@@ -162,29 +162,29 @@ public abstract class LinkStore {
    *                                       if no matching links
    * @throws Exception
    */
-  public abstract Link[] getLinkList(String dbid, long id1, long link_type, 
-                            long minTimestamp, long maxTimestamp, 
+  public abstract Link[] getLinkList(String dbid, long id1, long link_type,
+                            long minTimestamp, long maxTimestamp,
                             int offset, int limit)
     throws Exception;
 
   // count the #links
   public abstract long countLinks(String dbid, long id1, long link_type) throws Exception;
-  
-  /** 
+
+  /**
    * @return 0 if it doesn't support addBulkLinks and recalculateCounts methods
-   *         If it does support them, return the maximum number of links that 
+   *         If it does support them, return the maximum number of links that
    *         can be added at a time */
   public int bulkLoadBatchSize() {
     return 0;
   }
-  
+
   /** Add a batch of links without updating counts */
   public void addBulkLinks(String dbid, List<Link> a, boolean noinverse)
              throws Exception {
     throw new UnsupportedOperationException("addBulkLinks not supported for " +
-    		"LinkStore subclass " + this.getClass().getName());
+        "LinkStore subclass " + this.getClass().getName());
   }
-  
+
   /** Add a batch of counts */
   public void addBulkCounts(String dbid, List<LinkCount> a)
       throws Exception {

@@ -25,7 +25,7 @@ import com.facebook.LinkBench.ConfigUtil;
 
 /**
  * Geometric distribution
- * 
+ *
  * NOTE: this generates values in the range [min, max).  Since the
  * real geometric distribution generates values in range [min, inf),
  * we truncate anything >= max
@@ -34,21 +34,21 @@ public class GeometricDistribution implements ProbabilityDistribution {
 
   /** The probability parameter that defines the distribution */
   private double p = 0.0;
-  
+
   /** Valid range */
   private long min = 0, max = 0;
-  
+
   private double scale = 0.0;
-  
+
   public static final String PROB_PARAM_KEY = "prob";
-  
+
   @Override
   public void init(long min, long max, Properties props, String keyPrefix) {
     double parsedP = ConfigUtil.getDouble(props, keyPrefix + PROB_PARAM_KEY);
-    
+
     double scaleVal = 1.0;;
     if (props.containsKey(Config.PROB_MEAN)) {
-      scaleVal = (max - min) * ConfigUtil.getDouble(props, 
+      scaleVal = (max - min) * ConfigUtil.getDouble(props,
                             keyPrefix + Config.PROB_MEAN);
     }
     init(min, max, parsedP, scaleVal);
@@ -70,7 +70,7 @@ public class GeometricDistribution implements ProbabilityDistribution {
   public double expectedCount(long id) {
     return scaledPdf(id, scale);
   }
-  
+
   private double scaledPdf(long id, double scaleFactor) {
     if (id < min || id >= max) return 0.0;
     long x = id - min;
@@ -98,11 +98,11 @@ public class GeometricDistribution implements ProbabilityDistribution {
      * Source: http://www.math.uah.edu/stat/bernoulli/Geometric.html
      */
     if (r == 0.0) return min; // 0.0 must be handled specially
-    
+
     long x = min + (long)FastMath.ceil(
             FastMath.log(1 - r) / FastMath.log(1 - p));
     // truncate over max
-    return Math.min(x, max - 1); 
+    return Math.min(x, max - 1);
   }
 
 }

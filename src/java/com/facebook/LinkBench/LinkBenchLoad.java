@@ -41,7 +41,7 @@ import com.facebook.LinkBench.util.ClassLoadUtil;
  * Multi-threaded loader for loading graph edges (but not nodes) into
  * LinkStore. The range from startid1 to maxid1 is chunked up into equal sized
  * disjoint ranges.  These are then enqueued for processing by a number
- * of loader threads to be loaded in parallel. The #links generated for 
+ * of loader threads to be loaded in parallel. The #links generated for
  * an id1 is based on the configured distribution.  The # of link types,
  * and link payload data is also controlled by the configuration file.
  *  The actual counts of #links generated is tracked in nlinks_counts.
@@ -49,7 +49,7 @@ import com.facebook.LinkBench.util.ClassLoadUtil;
 
 public class LinkBenchLoad implements Runnable {
 
-  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER); 
+  private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
   private long maxid1;   // max id1 to generate
   private long startid1; // id1 at which to start
@@ -64,16 +64,16 @@ public class LinkBenchLoad implements Runnable {
 
   Level debuglevel;
   String dbid;
-  
+
   private ID2Chooser id2chooser;
 
   // Counters for load statistics
   long sameShuffle;
   long diffShuffle;
   long linksloaded;
-  
-  /** 
-   * special case for single hot row benchmark. If singleAssoc is set, 
+
+  /**
+   * special case for single hot row benchmark. If singleAssoc is set,
    * then make this method not print any statistics message, all statistics
    * are collected at a higher layer. */
   boolean singleAssoc;
@@ -103,13 +103,13 @@ public class LinkBenchLoad implements Runnable {
       int nloaders, LoadProgress prog_tracker, Random rng) {
     this(store, props, latencyStats, csvStreamOut, loaderID, singleAssoc,
               new ArrayBlockingQueue<LoadChunk>(2), prog_tracker);
-    
+
     // Just add a single chunk to the queue
     chunk_q.add(new LoadChunk(loaderID, startid1, maxid1, rng));
     chunk_q.add(LoadChunk.SHUTDOWN);
   }
 
-  
+
   public LinkBenchLoad(LinkStore linkStore,
                        Properties props,
                        LatencyStats latencyStats,
@@ -128,27 +128,27 @@ public class LinkBenchLoad implements Runnable {
     this.singleAssoc = singleAssoc;
     this.chunk_q = chunk_q;
     this.prog_tracker = prog_tracker;
-    
-    
+
+
     /*
      * Load settings from properties
      */
     maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
     startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
-    
+
     // math functions may cause problems for id1 = 0. Start at 1.
     if (startid1 <= 0) {
       throw new LinkBenchConfigError("startid1 must be >= 1");
     }
 
     debuglevel = ConfigUtil.getDebugLevel(props);
-    
+
     double medianLinkDataSize = ConfigUtil.getDouble(props,
                                               Config.LINK_DATASIZE);
     linkDataSize = new LogNormalDistribution();
     linkDataSize.init(0, LinkStore.MAX_LINK_DATA, medianLinkDataSize,
                                          Config.LINK_DATASIZE_SIGMA);
-    
+
     try {
       linkDataGen = ClassLoadUtil.newInstance(
           ConfigUtil.getPropertyRequired(props, Config.LINK_ADD_DATAGEN),
@@ -156,15 +156,15 @@ public class LinkBenchLoad implements Runnable {
       linkDataGen.init(props, Config.LINK_ADD_DATAGEN_PREFIX);
     } catch (ClassNotFoundException ex) {
       logger.error(ex);
-      throw new LinkBenchConfigError("Error loading data generator class: " 
+      throw new LinkBenchConfigError("Error loading data generator class: "
             + ex.getMessage());
     }
-    
+
     displayFreq_ms = ConfigUtil.getLong(props, Config.DISPLAY_FREQ) * 1000;
     int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
-    
+
     dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
-        
+
     /*
      * Initialize statistics
      */
@@ -172,7 +172,7 @@ public class LinkBenchLoad implements Runnable {
     sameShuffle = 0;
     diffShuffle = 0;
     stats = new SampledStats(loaderID, maxsamples, csvStreamOut);
-    
+
     id2chooser = new ID2Chooser(props, startid1, maxid1, 1, 1);
   }
 
@@ -188,7 +188,7 @@ public class LinkBenchLoad implements Runnable {
       logger.error("Error while initializing store", e);
       throw new RuntimeException(e);
     }
-    
+
     int bulkLoadBatchSize = store.bulkLoadBatchSize();
     boolean bulkLoad = bulkLoadBatchSize > 0;
     ArrayList<Link> loadBuffer = null;
@@ -200,17 +200,17 @@ public class LinkBenchLoad implements Runnable {
 
     logger.info("Starting loader thread  #" + loaderID + " loading links");
     lastDisplayTime = System.currentTimeMillis();
-    
+
     while (true) {
       LoadChunk chunk;
       try {
         chunk = chunk_q.take();
-	      //logger.info("chunk end="+chunk.end);
+        //logger.info("chunk end="+chunk.end);
       } catch (InterruptedException ie) {
         logger.warn("InterruptedException not expected, try again", ie);
         continue;
       }
-      
+
       // Shutdown signal is received though special chunk type
       if (chunk.shutdown) {
         break;
@@ -220,19 +220,19 @@ public class LinkBenchLoad implements Runnable {
       processChunk(chunk, bulkLoad, bulkLoadBatchSize,
                     loadBuffer, countLoadBuffer);
     }
-    
+
     if (bulkLoad) {
       // Load any remaining links or counts
       loadLinks(loadBuffer);
       loadCounts(countLoadBuffer);
     }
-    
+
     if (!singleAssoc) {
       logger.debug(" Same shuffle = " + sameShuffle +
                          " Different shuffle = " + diffShuffle);
       displayStats(lastDisplayTime, bulkLoad);
     }
-    
+
     store.close();
   }
 
@@ -240,7 +240,7 @@ public class LinkBenchLoad implements Runnable {
   private void displayStats(long startTime, boolean bulkLoad) {
     long endTime = System.currentTimeMillis();
     if (bulkLoad) {
-      stats.displayStats(startTime, endTime, 
+      stats.displayStats(startTime, endTime,
           Arrays.asList(LinkBenchOp.LOAD_LINKS_BULK,
           LinkBenchOp.LOAD_COUNTS_BULK, LinkBenchOp.LOAD_LINKS_BULK_NLINKS,
           LinkBenchOp.LOAD_COUNTS_BULK_NLINKS));
@@ -257,7 +257,7 @@ public class LinkBenchLoad implements Runnable {
       logger.debug("Loader thread  #" + loaderID + " processing "
                   + chunk.toString());
     }
-    
+
     // Counter for total number of links loaded in chunk;
     long links_in_chunk = 0;
 
@@ -267,13 +267,13 @@ public class LinkBenchLoad implements Runnable {
       // otherwise reuse object
       link = initLink();
     }
-    
+
     long prevPercentPrinted = 0;
     for (long id1 = chunk.start; id1 < chunk.end; id1 += chunk.step) {
       long added_links= createOutLinks(chunk.rng, link, loadBuffer, countLoadBuffer,
           id1, singleAssoc, bulkLoad, bulkLoadBatchSize);
       links_in_chunk += added_links;
- 
+
       if (!singleAssoc) {
         long nloaded = (id1 - chunk.start) / chunk.step;
         if (bulkLoad) {
@@ -285,7 +285,7 @@ public class LinkBenchLoad implements Runnable {
           prevPercentPrinted = percent;
         }
       }
-      
+
       // Check if stats should be flushed and reset
       long now = System.currentTimeMillis();
       if (lastDisplayTime + displayFreq_ms <= now) {
@@ -294,7 +294,7 @@ public class LinkBenchLoad implements Runnable {
         lastDisplayTime = now;
       }
     }
-    
+
     // Update progress and maybe print message
     prog_tracker.update(chunk.size, links_in_chunk);
   }
@@ -319,7 +319,7 @@ public class LinkBenchLoad implements Runnable {
       linkTypeCounts = new HashMap<Long, LinkCount>();
     }
     long nlinks_total = 0;
-    
+
     for (long link_type: id2chooser.getLinkTypes()) {
       long nlinks = id2chooser.calcLinkCount(id1, link_type);
       nlinks_total += nlinks;
@@ -328,7 +328,7 @@ public class LinkBenchLoad implements Runnable {
       } else {
         diffShuffle++;
       }
-     
+
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
         logger.trace("id1 = " + id1 + " link_type = " + link_type +
                            " nlinks = " + nlinks);
@@ -339,15 +339,15 @@ public class LinkBenchLoad implements Runnable {
           link = initLink();
         }
         constructLink(rng, link, id1, link_type, j, singleAssoc);
-        
+
         if (bulkLoad) {
           loadBuffer.add(link);
           if (loadBuffer.size() >= bulkLoadBatchSize) {
             loadLinks(loadBuffer);
           }
-          
+
           // Update link counts for this type
-          LinkCount count = linkTypeCounts.get(link.link_type); 
+          LinkCount count = linkTypeCounts.get(link.link_type);
           if (count == null) {
             count = new LinkCount(id1, link.link_type,
                                   link.time, link.version, 1);
@@ -361,7 +361,7 @@ public class LinkBenchLoad implements Runnable {
           loadLink(link, j, nlinks, singleAssoc);
         }
       }
-      
+
     }
 
     // Maintain the counts separately
@@ -398,7 +398,7 @@ public class LinkBenchLoad implements Runnable {
       long link_type, long outlink_ix, boolean singleAssoc) {
     link.id1 = id1;
     link.link_type = link_type;
-    
+
     // Using random number generator for id2 means we won't know
     // which id2s exist. So link id1 to
     // maxid1 + id1 + 1 thru maxid1 + id1 + nlinks(id1) UNLESS
@@ -428,7 +428,7 @@ public class LinkBenchLoad implements Runnable {
 
   /**
    * Load an individual link into the db.
-   * 
+   *
    * If an error occurs during loading, this method will log it,
    *  add stats, and reset the connection.
    * @param link
@@ -442,22 +442,22 @@ public class LinkBenchLoad implements Runnable {
     if (!singleAssoc) {
       timestart = System.nanoTime();
     }
-    
+
     try {
       // no inverses for now
       store.addLink(dbid, link, true);
       linksloaded++;
-  
+
       if (!singleAssoc && outlink_ix == nlinks - 1) {
         long timetaken = (System.nanoTime() - timestart);
-  
+
         // convert to microseconds
         stats.addStats(LinkBenchOp.LOAD_LINK, timetaken/1000, false);
-  
-        latencyStats.recordLatency(loaderID, 
+
+        latencyStats.recordLatency(loaderID,
                       LinkBenchOp.LOAD_LINK, timetaken);
       }
-  
+
     } catch (Throwable e){//Catch exception if any
         long endtime2 = System.nanoTime();
         long timetaken2 = (endtime2 - timestart)/1000;
@@ -475,13 +475,13 @@ public class LinkBenchLoad implements Runnable {
       store.addBulkLinks(dbid, loadBuffer, true);
       linksloaded += nlinks;
       loadBuffer.clear();
-  
+
       long timetaken = (System.nanoTime() - timestart);
-  
+
       // convert to microseconds
       stats.addStats(LinkBenchOp.LOAD_LINKS_BULK, timetaken/1000, false);
       stats.addStats(LinkBenchOp.LOAD_LINKS_BULK_NLINKS, nlinks, false);
-  
+
       latencyStats.recordLatency(loaderID, LinkBenchOp.LOAD_LINKS_BULK,
                                                              timetaken);
     } catch (Throwable e){//Catch exception if any
@@ -492,22 +492,22 @@ public class LinkBenchLoad implements Runnable {
         store.clearErrors(loaderID);
     }
   }
-  
+
   private void loadCounts(ArrayList<LinkCount> loadBuffer) {
     long timestart = System.nanoTime();
-    
+
     try {
       // no inverses for now
       int ncounts = loadBuffer.size();
       store.addBulkCounts(dbid, loadBuffer);
       loadBuffer.clear();
-  
+
       long timetaken = (System.nanoTime() - timestart);
-  
+
       // convert to microseconds
       stats.addStats(LinkBenchOp.LOAD_COUNTS_BULK, timetaken/1000, false);
       stats.addStats(LinkBenchOp.LOAD_COUNTS_BULK_NLINKS, ncounts, false);
-  
+
       latencyStats.recordLatency(loaderID, LinkBenchOp.LOAD_COUNTS_BULK,
                                                              timetaken);
     } catch (Throwable e){//Catch exception if any
@@ -518,7 +518,7 @@ public class LinkBenchLoad implements Runnable {
         store.clearErrors(loaderID);
     }
   }
-  
+
   /**
    * Represents a portion of the id space, starting with
    * start, going up until end (non-inclusive) with step size
@@ -550,7 +550,7 @@ public class LinkBenchLoad implements Runnable {
     public final long step;
     public final long size;
     public Random rng;
-    
+
     public String toString() {
       if (shutdown) {
         return "chunk SHUTDOWN";
@@ -567,7 +567,7 @@ public class LinkBenchLoad implements Runnable {
   public static class LoadProgress {
     /** report progress at intervals of progressReportInterval links */
     private final long progressReportInterval;
-    
+
     public LoadProgress(Logger progressLogger,
                         long id1s_total, long progressReportInterval) {
       super();
@@ -578,27 +578,27 @@ public class LinkBenchLoad implements Runnable {
       this.id1s_loaded = new AtomicLong();
       this.links_loaded = new AtomicLong();
     }
-    
+
     public static LoadProgress create(Logger progressLogger, Properties props) {
       long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
       long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
       long nids = maxid1 - startid1;
-      long progressReportInterval = ConfigUtil.getLong(props, 
+      long progressReportInterval = ConfigUtil.getLong(props,
                            Config.LOAD_PROG_INTERVAL, 50000L);
       return new LoadProgress(progressLogger, nids, progressReportInterval);
     }
-    
+
     private final Logger progressLogger;
     private final AtomicLong id1s_loaded; // progress
     private final AtomicLong links_loaded; // progress
     private final long id1s_total; // goal
     private long starttime_ms;
-    
+
     /** Mark current time as start time for load */
     public void startTimer() {
       starttime_ms = System.currentTimeMillis();
     }
-    
+
     /**
      * Update progress
      * @param id1_incr number of additional id1s loaded since last call
@@ -606,10 +606,10 @@ public class LinkBenchLoad implements Runnable {
      */
     public void update(long id1_incr, long links_incr) {
       long curr_id1s = id1s_loaded.addAndGet(id1_incr);
-      
+
       long curr_links = links_loaded.addAndGet(links_incr);
       long prev_links = curr_links - links_incr;
-      
+
       if ((curr_links / progressReportInterval) >
           (prev_links / progressReportInterval) || curr_id1s == id1s_total) {
         double percentage = (curr_id1s / (double)id1s_total) * 100.0;
@@ -620,7 +620,7 @@ public class LinkBenchLoad implements Runnable {
         double id1_rate = ((curr_id1s) / ((double) now - starttime_ms))*1000;
         progressLogger.info(String.format(
             "%d/%d id1s loaded (%.1f%% complete) at %.2f id1s/sec avg. " +
-            "%d links loaded at %.2f links/sec avg.", 
+            "%d links loaded at %.2f links/sec avg.",
             curr_id1s, id1s_total, percentage, id1_rate,
             curr_links, link_rate));
       }

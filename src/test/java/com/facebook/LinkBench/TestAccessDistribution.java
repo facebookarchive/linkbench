@@ -58,7 +58,7 @@ public class TestAccessDistribution extends TestCase {
   public void testRoundRobin() {
     testSanityBuiltinDist(AccessDistMode.ROUND_ROBIN, 0);
   }
-  
+
   @Test
   public void testUniform() {
     UniformDistribution u = new UniformDistribution();
@@ -67,8 +67,8 @@ public class TestAccessDistribution extends TestCase {
     u.init(min, max, props, "");
     ProbAccessDistribution unshuffled = new ProbAccessDistribution(u, null);
     testSanityAccessDist(unshuffled, min, max);
-    
-    ProbAccessDistribution shuffled = new ProbAccessDistribution(u, 
+
+    ProbAccessDistribution shuffled = new ProbAccessDistribution(u,
                         new InvertibleShuffler(13, 25, max - min));
     testSanityAccessDist(shuffled, min, max);
   }
@@ -82,30 +82,30 @@ public class TestAccessDistribution extends TestCase {
     z.init(min, max, props, "");
     ProbAccessDistribution unshuffled = new ProbAccessDistribution(z, null);
     testSanityAccessDist(unshuffled, min, max);
-    
-    ProbAccessDistribution shuffled = new ProbAccessDistribution(z, 
+
+    ProbAccessDistribution shuffled = new ProbAccessDistribution(z,
                         new InvertibleShuffler(13, 25, max - min));
     testSanityAccessDist(shuffled, min, max);
   }
-  
-  
+
+
   @Test
   public void testReal() {
     RealDistribution r = new RealDistribution();
     Properties props = new Properties();
-    props.setProperty(Config.DISTRIBUTION_DATA_FILE, 
+    props.setProperty(Config.DISTRIBUTION_DATA_FILE,
         new File("config/Distribution.dat").getAbsolutePath());
     int min = 100, max = 200;
     r.init(props, min, max, DistributionType.LINK_READS);
     ProbAccessDistribution unshuffled = new ProbAccessDistribution(r, null);
     testSanityAccessDist(unshuffled, min, max);
-    
-    ProbAccessDistribution shuffled = new ProbAccessDistribution(r, 
+
+    ProbAccessDistribution shuffled = new ProbAccessDistribution(r,
                         new InvertibleShuffler(13, 25, max - min));
     testSanityAccessDist(shuffled, min, max);
   }
-  
-  
+
+
 
   public static void testSanityBuiltinDist(AccessDistMode mode, long config) {
     long minid = 123;
@@ -132,7 +132,7 @@ public class TestAccessDistribution extends TestCase {
         assertTrue(id >= minid);
         assertTrue(id < maxid);
       } catch (AssertionFailedError e) {
-        System.err.println("Error: on trial " + i + " id returned: " 
+        System.err.println("Error: on trial " + i + " id returned: "
             + id + " not in range [" + minid + "," + maxid + ")");
         throw e;
       }

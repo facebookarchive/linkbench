@@ -23,7 +23,7 @@ public class MySqlNodeStoreTest extends NodeStoreTestBase {
 
   Connection conn;
   Properties currProps;
-  
+
   @Override
   protected Properties basicProps() {
     Properties props = super.basicProps();

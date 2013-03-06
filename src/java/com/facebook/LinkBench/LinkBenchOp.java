@@ -32,12 +32,12 @@ public enum LinkBenchOp {
   LOAD_LINKS_BULK,
   LOAD_COUNTS_BULK,
   // Although the following are not truly operations, we need stats
-  // for them 
+  // for them
   RANGE_SIZE,    // how big range scans are
   LOAD_LINKS_BULK_NLINKS, // how many links inserted in bulk
   LOAD_COUNTS_BULK_NLINKS, // how many counts inserted in bulk
   UNKNOWN;
-  
+
   public String displayName() {
     return name();
   }

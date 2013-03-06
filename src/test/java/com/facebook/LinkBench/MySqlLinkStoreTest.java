@@ -21,18 +21,18 @@ import java.util.Properties;
 
 /**
  * Test the MySQL LinkStore implementation.
- * 
+ *
  * Assumes that the database specified by the testDB field has been created
  * with permissions for a user/pass linkbench/linkbench to create tables, select,
  * insert, delete, etc.
  */
 public class MySqlLinkStoreTest extends LinkStoreTestBase {
-  
+
   private Connection conn;
-  
+
   /** Properties for last initStore call */
   private Properties currProps;
-  
+
   @Override
   protected long getIDCount() {
     // Make test smaller so that it doesn't take too long
@@ -44,7 +44,7 @@ public class MySqlLinkStoreTest extends LinkStoreTestBase {
     // Fewer requests to keep test quick
     return 10000;
   }
-  
+
   protected Properties basicProps() {
     Properties props = super.basicProps();
     MySqlTestConfig.fillMySqlTestServerProps(props);
@@ -63,7 +63,7 @@ public class MySqlLinkStoreTest extends LinkStoreTestBase {
     MySqlTestConfig.createTestTables(conn, testDB);
   }
 
-  
+
 
   @Override
   public DummyLinkStore getStoreHandle(boolean initialize) throws IOException, Exception {

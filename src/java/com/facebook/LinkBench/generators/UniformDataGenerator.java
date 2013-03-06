@@ -25,9 +25,9 @@ import com.facebook.LinkBench.LinkBenchConfigError;
 /**
  * A super simple data generator that generates a string of
  * characters chosen uniformly from a range.
- * 
+ *
  * This probably isn't a good generator to use if you want something realistic,
- * especially if compressibility properties of the data will affect your 
+ * especially if compressibility properties of the data will affect your
  * experiment.
  */
 public class UniformDataGenerator implements DataGenerator {
@@ -38,7 +38,7 @@ public class UniformDataGenerator implements DataGenerator {
     start = '\0';
     range = 1;
   }
-  
+
   /**
    * Generate characters from start to end (inclusive both ends)
    * @param start
@@ -55,13 +55,13 @@ public class UniformDataGenerator implements DataGenerator {
     }
 
     if (start >= end) {
-      throw new LinkBenchConfigError("startByte " + start 
+      throw new LinkBenchConfigError("startByte " + start
                                    + " >= endByte " + end);
     }
     this.start = (byte)start;
     this.range = end - start + 1;
   }
-  
+
   @Override
   public void init(Properties props, String keyPrefix) {
     int startByte = ConfigUtil.getInt(props, keyPrefix +
@@ -75,7 +75,7 @@ public class UniformDataGenerator implements DataGenerator {
   public byte[] fill(Random rng, byte[] data) {
     return gen(rng, data, start, range);
   }
-  
+
   public static byte[] gen(Random rng, byte[] data,
                            int startByte, int range) {
     int n = data.length;

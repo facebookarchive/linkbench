@@ -32,7 +32,7 @@ import com.facebook.LinkBench.util.ClassLoadUtil;
 
 /**
  * Load class for generating node data
- * 
+ *
  * This is separate from link loading because we can't have multiple parallel
  * loaders loading nodes, as the order of IDs being assigned would be messed up
  * @author tarmstrong
@@ -48,28 +48,28 @@ public class NodeLoader implements Runnable {
   // Data generation settings
   private final DataGenerator nodeDataGen;
   private final LogNormalDistribution nodeDataLength;
-  
+
   private final Level debuglevel;
   private final int loaderId;
   private final SampledStats stats;
   private final LatencyStats latencyStats;
-  
+
   private long startTime_ms;
-  
+
   private long nodesLoaded = 0;
   private long totalNodes = 0;
-  
+
   /** Next node count to report on */
   private long nextReport = 0;
-  
+
 
   /** Last time stat update displayed */
   private long lastDisplayTime_ms;
 
   /** How often to display stat updates */
   private final long displayFreq_ms;
-  
-  
+
+
   public NodeLoader(Properties props, Logger logger,
       NodeStore nodeStore, Random rng,
       LatencyStats latencyStats, PrintStream csvStreamOut, int loaderId) {
@@ -80,10 +80,10 @@ public class NodeLoader implements Runnable {
     this.rng = rng;
     this.latencyStats = latencyStats;
     this.loaderId = loaderId;
-    
+
     double medianDataLength = ConfigUtil.getDouble(props, Config.NODE_DATASIZE);
     nodeDataLength = new LogNormalDistribution();
-    nodeDataLength.init(0, NodeStore.MAX_NODE_DATA, medianDataLength, 
+    nodeDataLength.init(0, NodeStore.MAX_NODE_DATA, medianDataLength,
                                           Config.NODE_DATASIZE_SIGMA);
 
     try {
@@ -93,13 +93,13 @@ public class NodeLoader implements Runnable {
       nodeDataGen.init(props, Config.NODE_ADD_DATAGEN_PREFIX);
     } catch (ClassNotFoundException ex) {
       logger.error(ex);
-      throw new LinkBenchConfigError("Error loading data generator class: " 
+      throw new LinkBenchConfigError("Error loading data generator class: "
             + ex.getMessage());
     }
-    
+
     debuglevel = ConfigUtil.getDebugLevel(props);
     dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
-    
+
 
     displayFreq_ms = ConfigUtil.getLong(props, Config.DISPLAY_FREQ) * 1000;
     int maxsamples = ConfigUtil.getInt(props, Config.MAX_STAT_SAMPLES);
@@ -109,7 +109,7 @@ public class NodeLoader implements Runnable {
   @Override
   public void run() {
     logger.info("Starting loader thread  #" + loaderId + " loading nodes");
-    
+
     try {
       this.nodeStore.initialize(props, Phase.LOAD, loaderId);
     } catch (Exception e) {
@@ -122,10 +122,10 @@ public class NodeLoader implements Runnable {
       nodeStore.resetNodeStore(dbid, ConfigUtil.getLong(props, Config.MIN_ID));
     } catch (Exception e) {
       logger.error("Error while resetting IDs, cannot proceed with " +
-      		"node loading", e);
+          "node loading", e);
       return;
     }
-    
+
     int bulkLoadBatchSize = nodeStore.bulkLoadBatchSize();
     ArrayList<Node> nodeLoadBuffer = new ArrayList<Node>(bulkLoadBatchSize);
 
@@ -137,7 +137,7 @@ public class NodeLoader implements Runnable {
     lastDisplayTime_ms = startTime_ms;
     for (long id = startId; id < maxId; id++) {
       genNode(rng, id, nodeLoadBuffer, bulkLoadBatchSize);
-      
+
       long now = System.currentTimeMillis();
       if (lastDisplayTime_ms + displayFreq_ms <= now) {
         displayAndResetStats();
@@ -145,7 +145,7 @@ public class NodeLoader implements Runnable {
     }
     // Load any remaining data
     loadNodes(nodeLoadBuffer);
-    
+
     logger.info("Loading of nodes [" + startId + "," + maxId + ") done");
     displayAndResetStats();
     nodeStore.close();
@@ -153,7 +153,7 @@ public class NodeLoader implements Runnable {
 
   private void displayAndResetStats() {
     long now = System.currentTimeMillis();
-    stats.displayStats(lastDisplayTime_ms, now, 
+    stats.displayStats(lastDisplayTime_ms, now,
                        Arrays.asList(LinkBenchOp.LOAD_NODE_BULK));
     stats.resetSamples();
     lastDisplayTime_ms = now;
@@ -166,7 +166,7 @@ public class NodeLoader implements Runnable {
    */
   private void genNode(Random rng, long id1, ArrayList<Node> nodeLoadBuffer,
                           int bulkLoadBatchSize) {
-    int dataLength = (int)nodeDataLength.choose(rng);                          
+    int dataLength = (int)nodeDataLength.choose(rng);
     Node node = new Node(id1, LinkStore.DEFAULT_NODE_TYPE, System.currentTimeMillis(),
                          1, nodeDataGen.fill(rng, new byte[dataLength]));
     nodeLoadBuffer.add(node);
@@ -175,7 +175,7 @@ public class NodeLoader implements Runnable {
       nodeLoadBuffer.clear();
     }
   }
-  
+
   private void loadNodes(ArrayList<Node> nodeLoadBuffer) {
     long actualIds[] = null;
     long timestart = System.nanoTime();
@@ -183,29 +183,29 @@ public class NodeLoader implements Runnable {
       actualIds = nodeStore.bulkAddNodes(dbid, nodeLoadBuffer);
       long timetaken = (System.nanoTime() - timestart);
       nodesLoaded += nodeLoadBuffer.size();
-      
+
       // Check that expected ids were allocated
       assert(actualIds.length == nodeLoadBuffer.size());
       for (int i = 0; i < actualIds.length; i++) {
-        if (nodeLoadBuffer.get(i).id != actualIds[i]) { 
-          logger.warn("Expected ID of node: " + nodeLoadBuffer.get(i).id + 
+        if (nodeLoadBuffer.get(i).id != actualIds[i]) {
+          logger.warn("Expected ID of node: " + nodeLoadBuffer.get(i).id +
                       " != " + actualIds[i] + " the actual ID");
         }
       }
-      
+
       nodeLoadBuffer.clear();
-      
+
       // convert to microseconds
       stats.addStats(LinkBenchOp.LOAD_NODE_BULK, timetaken/1000, false);
-      latencyStats.recordLatency(loaderId, 
+      latencyStats.recordLatency(loaderId,
                     LinkBenchOp.LOAD_NODE_BULK, timetaken);
-      
+
       if (nodesLoaded >= nextReport) {
         double totalTimeTaken = (System.currentTimeMillis() - startTime_ms) / 1000.0;
         logger.debug(String.format(
-            "Loader #%d: %d/%d nodes loaded at %f nodes/sec", 
-            loaderId, nodesLoaded, totalNodes, 
-        		nodesLoaded / totalTimeTaken));
+            "Loader #%d: %d/%d nodes loaded at %f nodes/sec",
+            loaderId, nodesLoaded, totalNodes,
+            nodesLoaded / totalTimeTaken));
         nextReport += REPORT_INTERVAL;
       }
     } catch (Throwable e){//Catch exception if any

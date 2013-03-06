@@ -49,7 +49,7 @@ public class GeomDistTest extends DistributionTestBase {
     assertEquals(0.917646, d.cdf(7), 0.001);
     assertEquals(0.971752, d.cdf(10), 0.001);
     assertEquals(0.995252, d.cdf(15), 0.001);
-    
+
     assertEquals(0.3, d.pdf(1), 0.001);
     assertEquals(0.21, d.pdf(2), 0.001);
     assertEquals(0.147, d.pdf(3), 0.001);

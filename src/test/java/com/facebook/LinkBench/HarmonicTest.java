@@ -33,14 +33,14 @@ public class HarmonicTest extends TestCase {
     assertEquals(2679914.0, Harmonic.generalizedHarmonic(12345678, 0.1),
                  1);
   }
-  
+
   @Test
   public void testApprox() {
-    
-    // Test that approximation is close to actual for a range of shapes and 
+
+    // Test that approximation is close to actual for a range of shapes and
     // ns
     double shapes[] = {0.01, 0.1, 0.5, 0.9, 0.99};
-    
+
     for (long i = 0; i < 30; i+=4) {
       long n = (long)Math.pow(2, i);
       for (double shape: shapes) {

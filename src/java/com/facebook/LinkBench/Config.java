@@ -24,17 +24,17 @@ package com.facebook.LinkBench;
 public class Config {
 
   public static final String DEBUGLEVEL = "debuglevel";
-  
+
   /* Control store implementations used */
   public static final String LINKSTORE_CLASS = "linkstore";
   public static final String NODESTORE_CLASS = "nodestore";
-  
+
   /* Schema and tables used */
   public static final String DBID = "dbid";
   public static final String LINK_TABLE = "linktable";
   public static final String COUNT_TABLE = "counttable";
   public static final String NODE_TABLE = "nodetable";
-  
+
   /* Control graph structure */
   public static final String LOAD_RANDOM_SEED = "load_random_seed";
   public static final String MIN_ID = "startid1";
@@ -46,7 +46,7 @@ public class Config {
   public static final String NLINKS_CONFIG = "nlinks_config";
   public static final String NLINKS_DEFAULT = "nlinks_default";
   public static final String LINK_TYPE_COUNT ="link_type_count";
-  
+
   /* Data generation */
   public static final String LINK_DATASIZE = "link_datasize";
   public static final String NODE_DATASIZE = "node_datasize";
@@ -69,11 +69,11 @@ public class Config {
   /* Loading performance tuning */
   public static final String NUM_LOADERS = "loaders";
   public static final String LOADER_CHUNK_SIZE = "loader_chunk_size";
-  
+
   /* Request workload */
   public static final String NUM_REQUESTERS = "requesters";
   public static final String REQUEST_RANDOM_SEED = "request_random_seed";
-  
+
   // Distribution of accesses to IDs
   public static final String READ_CONFIG_PREFIX = "read_";
   public static final String WRITE_CONFIG_PREFIX = "write_";
@@ -93,11 +93,11 @@ public class Config {
   public static final String WRITE_UNCORR_FUNCTION = WRITE_UNCORR_CONFIG_PREFIX
                                                     + ACCESS_FUNCTION_SUFFIX;
   public static final String BLEND_SUFFIX = "blend";
-  public static final String READ_UNCORR_BLEND =  READ_UNCORR_CONFIG_PREFIX 
+  public static final String READ_UNCORR_BLEND =  READ_UNCORR_CONFIG_PREFIX
                                                     + BLEND_SUFFIX;
   public static final String WRITE_UNCORR_BLEND = WRITE_UNCORR_CONFIG_PREFIX
                                                     + BLEND_SUFFIX;
-  
+
   // Probability of different operations
   public static final String PR_ADD_LINK = "addlink";
   public static final String PR_DELETE_LINK = "deletelink";
@@ -120,20 +120,20 @@ public class Config {
   public static final String LINK_MULTIGET_DIST_MIN = "link_multiget_dist_min";
   public static final String LINK_MULTIGET_DIST_MAX = "link_multiget_dist_max";
   public static final String LINK_MULTIGET_DIST_PREFIX = "link_multiget_dist_";
-  
+
   /* Probability distribution parameters */
   public static final String PROB_MEAN = "mean";
-  
+
   /* Statistics collection and reporting */
   public static final String MAX_STAT_SAMPLES = "maxsamples";
   public static final String DISPLAY_FREQ = "displayfreq";
   public static final String MAPRED_REPORT_PROGRESS = "reportprogress";
   public static final String PROGRESS_FREQ = "progressfreq";
-  
+
   /* Reporting for progress indicators */
   public static String REQ_PROG_INTERVAL = "req_progress_interval";
   public static String LOAD_PROG_INTERVAL = "load_progress_interval";
-      
+
   /* MapReduce specific configuration */
   public static final String TEMPDIR = "tempdir";
   public static final String LOAD_DATA = "loaddata";

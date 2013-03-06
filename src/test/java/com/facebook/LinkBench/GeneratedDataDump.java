@@ -28,13 +28,13 @@ import com.facebook.LinkBench.generators.UniformDataGenerator;
 /**
  * Generate some sample data using data generators, in order to test out compressibility
  * of randomly generated data.
- * 
+ *
  * This generates several output files consistent of many generated payload data fields
  * separated by newlines
  */
 public class GeneratedDataDump {
   private static final Random rng = new Random();
-  
+
   public static void main(String args[]) {
     String outputDir = "";
     if (args.length == 0) {
@@ -45,8 +45,8 @@ public class GeneratedDataDump {
       System.err.println("GeneratedDataDump <output dir>");
       System.exit(1);
     }
-    
-    
+
+
     // Number of bytes per row
     final int objBytes = 256;
     final int assocBytes = 6;
@@ -68,10 +68,10 @@ public class GeneratedDataDump {
       System.err.println("file " + outFileName + " could not be opened");
       System.exit(1);
     }
-    
-    
+
+
     byte buf[] = new byte[bytes];
-    
+
     try {
       for (int i = 0; i < rows; i++) {
         gen.fill(rng, buf);
@@ -99,7 +99,7 @@ public class GeneratedDataDump {
     gen.init(start, end, uniqueness);
     return gen;
   }
-  
+
   private static DataGenerator makeUniformAssoc() {
     UniformDataGenerator gen = new UniformDataGenerator();
     gen.init(50, 75);
