@@ -14,13 +14,18 @@
  * limitations under the License.
  */
 
-package com.facebook.LinkBench;
+package com.facebook.LinkBench.store.hbase;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Properties;
 
+import com.facebook.LinkBench.Config;
+import com.facebook.LinkBench.ConfigUtil;
+import com.facebook.LinkBench.Link;
+import com.facebook.LinkBench.Phase;
+import com.facebook.LinkBench.store.LinkStore;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Delete;

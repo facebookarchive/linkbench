@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.Random;
 
+import com.facebook.LinkBench.store.LinkStore;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;

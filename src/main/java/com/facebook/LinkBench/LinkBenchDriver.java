@@ -34,6 +34,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.facebook.LinkBench.store.LinkStore;
+import com.facebook.LinkBench.store.LinkStoreFactory;
+import com.facebook.LinkBench.store.NodeStore;
+import com.facebook.LinkBench.store.NodeStoreFactory;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -150,64 +154,39 @@ public class LinkBenchDriver {
     return new Stores(linkStore, nodeStore);
   }
 
-  private LinkStore createLinkStore() throws Exception, IOException {
-    // The property "linkstore" defines the class name that will be used to
-    // store data in a database. The folowing class names are pre-packaged
-    // for easy access:
-    //   LinkStoreMysql :  run benchmark on  mySQL
-    //   LinkStoreHBaseGeneralAtomicityTesting : atomicity testing on HBase.
+    private LinkStore createLinkStore() {
+        String linkStoreFactoryClassName = ConfigUtil.getPropertyRequired(props, Config.LINKSTORE_FACTORY_CLASS);
 
-    String linkStoreClassName = ConfigUtil.getPropertyRequired(props,
-                                            Config.LINKSTORE_CLASS);
+        logger.debug("Using LinkStoreFactory implementation: " + linkStoreFactoryClassName);
 
-    logger.debug("Using LinkStore implementation: " + linkStoreClassName);
-
-    LinkStore linkStore;
-    try {
-      linkStore = ClassLoadUtil.newInstance(linkStoreClassName,
-                                            LinkStore.class);
-    } catch (ClassNotFoundException nfe) {
-      throw new IOException("Cound not find class for " + linkStoreClassName);
+        try {
+            LinkStoreFactory  linkStoreFactory = ClassLoadUtil.newInstance(linkStoreFactoryClassName, LinkStoreFactory.class);
+            return linkStoreFactory.createLinkStore();
+        } catch (ClassNotFoundException nfe) {
+            throw new IllegalStateException("Could not find class for " + linkStoreFactoryClassName);
+        }
     }
 
-    return linkStore;
-  }
+    /**
+     * @param linkStore a LinkStore instance to be reused if it turns out
+     *                  that linkStore and nodeStore classes are same
+     * @return
+     */
+    private NodeStore createNodeStore(LinkStore linkStore) {
+        String nodeStoreFactoryClassName = props.getProperty(Config.NODESTORE_FACTORY_CLASS);
+        if (nodeStoreFactoryClassName == null) {
+            logger.debug("No NodeStoreFactory implementation provided");
+        } else {
+            logger.debug("Using NodeStoreFactory implementation: " + nodeStoreFactoryClassName);
+        }
 
-  /**
-   * @param linkStore a LinkStore instance to be reused if it turns out
-   * that linkStore and nodeStore classes are same
-   * @return
-   * @throws Exception
-   * @throws IOException
-   */
-  private NodeStore createNodeStore(LinkStore linkStore) throws Exception,
-      IOException {
-    String nodeStoreClassName = props.getProperty(Config.NODESTORE_CLASS);
-    if (nodeStoreClassName == null) {
-      logger.debug("No NodeStore implementation provided");
-    } else {
-      logger.debug("Using NodeStore implementation: " + nodeStoreClassName);
+        try {
+            NodeStoreFactory nodeStoreFactory = ClassLoadUtil.newInstance(nodeStoreFactoryClassName, NodeStoreFactory.class);
+            return nodeStoreFactory.createNodeStore(linkStore);
+        } catch (java.lang.ClassNotFoundException nfe) {
+            throw new IllegalStateException("Could not find class for " + nodeStoreFactoryClassName);
+        }
     }
-
-    if (linkStore != null && linkStore.getClass().getName().equals(
-                                                nodeStoreClassName)) {
-      // Same class, reuse object
-      if (!NodeStore.class.isAssignableFrom(linkStore.getClass())) {
-        throw new Exception("Specified NodeStore class " + nodeStoreClassName
-                          + " is not a subclass of NodeStore");
-      }
-      return (NodeStore)linkStore;
-    } else {
-      NodeStore nodeStore;
-      try {
-        nodeStore = ClassLoadUtil.newInstance(nodeStoreClassName,
-                                                            NodeStore.class);
-        return nodeStore;
-      } catch (java.lang.ClassNotFoundException nfe) {
-        throw new IOException("Cound not find class for " + nodeStoreClassName);
-      }
-    }
-  }
 
   void load() throws IOException, InterruptedException, Throwable {
 

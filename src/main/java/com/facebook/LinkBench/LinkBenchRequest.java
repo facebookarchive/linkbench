@@ -23,6 +23,8 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.facebook.LinkBench.store.LinkStore;
+import com.facebook.LinkBench.store.NodeStore;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 

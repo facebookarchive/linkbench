@@ -22,11 +22,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Random;
 
+import com.facebook.LinkBench.store.LinkStore;
 import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.ConfigUtil;
 import com.facebook.LinkBench.LinkBenchOp;
-import com.facebook.LinkBench.LinkStore;
 
 
 /**

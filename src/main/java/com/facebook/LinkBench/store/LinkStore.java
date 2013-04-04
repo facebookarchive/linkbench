@@ -13,7 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.LinkBench;
+package com.facebook.LinkBench.store;
+
+import com.facebook.LinkBench.Link;
+import com.facebook.LinkBench.LinkBenchOp;
+import com.facebook.LinkBench.LinkCount;
+import com.facebook.LinkBench.Phase;
 
 import java.io.*;
 import java.util.ArrayList;

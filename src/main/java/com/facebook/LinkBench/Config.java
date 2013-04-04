@@ -26,8 +26,8 @@ public class Config {
   public static final String DEBUGLEVEL = "debuglevel";
 
   /* Control store implementations used */
-  public static final String LINKSTORE_CLASS = "linkstore";
-  public static final String NODESTORE_CLASS = "nodestore";
+  public static final String LINKSTORE_FACTORY_CLASS = "linkstorefactory";
+  public static final String NODESTORE_FACTORY_CLASS = "nodestorefactory";
 
   /* Schema and tables used */
   public static final String DBID = "dbid";

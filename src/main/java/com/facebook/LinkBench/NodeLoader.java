@@ -21,6 +21,8 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.Random;
 
+import com.facebook.LinkBench.store.LinkStore;
+import com.facebook.LinkBench.store.NodeStore;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 

@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 
+import com.facebook.LinkBench.store.NodeStore;
 import junit.framework.TestCase;
 
 import org.junit.Test;

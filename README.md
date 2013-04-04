@@ -417,9 +417,10 @@ Additional Database Systems
 ---------------------------
 You can write plugins to benchmark additional database systems
 simply by writing a Java class implementing a small set of graph operations.
-Any classes implementing the `com.facebook.LinkBench.LinkStore`
-and `com.facebook.LinkBench.NodeStore` interfaces can be loaded
-through the *linkstore* and *nodestore* configuration file keys.
+Any classes implementing the `com.facebook.LinkBench.store.LinkStore`
+and `com.facebook.LinkBench.store.NodeStore` interfaces must have a corresponding
+`com.facebook.LinkBench.store.LinkStoreFactory` and `com.facebook.LinkBench.store.NodeStoreFactory` implementations
+and can be loaded through the *linkstorefactory* and *nodestorefactory* configuration file keys.
 
 There are several steps you will have to go through to add a
 new plugin .
@@ -434,6 +435,10 @@ extends GraphStore`, and implement all of the required methods of
 `LinkStore` and `NodeStore`.  Two reference implementations are provided:
 `LinkStoreMysql`, a fully-fledged implementation,  and `MemoryLinkStore`,
 a toy in-memory implementation.
+
+Afterwards, you need to provide corresponding implementations of
+`com.facebook.LinkBench.store.LinkStoreFactory` and `com.facebook.LinkBench.store.NodeStoreFactory`
+for your newly created stores.
 
 LinkBench provides some tests to validate your implementation that you
 can use during development.  If you extend any of the test classes

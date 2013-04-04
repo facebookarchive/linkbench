@@ -15,6 +15,8 @@
  */
 package com.facebook.LinkBench;
 
+import com.facebook.LinkBench.store.mysql.LinkStoreMysql;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -38,8 +40,8 @@ public class MySqlTestConfig {
   static String nodetable = "test_nodetable";
 
   public static void fillMySqlTestServerProps(Properties props) {
-    props.setProperty(Config.LINKSTORE_CLASS, LinkStoreMysql.class.getName());
-    props.setProperty(Config.NODESTORE_CLASS, LinkStoreMysql.class.getName());
+    props.setProperty(Config.LINKSTORE_FACTORY_CLASS, LinkStoreMysql.class.getName());
+    props.setProperty(Config.NODESTORE_FACTORY_CLASS, LinkStoreMysql.class.getName());
     props.setProperty(LinkStoreMysql.CONFIG_HOST, host);
     props.setProperty(LinkStoreMysql.CONFIG_PORT, Integer.toString(port));
     props.setProperty(LinkStoreMysql.CONFIG_USER, user);

@@ -18,11 +18,12 @@ package com.facebook.LinkBench.stats;
 import java.io.PrintStream;
 import java.text.DecimalFormat;
 
+import com.facebook.LinkBench.store.LinkStore;
 import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.ConfigUtil;
 import com.facebook.LinkBench.LinkBenchOp;
-import com.facebook.LinkBench.LinkStore;
+import com.facebook.LinkBench.store.LinkStore;
 
 
 /**

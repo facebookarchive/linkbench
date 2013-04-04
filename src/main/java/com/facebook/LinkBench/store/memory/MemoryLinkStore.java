@@ -13,7 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.LinkBench;
+package com.facebook.LinkBench.store.memory;
+
+import com.facebook.LinkBench.Link;
+import com.facebook.LinkBench.Node;
+import com.facebook.LinkBench.Phase;
+import com.facebook.LinkBench.store.GraphStore;
 
 import java.io.IOException;
 import java.util.Comparator;

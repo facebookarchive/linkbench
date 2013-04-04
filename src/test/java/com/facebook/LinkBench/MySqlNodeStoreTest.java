@@ -15,6 +15,9 @@
  */
 package com.facebook.LinkBench;
 
+import com.facebook.LinkBench.store.mysql.LinkStoreMysql;
+import com.facebook.LinkBench.store.NodeStore;
+
 import java.io.IOException;
 import java.sql.Connection;
 import java.util.Properties;

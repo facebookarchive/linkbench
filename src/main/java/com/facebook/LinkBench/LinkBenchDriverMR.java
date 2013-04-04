@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import java.util.Properties;
 import java.util.Random;
 
+import com.facebook.LinkBench.store.LinkStore;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -91,7 +92,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     LinkStore newstore = null;
 
     if (store == null) {
-      store = ConfigUtil.getPropertyRequired(props, Config.LINKSTORE_CLASS);
+      store = ConfigUtil.getPropertyRequired(props, Config.LINKSTORE_FACTORY_CLASS);
       logger.info("Using store class: " + store);
     }
 

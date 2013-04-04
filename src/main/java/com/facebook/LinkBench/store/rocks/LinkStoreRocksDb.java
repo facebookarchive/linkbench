@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.LinkBench;
+package com.facebook.LinkBench.store.rocks;
 
+import com.facebook.LinkBench.*;
+import com.facebook.LinkBench.store.GraphStore;
 import com.facebook.rocks.swift.*;
 import com.facebook.swift.service.ThriftClientManager;
 import com.facebook.nifty.client.FramedClientConnector;
@@ -279,7 +281,7 @@ public class LinkStoreRocksDb extends GraphStore {
     int i = 0;
     for (TaoAssocGetResult tar : tr) {
       results[i] = new Link(id1, link_type, tar.getId2(),
-          LinkStore.VISIBILITY_DEFAULT, tar.getData(),
+              VISIBILITY_DEFAULT, tar.getData(),
           (int)(tar.getDataVersion()), tar.getTime());
     }
     return results;
@@ -316,7 +318,7 @@ public class LinkStoreRocksDb extends GraphStore {
     int i = 0;
     for (TaoAssocGetResult tar : tr) {
       results[i] = new Link(id1, link_type, tar.getId2(),
-          LinkStore.VISIBILITY_DEFAULT, tar.getData(),
+              VISIBILITY_DEFAULT, tar.getData(),
           (int)(tar.getDataVersion()), tar.getTime());
       i++;
     }

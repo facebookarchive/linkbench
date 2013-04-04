@@ -15,6 +15,8 @@
  */
 package com.facebook.LinkBench;
 
+import com.facebook.LinkBench.store.LinkStore;
+
 import java.util.Arrays;
 
 
@@ -31,7 +33,7 @@ public class Link {
     this.time = time;
   }
 
-  Link() {
+  public Link() {
     link_type = LinkStore.DEFAULT_LINK_TYPE;
     visibility = LinkStore.VISIBILITY_DEFAULT;
   }

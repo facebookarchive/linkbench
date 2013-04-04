@@ -22,6 +22,7 @@ import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import com.facebook.LinkBench.store.LinkStore;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;

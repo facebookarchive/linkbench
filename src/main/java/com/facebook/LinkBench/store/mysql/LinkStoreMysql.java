@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.LinkBench;
+package com.facebook.LinkBench.store.mysql;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,6 +30,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 
+import com.facebook.LinkBench.*;
+import com.facebook.LinkBench.store.GraphStore;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
@@ -233,7 +235,7 @@ public class LinkStoreMysql extends GraphStore {
                      " FROM " + dbid + "." + assoctable +
                      " WHERE id1 = " + id +
                      " AND link_type = " + link_type +
-                     " AND visibility = " + LinkStore.VISIBILITY_DEFAULT;
+                     " AND visibility = " + VISIBILITY_DEFAULT;
 
     String select2 = "SELECT COALESCE (SUM(count), 0)" +
                      " FROM " + dbid + "." + counttable +
@@ -672,7 +674,7 @@ public class LinkStoreMysql extends GraphStore {
                    " where id1 = " + id1 + " and link_type = " + link_type +
                    " and time >= " + minTimestamp +
                    " and time <= " + maxTimestamp +
-                   " and visibility = " + LinkStore.VISIBILITY_DEFAULT +
+                   " and visibility = " + VISIBILITY_DEFAULT +
                    " order by time desc " +
                    " limit " + offset + "," + limit + "; commit;";
 

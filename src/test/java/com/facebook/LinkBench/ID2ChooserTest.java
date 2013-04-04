@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.Properties;
 import java.util.Random;
 
+import com.facebook.LinkBench.store.LinkStore;
 import junit.framework.TestCase;
 
 import org.junit.Test;
