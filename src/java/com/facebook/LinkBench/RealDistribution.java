@@ -18,7 +18,9 @@ package com.facebook.LinkBench;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.InputMismatchException;
 import java.util.NavigableMap;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Scanner;
@@ -213,15 +215,24 @@ public class RealDistribution extends PiecewiseLinearDistribution {
 
 
   //helper function:
-  private static ArrayList<Point> readCDF(Scanner scanner) {
+  private static ArrayList<Point> readCDF(String filePath, Scanner scanner) {
     ArrayList<Point> points = new ArrayList<Point>();
     while (scanner.hasNextInt()) {
       int value = scanner.nextInt();
       // File on disk has percentages
-      double percent = scanner.nextDouble();
-      double probability = percent / 100;
-      Point temp = new Point(value, probability);
-      points.add(temp);
+      try {
+        double percent = scanner.nextDouble();
+        double probability = percent / 100;
+        Point temp = new Point(value, probability);
+        points.add(temp);
+      } catch (InputMismatchException ex) {
+        throw new LinkBenchConfigError("Expected to find floating point "
+            + "value in input file" + filePath + " but found token \""
+            + scanner.next() + "\"");
+      } catch (NoSuchElementException ex) {
+        throw new LinkBenchConfigError("Expected to find floating point "
+            + "value in input file" + filePath + " but found end of file");
+      }
     }
     return points;
   }
@@ -282,11 +293,11 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     while (scanner.hasNext()) {
       String type = scanner.next();
       if (type.equals("nlinks")) {
-        nlinks_cdf = readCDF(scanner);
+        nlinks_cdf = readCDF(fileAbsPath, scanner);
         nlinks_expected_val = expectedValue(nlinks_cdf);
       }
       else if (type.equals("link_nreads")) {
-        link_nreads_cdf = readCDF(scanner);
+        link_nreads_cdf = readCDF(fileAbsPath, scanner);
         double[] nreads_pdf = getPDF(link_nreads_cdf);
         double[] nreads_ccdf = getCCDF(nreads_pdf);
         link_nreads_cs = getCumulativeSum(nreads_ccdf);
@@ -298,7 +309,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
         link_nreads_expected_val = expectedValue(link_nreads_cdf);
       }
       else if (type.equals("link_nwrites")) {
-        link_nwrites_cdf = readCDF(scanner);
+        link_nwrites_cdf = readCDF(fileAbsPath, scanner);
         double[] nwrites_pdf = getPDF(link_nwrites_cdf);
         double[] nwrites_ccdf = getCCDF(nwrites_pdf);
         nwrites_cs = getCumulativeSum(nwrites_ccdf);
@@ -309,7 +320,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
         }
         link_nwrites_expected_val = expectedValue(link_nwrites_cdf);
       } else if (type.equals("node_nreads")) {
-        node_nreads_cdf = readCDF(scanner);
+        node_nreads_cdf = readCDF(fileAbsPath, scanner);
         double[] node_nreads_pdf = getPDF(node_nreads_cdf);
         double[] node_nreads_ccdf = getCCDF(node_nreads_pdf);
         node_nreads_cs = getCumulativeSum(node_nreads_ccdf);
@@ -321,7 +332,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
         node_nreads_expected_val = expectedValue(node_nreads_cdf);
       }
       else if (type.equals("node_nwrites")) {
-        node_nwrites_cdf = readCDF(scanner);
+        node_nwrites_cdf = readCDF(fileAbsPath, scanner);
         double[] node_nwrites_pdf = getPDF(node_nwrites_cdf);
         double[] node_nwrites_ccdf = getCCDF(node_nwrites_pdf);
         node_nwrites_cs = getCumulativeSum(node_nwrites_ccdf);
@@ -332,7 +343,8 @@ public class RealDistribution extends PiecewiseLinearDistribution {
         }
         node_nwrites_expected_val = expectedValue(node_nwrites_cdf);
       } else {
-        throw new RuntimeException("Invalid file content: " + type);
+        throw new RuntimeException("Unexpected token in distribution file, "
+                  + "expected name of next distribution: \"" + type + "\"");
       }
     }
   }
