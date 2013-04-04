@@ -32,7 +32,7 @@ public class DummyLinkStoreTest extends LinkStoreTestBase {
   protected DummyLinkStore getStoreHandle(boolean initialized)
                                   throws IOException, Exception {
     DummyLinkStore store = new DummyLinkStore();
-    if (initialized) {
+    if (!initialized) {
       store.initialize(props, Phase.REQUEST, 0);
     }
     return store;
