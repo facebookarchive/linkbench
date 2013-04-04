@@ -174,8 +174,8 @@ public abstract class GraphStoreTestBase extends TestCase {
     try {
       Random rng = LinkStoreTestBase.createRNG();
 
-      LinkStoreTestBase.serialLoad(rng, logger, props, getStoreHandle(false));
       serialLoadNodes(rng, logger, props, getStoreHandle(false));
+      LinkStoreTestBase.serialLoad(rng, logger, props, getStoreHandle(false));
 
       DummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);
