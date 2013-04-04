@@ -15,6 +15,9 @@
  */
 package com.facebook.LinkBench;
 
+import com.facebook.LinkBench.store.memory.MemoryLinkStore;
+import com.facebook.LinkBench.store.NodeStore;
+
 import java.io.IOException;
 import java.util.Properties;
 

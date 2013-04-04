@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.Random;
 
+import com.facebook.LinkBench.store.LinkStore;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
@@ -174,8 +175,8 @@ public abstract class GraphStoreTestBase extends TestCase {
     try {
       Random rng = LinkStoreTestBase.createRNG();
 
-      LinkStoreTestBase.serialLoad(rng, logger, props, getStoreHandle(false));
       serialLoadNodes(rng, logger, props, getStoreHandle(false));
+      LinkStoreTestBase.serialLoad(rng, logger, props, getStoreHandle(false));
 
       DummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);

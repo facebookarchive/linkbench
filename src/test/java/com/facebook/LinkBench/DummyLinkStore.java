@@ -21,7 +21,8 @@ import java.util.Properties;
 
 import com.facebook.LinkBench.Link;
 import com.facebook.LinkBench.LinkCount;
-import com.facebook.LinkBench.LinkStore;
+import com.facebook.LinkBench.store.GraphStore;
+import com.facebook.LinkBench.store.LinkStore;
 import com.facebook.LinkBench.Phase;
 
 /**

@@ -15,6 +15,9 @@
  */
 package com.facebook.LinkBench;
 
+import com.facebook.LinkBench.store.memory.MemoryLinkStore;
+import com.facebook.LinkBench.store.memory.MemoryLinkStoreFactory;
+
 import java.io.IOException;
 import java.util.Properties;
 
@@ -30,7 +33,7 @@ public class MemoryLinkStoreTest extends LinkStoreTestBase {
   @Override
   protected Properties basicProps() {
     Properties props = super.basicProps();
-    props.setProperty(Config.LINKSTORE_CLASS, MemoryLinkStore.class.getName());
+    props.setProperty(Config.LINKSTORE_FACTORY_CLASS, MemoryLinkStoreFactory.class.getName());
     return props;
   }
 

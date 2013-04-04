@@ -13,24 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.LinkBench;
+package com.facebook.LinkBench.store;
 
-import com.facebook.LinkBench.store.memory.MemoryLinkStore;
+import com.facebook.LinkBench.Node;
 
-import java.io.IOException;
-import java.util.Properties;
+import java.util.List;
 
-public class MemoryGraphStoreTest extends GraphStoreTestBase {
+/**
+ * An abstract class for storing both nodes and edges
+ * @author tarmstrong
+ */
+public abstract class GraphStore extends LinkStore implements NodeStore {
 
-  MemoryLinkStore store;
-  @Override
-  protected void initStore(Properties props) throws IOException, Exception {
-    store = new MemoryLinkStore();
+  /** Provide generic implementation */
+  public long[] bulkAddNodes(String dbid, List<Node> nodes) throws Exception {
+    long ids[] = new long[nodes.size()];
+    int i = 0;
+    for (Node node: nodes) {
+      long id = addNode(dbid, node);
+      ids[i++] = id;
+    }
+    return ids;
   }
-
-  @Override
-  protected DummyLinkStore getStoreHandle(boolean initialized) throws IOException, Exception {
-    return new DummyLinkStore(store.newHandle(), initialized);
-  }
-
 }
