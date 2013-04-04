@@ -22,10 +22,19 @@ import java.util.Arrays;
  * @author tarmstrong
  */
 public class Node {
+  /** Unique identifier for node */
   public long id;
+
+  /** Type of node */
   public int type;
+
+  /** Version of node: typically updated on every change */
   public long version;
+
+  /** Last update time of node as UNIX timestamp */
   public int time;
+
+  /** Arbitrary payload data */
   public byte data[];
 
   public Node(long id, int type, long version, int time,

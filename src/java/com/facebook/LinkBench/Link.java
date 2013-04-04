@@ -72,12 +72,26 @@ public class Link {
     return l;
   }
 
+  /** The node id of the source of directed edge */
   public long id1;
-  public long link_type;
+
+  /** The node id of the target of directed edge */
   public long id2;
+
+  /** Type of link */
+  public long link_type;
+
+  /** Visibility mode */
   public byte visibility;
-  public byte[] data;
+
+  /** Version of link */
   public int version;
+
+  /** time is the sort key for links.  Often it contains a timestamp,
+      but it can be used as a arbitrary user-defined sort key. */
   public long time;
+
+  /** Arbitrary payload data */
+  public byte[] data;
 
 }
