@@ -81,7 +81,7 @@ public class TimerTest extends TestCase {
          + actualArrivalRate_ns * 1e9 + " /s " +
         " expected " + arrivalRate_s + "/s");
 
-    assertTrue(actualArrivalRate_ns >= arrivalRate_ns * 0.95);
-    assertTrue(actualArrivalRate_ns <= arrivalRate_ns * 1.05);
+    assertTrue(actualArrivalRate_ns >= arrivalRate_ns * 0.9);
+    assertTrue(actualArrivalRate_ns <= arrivalRate_ns * 1.1);
   }
 }
