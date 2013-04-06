@@ -126,6 +126,38 @@
                 </pluginRepository>
             </pluginRepositories>
         </profile>
+        <profile>
+            <id>mysql-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                              <include>**/*MySql*.class</include>
+                            </includes>
+                            <excludedGroups></excludedGroups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>fast-test</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                           <excludedGroups>com.facebook.LinkBench.testtypes.ProviderTest,
+                                           com.facebook.LinkBench.testtypes.SlowTest</excludedGroups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 
     <build>
@@ -188,7 +220,24 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <version>2.14</version>
+              <dependencies>
+                  <dependency>
+                      <groupId>org.apache.maven.surefire</groupId>
+                      <artifactId>surefire-junit47</artifactId>
+                      <version>2.14</version>
+                  </dependency>
+              </dependencies>
+              <configuration>
+                  <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                  <!-- Configure basic set of tests that don't have special
+                       provider dependencies and aren't long-running -->
+                  <excludedGroups>com.facebook.LinkBench.testtypes.ProviderTest</excludedGroups>
+              </configuration>
+            </plugin>
         </plugins>
     </build>
-
 </project>

@@ -111,7 +111,11 @@ Then enter the directory and build LinkBench
     cd linkbench
     mvn clean package
 
-In order to skip tests (because they tend to run quite long), type
+In order to skip slower tests (some run quite long), type
+
+    mvn clean package -P fast-test
+
+To skip all tests
 
     mvn clean package -DskipTests
 
@@ -443,6 +447,12 @@ will be run against it.  These tests are sanity checks rather than
 comprehensive verification of your implementation.  In particular,
 they do not try to verify the atomicity, consistency or durability
 properties of the implementation.
+
+Database-specific tests are not run by default.  You can enable them
+with Maven profiles.  For example, to run the MySQL tests you can
+run:
+
+    mvn test -P mysql-test
 
 The MySQL related unit tests are run against a test database that needs
 setting up before running the unit tests. The default settings for this

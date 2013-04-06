@@ -43,7 +43,6 @@ public class UniformDistTest extends DistributionTestBase {
         long i = dist.choose(rng);
         assertTrue(i >= 0);
         assertTrue(i < max);
-        System.err.println(i);
       }
     }
   }

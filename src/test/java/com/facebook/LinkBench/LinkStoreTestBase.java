@@ -670,7 +670,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       System.err.println("Expected request rate: " + requestsPerSec
           + " actual request rate: " + actualArrivalRate);
       // Check that it isn't more that 5% faster than expected average
-      assertTrue(actualArrivalRate <= 1.05 * requestsPerSec);
+      assertTrue("arrival rate within 10% of expected", actualArrivalRate <= 1.1 * requestsPerSec);
     } finally {
       deleteIDRange(testDB, getStoreHandle(true), startId, idCount);
     }

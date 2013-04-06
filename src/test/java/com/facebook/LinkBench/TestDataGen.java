@@ -24,11 +24,14 @@ import java.util.zip.DeflaterOutputStream;
 import junit.framework.TestCase;
 
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 import com.facebook.LinkBench.generators.DataGenerator;
 import com.facebook.LinkBench.generators.MotifDataGenerator;
 import com.facebook.LinkBench.generators.UniformDataGenerator;
+import com.facebook.LinkBench.testtypes.SlowTest;
 
+@Category(SlowTest.class)
 public class TestDataGen extends TestCase {
 
   public static void printByteGrid(byte[] data) {

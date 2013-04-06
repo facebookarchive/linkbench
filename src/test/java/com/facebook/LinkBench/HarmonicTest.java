@@ -15,16 +15,21 @@
  */
 package com.facebook.LinkBench;
 
+import junit.framework.TestCase;
+
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 import com.facebook.LinkBench.distributions.ApproxHarmonic;
 import com.facebook.LinkBench.distributions.Harmonic;
+import com.facebook.LinkBench.testtypes.SlowTest;
 
-import junit.framework.TestCase;
 
+@Category(SlowTest.class)
 public class HarmonicTest extends TestCase {
 
   @Test
+  @Category(SlowTest.class)
   public void testHarmonic() {
     assertEquals(1, Harmonic.generalizedHarmonic(1, 0.8), 0.001);
     assertEquals(1.99534, Harmonic.generalizedHarmonic(10, 1.5), 0.00001);
@@ -34,31 +39,42 @@ public class HarmonicTest extends TestCase {
                  1);
   }
 
+  static final double SHAPES[] = {0.01, 0.1, 0.5, 0.9, 0.99};
+
+  
   @Test
-  public void testApprox() {
+  public void testApproxFast() {
+    for (long i = 0; i < 16; i+=4) {
+      testApproxHelper(i);
+    }
+  }
+  
+  @Test
+  @Category(SlowTest.class)
+  public void testApproxSlow() {
+    for (long i = 16; i < 30; i+=4) {
+      testApproxHelper(i);
+    }
+  }
 
-    // Test that approximation is close to actual for a range of shapes and
-    // ns
-    double shapes[] = {0.01, 0.1, 0.5, 0.9, 0.99};
-
-    for (long i = 0; i < 30; i+=4) {
-      long n = (long)Math.pow(2, i);
-      for (double shape: shapes) {
-        double exact = Harmonic.generalizedHarmonic(n, shape);
-        long start = System.currentTimeMillis();
-        double approx = ApproxHarmonic.generalizedHarmonic(n, shape);
-        long end = System.currentTimeMillis();
-        System.err.format("ApproxHarmonic.generalizedHarmonic(%d, %f) " +
-                          "took %.3fs\n", n, shape, (end - start) / 1000.0);
-        double err = approx - exact;
-        double errPc = (err / exact) * 100.0;
-        System.err.format("ApproxHarmonic.generalizedHarmonic(%d, %f) = %f. " +
-                          "exact=%f err=%f err%%=%.2f\n", n, shape, approx,
-                           exact, err, errPc);
-        double errThresh = 0.05;
-        assertTrue(String.format("Err%%=%.3f must be < 0.05%%", Math.abs(errPc)),
-                                 Math.abs(errPc) < errThresh);
-      }
+  /** Test that approximation is close to actual for a range of shapes and ns */
+  private void testApproxHelper(long i) {
+    long n = (long)Math.pow(2, i);
+    for (double shape: SHAPES) {
+      double exact = Harmonic.generalizedHarmonic(n, shape);
+      long start = System.currentTimeMillis();
+      double approx = ApproxHarmonic.generalizedHarmonic(n, shape);
+      long end = System.currentTimeMillis();
+      System.err.format("ApproxHarmonic.generalizedHarmonic(%d, %f) " +
+                        "took %.3fs\n", n, shape, (end - start) / 1000.0);
+      double err = approx - exact;
+      double errPc = (err / exact) * 100.0;
+      System.err.format("ApproxHarmonic.generalizedHarmonic(%d, %f) = %f. " +
+                        "exact=%f err=%f err%%=%.2f\n", n, shape, approx,
+                         exact, err, errPc);
+      double errThresh = 0.05;
+      assertTrue(String.format("Err%%=%.3f must be < 0.05%%", Math.abs(errPc)),
+                               Math.abs(errPc) < errThresh);
     }
   }
 }
