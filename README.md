@@ -89,8 +89,8 @@ or Mac OS X.
       JAVA\_HOME environment variable to the directory of the desired
       Java runtime version.  You will also need a Java JDK to compile from source.
 
-**Ant**: To build LinkBench, you will need the Apache Ant build tool. If
-    you do not have it already, it is available from http://ant.apache.org .
+**Maven**: To build LinkBench, you will need the Apache Maven build tool. If
+    you do not have it already, it is available from http://maven.apache.org .
 
 **MySQL Connector**:  To benchmark MySQL with LinkBench, you need MySQL
     Connector/J, A version of the MySQL connector is bundled with
@@ -109,7 +109,11 @@ First get the source code
 Then enter the directory and build LinkBench
 
     cd linkbench
-    ant dist
+    mvn clean package
+
+In order to skip tests (because they tend to run quite long), type
+
+    mvn clean package -DskipTests
 
 If the build is successful, you should get a message like this at the end of the output:
 

@@ -66,18 +66,8 @@ CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
 # so that filenames w/ spaces are handled correctly in loops below
 IFS=
 
-# add libs to CLASSPATH
-for f in $LINKBENCH_HOME/lib/*.jar; do
-  CLASSPATH=${CLASSPATH}:$f;
-done
-
-# add libs to CLASSPATH
-for f in $LINKBENCH_HOME/build/lib/*.jar; do
-  CLASSPATH=${CLASSPATH}:$f;
-done
-
 # add latest jar to CLASSPATH
-CLASSPATH=${CLASSPATH}:dist/FacebookLinkBench.jar;
+CLASSPATH=${CLASSPATH}:target/FacebookLinkBench.jar;
 
 # restore ordinary behaviour
 unset IFS
