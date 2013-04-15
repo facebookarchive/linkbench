@@ -42,7 +42,12 @@ public interface NodeStore {
   /**
    * Adds a new node object to the database.
    *
-   * This allocates a new id for the object and returns i
+   * This allocates a new id for the object and returns i.
+   *
+   * The benchmark assumes that, after resetStore() is called,
+   * node IDs are allocated in sequence, i.e. startID, startID + 1, ...
+   * Add node should return the next ID in the sequence.
+   *
    * @param dbid the db shard to put that object in
    * @param node a node with all data aside from id filled in.  The id
    *    field is *not* updated to the new value by this function
@@ -51,7 +56,9 @@ public interface NodeStore {
   public long addNode(String dbid, Node node) throws Exception;
 
   /**
-   * Bulk loading to more efficiently load nodes
+   * Bulk loading to more efficiently load nodes.
+   * Calling this is equivalent to calling addNode multiple times.
+   *
    * @param dbid
    * @param nodes
    * @return the actual IDs allocated to the nodes

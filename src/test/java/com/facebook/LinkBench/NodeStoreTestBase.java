@@ -66,39 +66,54 @@ public abstract class NodeStoreTestBase extends TestCase {
     int now = (int)(System.currentTimeMillis()/1000L);
     NodeStore store = getNodeStoreHandle(true);
 
-    Node test = new Node(-1, 2048, 1, now,  new byte[] {0xb, 0xe, 0xa, 0x5, 0x7});
-    store.resetNodeStore(testDB, 4); // We always start counting from 4 at Facebook
+    final int nodeType = 2048;
+    final long initId = 4; // We always start counting from 4 at Facebook
+    store.resetNodeStore(testDB, initId); // Start from clean store
+
+    byte data[] = new byte[] {0xb, 0xe, 0xa, 0x5, 0x7};
+    Node test = new Node(-1, nodeType, 1, now, data);
+
     long id = store.addNode(testDB, test);
     // Check id allocated
-    assertEquals(4, id);
-    assertEquals(-1, test.id); // Check not modified
+    assertEquals("expected first ID allocated after reset", initId, id);
+    assertEquals("addNode should not modify arguments", -1, test.id);
     test.id = id;
 
     // Allocate another
     id = store.addNode(testDB, test);
     test.id = id;
-    assertEquals(5, id);
+    long secondId = initId + 1;
+    assertEquals("expected second ID allocated after reset", secondId, id);
 
     // Check retrieval
-    Node fetched = store.getNode(testDB, 2048, 5);
-    assertTrue(fetched != test); // should not alias
-    assertTrue(fetched + ".equals(" + test + ")",
-               fetched.equals(test)); // but should have same data
+    Node fetched = store.getNode(testDB, nodeType, secondId);
+    assertNotSame("Fetched nodes should not alias", fetched, test);
+    assertEquals("Check fetched node" + fetched + ".equals(" + test + ")",
+               test, fetched); // but should have same data
 
     // Check deletion
-    assertTrue(store.deleteNode(testDB, 2048, 5));
-    assertNull(store.getNode(testDB, 2048, 5));
+    assertTrue(store.deleteNode(testDB, nodeType, secondId));
+    assertNull(store.getNode(testDB, nodeType, secondId));
     // Delete non-existent data
-    assertFalse(store.deleteNode(testDB, 2048, 8)); // bad id
-    assertFalse(store.deleteNode(testDB, 2049, 4)); // bad type
+    assertFalse("Deleting non-existent node should fail",
+            store.deleteNode(testDB, nodeType, 8));
+    int otherType = nodeType + 1;
+    assertFalse("Node should not be deleted if types don't match",
+            store.deleteNode(testDB, otherType, initId));
 
     // Check reset works right
-    store.resetNodeStore(testDB, 3);
-    assertNull(store.getNode(testDB, 2048, 4));
-    assertEquals(3, store.addNode(testDB, test));
-    assertEquals(4, store.addNode(testDB, test));
-    assertNotNull(store.getNode(testDB, 2048, 3));
-    assertNotNull(store.getNode(testDB, 2048, 4));
+    long newInitId = initId - 1;
+    store.resetNodeStore(testDB, newInitId);
+    assertNull("Nodes should be deleted after reset",
+                  store.getNode(testDB, nodeType, newInitId));
+    assertEquals("Correct ID after second reset", newInitId,
+                  store.addNode(testDB, test));
+    assertEquals("Correct ID after second reset", newInitId + 1,
+                  store.addNode(testDB, test));
+    assertNotNull("Added node should exist",
+                  store.getNode(testDB, nodeType, newInitId));
+    assertNotNull("Added node should exist",
+                  store.getNode(testDB, nodeType, newInitId + 1));
   }
 
   @Test
