@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.InputMismatchException;
+import java.util.Locale;
 import java.util.NavigableMap;
 import java.util.NoSuchElementException;
 import java.util.Properties;
@@ -35,6 +36,10 @@ import com.facebook.LinkBench.distributions.PiecewiseLinearDistribution;
  */
 
 public class RealDistribution extends PiecewiseLinearDistribution {
+
+  /** The locale used for number formats, etc in distribution file */
+  private static final Locale INPUT_FILE_LOCALE = Locale.ENGLISH;
+
   public static final String DISTRIBUTION_CONFIG = "realdist";
   private static final Logger logger =
                       Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
@@ -290,6 +295,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     logger.info("Loading real distribution data from " + fileAbsPath);
 
     Scanner scanner = new Scanner(new File(fileAbsPath));
+    scanner.useLocale(INPUT_FILE_LOCALE);
     while (scanner.hasNext()) {
       String type = scanner.next();
       if (type.equals("nlinks")) {
