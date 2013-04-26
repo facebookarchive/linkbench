@@ -325,7 +325,7 @@ public class LinkBenchRequest implements Runnable {
       double medLinkDataSize = ConfigUtil.getDouble(props,
                                             Config.LINK_DATASIZE);
       linkDataSize = new LogNormalDistribution();
-      linkDataSize.init(0, LinkStore.MAX_LINK_DATA, medLinkDataSize,
+      linkDataSize.init(1, LinkStore.MAX_LINK_DATA, medLinkDataSize,
                            Config.LINK_DATASIZE_SIGMA);
       linkAddDataGen = ClassLoadUtil.newInstance(
           ConfigUtil.getPropertyRequired(props, Config.LINK_ADD_DATAGEN),
@@ -383,7 +383,7 @@ public class LinkBenchRequest implements Runnable {
       double medNodeDataSize = ConfigUtil.getDouble(props,
                                               Config.NODE_DATASIZE);
       nodeDataSize = new LogNormalDistribution();
-      nodeDataSize.init(0, NodeStore.MAX_NODE_DATA, medNodeDataSize,
+      nodeDataSize.init(1, NodeStore.MAX_NODE_DATA, medNodeDataSize,
                         Config.NODE_DATASIZE_SIGMA);
 
       String dataGenClass = ConfigUtil.getPropertyRequired(props,
