@@ -343,8 +343,9 @@ public class LinkStoreMysql extends GraphStore {
                       ", " + base_count +
                       ", " + l.time +
                       ", " + l.version + ") " +
-                      "ON DUPLICATE KEY UPDATE count = count + " +
-                      update_count + ";";
+                      "ON DUPLICATE KEY UPDATE" +
+                      " count = count + " + update_count + 
+                      ", version = version + 1;";
 
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
         logger.trace(updatecount);
