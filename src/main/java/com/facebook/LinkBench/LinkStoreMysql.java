@@ -336,15 +336,18 @@ public class LinkStoreMysql extends GraphStore {
       int base_count = update_count < 0 ? 0 : 1;
       // query to update counttable
       // if (id, link_type) is not there yet, add a new record with count = 1
+      long currentTime = (new Date()).getTime();
       String updatecount = "INSERT INTO " + dbid + "." + counttable +
                       "(id, link_type, count, time, version) " +
                       "VALUES (" + l.id1 +
                       ", " + l.link_type +
                       ", " + base_count +
-                      ", " + l.time +
-                      ", " + l.version + ") " +
-                      "ON DUPLICATE KEY UPDATE count = count + " +
-                      update_count + ";";
+                      ", " + currentTime +
+                      ", " + 0 + ") " +
+                      "ON DUPLICATE KEY UPDATE" +
+                      " count = count + " + update_count +
+                      ", version = version + 1 " +
+                      ", time = " + currentTime + ";";
 
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
         logger.trace(updatecount);
