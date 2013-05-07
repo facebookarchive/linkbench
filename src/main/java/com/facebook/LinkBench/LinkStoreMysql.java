@@ -287,6 +287,10 @@ public class LinkStoreMysql extends GraphStore {
 
     int nrows = addLinksNoCount(dbid, Collections.singletonList(l));
 
+    // Note: at this point, we have an exclusive lock on the link
+    // row until the end of the transaction, so can safely do
+    // further updates without concurrency issues.
+
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("nrows = " + nrows);
     }
@@ -336,6 +340,7 @@ public class LinkStoreMysql extends GraphStore {
       int base_count = update_count < 0 ? 0 : 1;
       // query to update counttable
       // if (id, link_type) is not there yet, add a new record with count = 1
+      // The update happens atomically, with the latest count and version
       long currentTime = (new Date()).getTime();
       String updatecount = "INSERT INTO " + dbid + "." + counttable +
                       "(id, link_type, count, time, version) " +
@@ -456,11 +461,16 @@ public class LinkStoreMysql extends GraphStore {
     // Result could be either NULL, VISIBILITY_HIDDEN or VISIBILITY_DEFAULT.
     // In case of VISIBILITY_DEFAULT, later we need to mark the link as
     // hidden, and update counttable.
+    // We lock the row exclusively because we rely on getting the correct
+    // value of visible to maintain link counts.  Without the lock,
+    // a concurrent transaction could also see the link as visible and
+    // we would double-decrement the link count.
     String select = "SELECT visibility" +
                     " FROM " + dbid + "." + linktable +
                     " WHERE id1 = " + id1 +
                     " AND id2 = " + id2 +
-                    " AND link_type = " + link_type + ";";
+                    " AND link_type = " + link_type +
+                    " FOR UPDATE;";
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(select);
@@ -514,6 +524,7 @@ public class LinkStoreMysql extends GraphStore {
       //   count = (count == 1) ? 0) we decrease the value of count
       //   column by 1;
       // * otherwise, insert new link with count column = 0
+      // The update happens atomically, with the latest count and version
       long currentTime = (new Date()).getTime();
       String update = "INSERT INTO " + dbid + "." + counttable +
                       " (id, link_type, count, time, version) " +
