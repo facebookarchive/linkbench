@@ -493,10 +493,13 @@ public class LinkStoreMysql extends GraphStore {
     if (!found) {
       // do nothing
     }
-    else if (visibility == VISIBILITY_HIDDEN) {
+    else if (visibility == VISIBILITY_HIDDEN && !expunge) {
       // do nothing
     }
-    else if (visibility == VISIBILITY_DEFAULT) {
+    else {
+      // Only update count if link is present and visible
+      boolean updateCount = (visibility != VISIBILITY_HIDDEN);
+
       // either delete or mark the link as hidden
       String delete;
 
@@ -543,10 +546,6 @@ public class LinkStoreMysql extends GraphStore {
       }
 
       stmt.executeUpdate(update);
-    }
-    else {
-      throw new Exception("Value of visibility is not valid: " +
-                          visibility);
     }
 
     if (INTERNAL_TESTING) {
