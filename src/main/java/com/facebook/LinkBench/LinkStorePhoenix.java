@@ -265,8 +265,9 @@ public class LinkStorePhoenix extends GraphStore {
                          "." + l.link_type);
     }
 
-    // FIXME: It seems that there are no way to know whether a link is already exist or not
-    // Then this is not thread safe. Could lead to wrong result. Need a fix here.
+    // FIXME: The way we query link then update count is not thread safe,
+    // since we don't hold any lock between query and update.
+    // Could lead to wrong result. Need a fix here.
 
     int update_count = 0;
 
@@ -291,25 +292,31 @@ public class LinkStorePhoenix extends GraphStore {
     }
 
     if (update_count != 0) {
-      // FIXME : This won't be right, since it's not atomic thus not thread safe.
-      // However at present phoenix doesn't support atomic update operation.
-      // Need to fix version = version + 1 too.
-      long old_count = countLinks(dbid, l.id1, l.link_type);
-      long new_count = old_count + update_count;
+      // We do update count by first insert time filed 
+      // then update count and version.
 
-      String updatecount = "UPSERT INTO " + counttable +
-                      " (id, link_type, count, time, version) " +
+      String statement = "UPSERT INTO " + counttable +
+                      " (id, link_type, time) " +
                       "VALUES (" + l.id1 +
                       ", " + l.link_type +
-                      ", " + new_count +
-                      ", " + l.time +
-                      ", " + l.version + ")";
+                      ", " + l.time + ")";
 
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-        logger.trace(updatecount);
+        logger.trace(statement);
+      }
+      stmt.executeUpdate(statement);
+      
+      statement = "UPSERT INTO " + counttable +
+              " (id, link_type, count, version) " +
+              "INCREASE VALUES (" + l.id1 +
+              ", " + l.link_type +
+              ", " + update_count +
+              ", 1" + ")";
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+          logger.trace(statement);
       }
 
-      stmt.executeUpdate(updatecount);
+      stmt.executeUpdate(statement);
       conn.commit();
     }
 
@@ -406,6 +413,7 @@ public class LinkStorePhoenix extends GraphStore {
 
     int visibility = -1;
     boolean found = false;
+    int count_inc = 0;
     while (result.next()) {
       visibility = result.getInt("visibility");
       found = true;
@@ -418,11 +426,9 @@ public class LinkStorePhoenix extends GraphStore {
 
     if (!found) {
       // do nothing
-    }
-    else if (visibility == VISIBILITY_HIDDEN) {
+    } else if (visibility == VISIBILITY_HIDDEN && !expunge) {
       // do nothing
-    }
-    else if (visibility == VISIBILITY_DEFAULT) {
+    } else {
       // either delete or mark the link as hidden
       String delete;
 
@@ -447,34 +453,43 @@ public class LinkStorePhoenix extends GraphStore {
 
       stmt.executeUpdate(delete);
 
+      if (visibility == VISIBILITY_DEFAULT) {
+        count_inc = -1;
+      }
+    }
+    
+    if (count_inc != 0) {
       // update count table
-      // FIXME : Still this is not thread safe.
-      // Due to we have no way to checkandput etc. with phoenix.
-
-      long old_count = countLinks(dbid, id1, link_type);
-      long new_count = old_count == 0 ? 0 : old_count - 1;
-
       long currentTime = (new Date()).getTime();
-      
-      // FIXME : version info should also be update instead of set to 0.
-      String update = "UPSERT INTO " + counttable +
-          " (id, link_type, count, time, version) " +
-          "VALUES (" + id1 +
-          ", " + link_type +
-          ", " + new_count +
-          ", " + currentTime +
-          ", " + 0 + ")";
 
+      String statement = "UPSERT INTO " + counttable
+          + " (id, link_type, time) "
+          + "VALUES (" + id1
+          + ", " + link_type
+          + ", " + currentTime + ")";
 
       if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-        logger.trace(update);
+        logger.trace(statement);
+      }
+      stmt.executeUpdate(statement);
+
+      statement = "UPSERT INTO " + counttable
+          + " (id, link_type, count, version) "
+          + "INCREASE VALUES ("
+          + id1 + ", "
+          + link_type + ", "
+          + count_inc
+          + ", 1" + ")";
+
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace(statement);
       }
 
-      stmt.executeUpdate(update);
-    }
-    else {
-      throw new Exception("Value of visibility is not valid: " +
-                          visibility);
+      stmt.executeUpdate(statement);
+
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace(statement);
+      }
     }
 
     conn.commit();
@@ -599,13 +614,17 @@ public class LinkStorePhoenix extends GraphStore {
         int offset, int limit)
             throws Exception {
     assert(offset >= 0);
+    
+    if (limit <=0) {
+      limit = rangeLimit;
+    }
     // TODO: Just fake the offset operation for Phoenix.
     // Need to check whether this can be implemented in Phoenix or not.
+
+    // FIXME: Phoenix do not support very large limit, so this will not work correctly for
+    // a large offset + limit.
+    long querylimit = Math.min((long)(limit + offset), 10000);
     
-    // FIXME: Also, since phoenix do order by after limit, it won't work right
-    // in this case, so we need to do limit by ourselves to work around this.
-    // However order by in phoenix won't work without limit or aggregation. so use
-    // rangeLimit as limit. So this still won't work right if limit > rangeLimit.
     String query = " select id1, id2, link_type," +
                    " visibility, data, time," +
                    " version from " + linktable +
@@ -614,7 +633,7 @@ public class LinkStorePhoenix extends GraphStore {
                    " and time <= " + maxTimestamp +
                    " and visibility = " + LinkStore.VISIBILITY_DEFAULT +
                    " order by time desc" +
-                   " limit " + rangeLimit;
+                   " limit " + querylimit;
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Query is " + query);
@@ -632,7 +651,7 @@ public class LinkStorePhoenix extends GraphStore {
         continue;
       }
       // only accept limit number of results.
-      if (index > (offset + limit)) {
+      if (index > (querylimit)) {
         break;
       }
       Link l = createLinkFromRow(rs);
@@ -954,26 +973,5 @@ public class LinkStorePhoenix extends GraphStore {
       throw new Exception(rows + " rows modified on delete: should delete " +
                       "at most one");
     }
-  }
-
-
-  /**
-   * Create a hex string literal from array:
-   * E.g. [0xf, bc, 4c, 3] converts to '0fbc4c03'
-   * @param arr
-   * @return the hex literal including quotes
-   */
-  private static String stringLiteral(byte[] arr) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("'");
-    for (int i = 0; i < arr.length; i++) {
-      byte b = arr[i];
-      int lo = b & 0xf;
-      int hi = (b >> 4) & 0xf;
-      sb.append(Character.forDigit(hi, 16));
-      sb.append(Character.forDigit(lo, 16));
-    }
-    sb.append("'");
-    return sb.toString();
   }
 }
