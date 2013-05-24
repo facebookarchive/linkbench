@@ -845,7 +845,7 @@ public class LinkBenchRequest implements Runnable {
     logger.info("ThreadID = " + requesterID +
                        " total requests = " + requestsDone +
                        " requests/second = " + ((1000 * requestsDone)/
-                                                Math.max(1, (endTime - benchmarkStartTime))) +
+                                                Math.max(1, (curTime - benchmarkStartTime))) +
                        " found = " + numfound +
                        " not found = " + numnotfound +
                        " history queries = " + numHistoryQueries + "/" +
