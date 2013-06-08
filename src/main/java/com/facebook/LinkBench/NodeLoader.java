@@ -83,7 +83,7 @@ public class NodeLoader implements Runnable {
 
     double medianDataLength = ConfigUtil.getDouble(props, Config.NODE_DATASIZE);
     nodeDataLength = new LogNormalDistribution();
-    nodeDataLength.init(0, NodeStore.MAX_NODE_DATA, medianDataLength,
+    nodeDataLength.init(1, NodeStore.MAX_NODE_DATA, medianDataLength,
                                           Config.NODE_DATASIZE_SIGMA);
 
     try {
