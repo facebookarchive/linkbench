@@ -52,6 +52,9 @@ echo "Using java at: $JAVA"
 
 JAVA_HEAP_MAX=-Xmx1000m
 
+#GC example
+#OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:NewSize=128m -XX:MaxNewSize=128m"
+
 # check envvars which might override default args
 if [ "$HEAPSIZE" != "" ]; then
   #echo "run with heapsize $HEAPSIZE"
