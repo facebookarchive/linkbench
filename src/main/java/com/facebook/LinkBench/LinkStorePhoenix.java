@@ -805,11 +805,7 @@ public class LinkStorePhoenix extends GraphStore {
   @Override
   public void resetNodeStore(String dbid, long startID) throws Exception {
     checkNodeTableConfigured();
-    // FIXME : need to implement TRUNCATE TABLE.
-    // Truncate table deletes all data and allows us to reset autoincrement
-//    stmt.execute(String.format("TRUNCATE TABLE `%s`.`%s`;",
-//                 dbid, nodetable));
-
+    // We don't TRUNCATE TABLE. only reset ID
     nodeIdGenerator.set(startID);
   }
 

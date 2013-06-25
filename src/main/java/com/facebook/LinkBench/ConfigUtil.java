@@ -16,9 +16,14 @@
 package com.facebook.LinkBench;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.filecache.DistributedCache;
+import org.apache.hadoop.fs.Path;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.EnhancedPatternLayout;
 import org.apache.log4j.FileAppender;
@@ -29,6 +34,18 @@ import org.apache.log4j.Logger;
 public class ConfigUtil {
   public static final String linkbenchHomeEnvVar = "LINKBENCH_HOME";
   public static final String LINKBENCH_LOGGER = "com.facebook.linkbench";
+
+  private static final Logger logger = Logger.getLogger("ConfigUtil");
+
+  public static final String CONFIG_WORKLOAD_FILENAME = "linkbench_workload_filename";
+  public static final String CONFIG_DISTRIBUTION_FILENAME = "linkbench_distribution_filename";
+  public static final String CONFIG_CONFIG_FILENAME = "linkbench_config_filename";
+  public static final String CONFIG_MAPREDUCE_MODE = "linkbench_mapreduce_mode";
+  public static final String CONFIG_LOCAL_CACHE_DIST_FILE = "linkbench_local_cache_config_file";
+
+  public static final int CONFIGFILEPOS = 0;
+  public static final int WORKLOADFILEPOS = 1;
+  public static final int DISTFILEPOS = 2;
 
   /**
    * @return null if not set, or if not valid path
@@ -220,5 +237,145 @@ public class ConfigUtil {
       throw new LinkBenchConfigError("Expected configuration key " + key +
                 " to be true or false, but was '" + v + "'");
     }
+  }
+  
+  
+  /**
+   * @param configFile
+   * @param fileNames, array[3] to hold the parsed config files' name.
+   * @return
+   * @throws IOException
+   * @throws FileNotFoundException
+   */
+  public static Properties parseConfigFile(String configFile, String[] fileNames) throws IOException, FileNotFoundException {
+
+    // check the fileNames array size, ugly! could use better implementation.
+    if (fileNames.length < 3) {
+      throw new RuntimeException("fileNames.length < 3");
+    }
+
+    logger.info("configFile = " + configFile);
+    Properties props = new Properties();
+    props.load(new FileInputStream(configFile));
+
+    String workloadConfigFile = null;
+    if (props.containsKey(Config.WORKLOAD_CONFIG_FILE)) {
+      workloadConfigFile = props.getProperty(Config.WORKLOAD_CONFIG_FILE);
+      if (!new File(workloadConfigFile).isAbsolute()) {
+        String linkBenchHome = ConfigUtil.findLinkBenchHome();
+        if (linkBenchHome == null) {
+          throw new RuntimeException("Data file config property "
+              + Config.WORKLOAD_CONFIG_FILE
+              + " was specified using a relative path, but linkbench home"
+              + " directory was not specified through environment var "
+              + ConfigUtil.linkbenchHomeEnvVar);
+        } else {
+          workloadConfigFile = linkBenchHome + File.separator + workloadConfigFile;
+        }
+      }
+
+      logger.info("workloadConfigFile = " + workloadConfigFile);
+      Properties workloadProps = new Properties();
+      workloadProps.load(new FileInputStream(workloadConfigFile));
+      
+      // Add workload properties, but allow other values to override
+      for (String key: workloadProps.stringPropertyNames()) {
+        if (props.getProperty(key) == null) {
+          props.setProperty(key, workloadProps.getProperty(key));
+        }
+      }
+    }
+
+    String distributionDataFile = null;
+
+    if (props.containsKey(Config.DISTRIBUTION_DATA_FILE)) {
+      distributionDataFile = ConfigUtil.getPropertyRequired(props,
+          Config.DISTRIBUTION_DATA_FILE);
+    }
+
+    logger.info("distributionDataFile = " + distributionDataFile);
+
+    fileNames[CONFIGFILEPOS] = configFile != null ? new Path(configFile).getName() : null;
+    fileNames[WORKLOADFILEPOS] = workloadConfigFile != null ? new Path(workloadConfigFile).getName() : null;
+    fileNames[DISTFILEPOS] = distributionDataFile != null ? new Path(distributionDataFile).getName() : null;
+
+    return props;
+  }
+
+  
+  public static void setConfigFileNamesToConf(Configuration conf, String fileNames[]) {
+    assert(fileNames.length >= 3);
+    conf.set(CONFIG_CONFIG_FILENAME, fileNames[CONFIGFILEPOS]);
+    conf.set(CONFIG_WORKLOAD_FILENAME, fileNames[WORKLOADFILEPOS]);
+    conf.set(CONFIG_DISTRIBUTION_FILENAME, fileNames[DISTFILEPOS]);
+  }
+
+  public static String[] getConfigFileNamesFromConf(Configuration conf) {
+    String fileNames[] = new String[3];
+
+    fileNames[CONFIGFILEPOS] = conf.get(CONFIG_CONFIG_FILENAME);
+    fileNames[WORKLOADFILEPOS] = conf.get(CONFIG_WORKLOAD_FILENAME);
+    fileNames[DISTFILEPOS] = conf.get(CONFIG_DISTRIBUTION_FILENAME);
+    
+    return fileNames;
+  }
+  
+  /**
+   * Loading properties from files on Distributed cache directly.
+   * @param configFile
+   * @return
+   * @throws IOException
+   * @throws FileNotFoundException
+   */
+  public static Properties loadPropertiesMR(Configuration conf) throws IOException, FileNotFoundException {
+
+    String configFileNames[] = getConfigFileNamesFromConf(conf);
+
+    Path[] localFiles = DistributedCache.getLocalCacheFiles(conf);
+
+    String localConfigFiles[] = new String[3];
+    
+    for (Path p: localFiles) {
+      logger.info("file = " + p.getName());
+      if (p.getName().equalsIgnoreCase(configFileNames[CONFIGFILEPOS])) {
+        localConfigFiles[CONFIGFILEPOS] = p.toString();
+      } else if (p.getName().equalsIgnoreCase(configFileNames[WORKLOADFILEPOS])) {
+        localConfigFiles[WORKLOADFILEPOS] = p.toString();
+      } else if (p.getName().equalsIgnoreCase(configFileNames[DISTFILEPOS])) {
+        localConfigFiles[DISTFILEPOS] = p.toString();
+      }
+    }
+
+    Properties props = new Properties();
+    props.load(new FileInputStream(localConfigFiles[CONFIGFILEPOS]));
+    
+    String workloadConfigFile = localConfigFiles[WORKLOADFILEPOS];
+    if (workloadConfigFile != null) {
+      Properties workloadProps = new Properties();
+      workloadProps.load(new FileInputStream(workloadConfigFile));
+      
+      // Add workload properties, but allow other values to override
+      for (String key: workloadProps.stringPropertyNames()) {
+        if (props.getProperty(key) == null) {
+          props.setProperty(key, workloadProps.getProperty(key));
+        }
+      }
+    }
+
+    props.setProperty(CONFIG_MAPREDUCE_MODE, "TRUE");
+    props.setProperty(CONFIG_LOCAL_CACHE_DIST_FILE, localConfigFiles[DISTFILEPOS]);
+
+    return props;
+  }
+
+  public static Boolean isMapReduceMode(Properties props) {
+    Boolean result = false;
+    try {
+      result = getBool(props, CONFIG_MAPREDUCE_MODE);
+    } catch (LinkBenchConfigError e) {
+      // The property is not existing, thus not in MapReduce Mode.
+      result = false;
+    }
+    return result;
   }
 }

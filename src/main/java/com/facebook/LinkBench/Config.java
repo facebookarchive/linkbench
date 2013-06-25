@@ -68,6 +68,7 @@ public class Config {
 
   /* Loading performance tuning */
   public static final String NUM_LOADERS = "loaders";
+  public static final String NUM_NODE_LOADERS = "node_loaders";
   public static final String LOADER_CHUNK_SIZE = "loader_chunk_size";
 
   /* Request workload */
@@ -137,9 +138,13 @@ public class Config {
   /* MapReduce specific configuration */
   public static final String TEMPDIR = "tempdir";
   public static final String LOAD_DATA = "loaddata";
+  public static final String DO_REQUEST = "dorequest";
   public static final String MAPRED_USE_INPUT_FILES = "useinputfiles";
 
   /* External data */
   public static final String DISTRIBUTION_DATA_FILE = "data_file";
   public static final String WORKLOAD_CONFIG_FILE = "workload_file";
+
+
+ 
 }

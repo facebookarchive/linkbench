@@ -272,23 +272,30 @@ public class RealDistribution extends PiecewiseLinearDistribution {
    * value and the cumulative distribution at that value i.e. <x, CDF(x)>.
    */
   private static void getStatisticalData(Properties props) throws FileNotFoundException {
-    String filename = ConfigUtil.getPropertyRequired(props,
-                            Config.DISTRIBUTION_DATA_FILE);
+    
+    Boolean isMapReduceMode = ConfigUtil.isMapReduceMode(props);
 
-    // If relative path, should be relative to linkbench home directory
     String fileAbsPath;
-    if (new File(filename).isAbsolute()) {
-      fileAbsPath = filename;
+    if (isMapReduceMode) {
+      fileAbsPath = props.getProperty(ConfigUtil.CONFIG_LOCAL_CACHE_DIST_FILE);
     } else {
-      String linkBenchHome = ConfigUtil.findLinkBenchHome();
-      if (linkBenchHome == null) {
-        throw new RuntimeException("Data file config property "
-            + Config.DISTRIBUTION_DATA_FILE
-            + " was specified using a relative path, but linkbench home"
-            + " directory was not specified through environment var "
-            + ConfigUtil.linkbenchHomeEnvVar);
+      String filename = ConfigUtil.getPropertyRequired(props,
+          Config.DISTRIBUTION_DATA_FILE);
+
+      // If relative path, should be relative to linkbench home directory
+      if (new File(filename).isAbsolute()) {
+        fileAbsPath = filename;
       } else {
-        fileAbsPath = linkBenchHome + File.separator + filename;
+        String linkBenchHome = ConfigUtil.findLinkBenchHome();
+        if (linkBenchHome == null) {
+          throw new RuntimeException("Data file config property "
+              + Config.DISTRIBUTION_DATA_FILE
+              + " was specified using a relative path, but linkbench home"
+              + " directory was not specified through environment var "
+              + ConfigUtil.linkbenchHomeEnvVar);
+        } else {
+          fileAbsPath = linkBenchHome + File.separator + filename;
+        }
       }
     }
 
