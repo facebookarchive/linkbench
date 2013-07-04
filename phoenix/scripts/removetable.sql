@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS linktable;
+DROP TABLE IF EXISTS counttable;
+DROP TABLE IF EXISTS nodetable;

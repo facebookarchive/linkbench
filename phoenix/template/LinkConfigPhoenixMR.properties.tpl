@@ -1,4 +1,4 @@
-# Sample Phoenix LinkBench configuration file.
+# Sample Phoenix LinkBench configuration file for MapReduce.
 #
 # This file contains settings for the data store, as well as controlling
 # benchmark output and behavior.  The workload is defined in a separate
@@ -27,10 +27,10 @@ linkstore = com.facebook.LinkBench.LinkStorePhoenix
 nodestore = com.facebook.LinkBench.LinkStorePhoenix
 
 # Phoenix connection information
-host = localhost
+host = ZKADDRESS_PLACEHOLDER
 user = user
 password = password
-port = 2181
+port = ZKPORT_PLACEHOLDER
 dbid = notused
 
 # database table names
@@ -58,13 +58,13 @@ debuglevel = INFO
 progressfreq = 300
 
 # display frequency of per-thread stats (latency, etc) in seconds
-displayfreq = 1800
+displayfreq = 100
 
 # display global load update (% complete, etc) after this many links loaded
-load_progress_interval = 100000
+load_progress_interval = 10000
 
 # display global update on request phase (% complete, etc) after this many ops
-req_progress_interval = 5000
+req_progress_interval = 50000
 
 # max number of samples to store for each per-thread statistic
 maxsamples = 10000
@@ -75,8 +75,14 @@ maxsamples = 10000
 #                             #
 ###############################
 
-# number of threads to run during load phase
-loaders = 10
+# config to enable the load phase for MR job.
+loaddata = true
+
+# number of threads to run for loading node during load phase
+node_loaders = 20
+
+# number of threads to run for loading link during load phase
+loaders = 60
 
 # whether to generate graph nodes during load process
 generate_nodes = true
@@ -93,8 +99,11 @@ loader_chunk_size = 1000
 #                                #
 ##################################
 
+# config to enable the request phase for MR job.
+dorequest = false
+
 # number of threads to run during request phase
-requesters = 100
+requesters = 48
 
 # read + write requests per thread
 requests = 10000

@@ -108,9 +108,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
 
     LinkStore newstore = null;
 
-
     logger.info("Using store class: " + linkStoreClassName);
-
 
     // The property "store" defines the class name that will be used to
     // store data in a database. The folowing class names are pre-packaged
@@ -134,6 +132,40 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     return newstore;
   }
 
+  /**
+   * @param linkStore a LinkStore instance to be reused if it turns out
+   * that linkStore and nodeStore classes are same
+   * @return
+   * @throws Exception
+   * @throws IOException
+   */
+  private static NodeStore createNodeStore(String nodeStoreClassName, LinkStore linkStore) throws
+      IOException {
+    if (nodeStoreClassName == null) {
+      logger.debug("No NodeStore implementation provided");
+    } else {
+      logger.debug("Using NodeStore implementation: " + nodeStoreClassName);
+    }
+
+    if (linkStore != null && linkStore.getClass().getName().equals(
+                                                nodeStoreClassName)) {
+      // Same class, reuse object
+      if (!NodeStore.class.isAssignableFrom(linkStore.getClass())) {
+        throw new IOException("Specified NodeStore class " + nodeStoreClassName
+                          + " is not a subclass of NodeStore");
+      }
+      return (NodeStore)linkStore;
+    } else {
+      NodeStore nodeStore;
+      try {
+        nodeStore = ClassLoadUtil.newInstance(nodeStoreClassName,
+                                                            NodeStore.class);
+        return nodeStore;
+      } catch (java.lang.ClassNotFoundException nfe) {
+        throw new IOException("Cound not find class for " + nodeStoreClassName);
+      }
+    }
+  }
   
   /**
    * generate an instance of NodeStore
@@ -458,16 +490,19 @@ public class LinkBenchDriverMR extends Configured implements Tool {
            throws IOException, InterruptedException{
       //ConfigUtil.setupLogging(props, null);
       
-      LinkStore store = initStore(
+      LinkStore linkstore = initStore(
           ConfigUtil.getPropertyRequired(props, Config.LINKSTORE_CLASS),
           Phase.REQUEST, requesterid.get());
+
+      String nodeStoreClassName = props.getProperty(Config.NODESTORE_CLASS);
+      NodeStore nodestore = createNodeStore(nodeStoreClassName, linkstore);
       LatencyStats latencyStats = new LatencyStats(nrequesters.get());
       RequestProgress progress =
                               LinkBenchRequest.createProgress(logger, props);
       progress.startTimer();
       // TODO: Don't support NodeStore yet
       final LinkBenchRequest requester =
-        new LinkBenchRequest(store, null, props, latencyStats, null, progress,
+        new LinkBenchRequest(linkstore, nodestore, props, latencyStats, null, progress,
                 new Random(), requesterid.get(), nrequesters.get());
 
       requester.run();
@@ -543,7 +578,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     int nlinkloaders = ConfigUtil.getInt(props, Config.NUM_LOADERS);
     int nnodeloaders = ConfigUtil.getInt(props, Config.NUM_NODE_LOADERS);
     Job loadjob = prepareJob(LOAD, nlinkloaders, nnodeloaders);
-    FileSystem fs = setupInputFiles(loadjob, nlinkloaders, nnodeloaders);
+    FileSystem fs = setupInputFiles(loadjob, LOAD, nlinkloaders, nnodeloaders);
 
     try {
       logger.info("Starting loaders " + nlinkloaders);
@@ -585,7 +620,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     
     int nrequesters = ConfigUtil.getInt(props, Config.NUM_REQUESTERS);
     Job requestJob = prepareJob(REQUEST, nrequesters, 0);
-    FileSystem fs = setupInputFiles(requestJob, nrequesters, 0);
+    FileSystem fs = setupInputFiles(requestJob, REQUEST, nrequesters, 0);
 
     try {
       logger.info("Starting requesters " + nrequesters);

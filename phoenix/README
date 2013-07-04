@@ -1,0 +1,50 @@
+This is a README for prebuilt package. 
+
+If you are working with the source code tree, use PhoenixStoreReadme.md in the source tree
+
+====== HOWTO run ======
+
+1. You need to have a ready HBase Cluster to test upon
+
+Should be 0.94.5+, better to have hbase version 0.94.7
+
+There is a bug that impact the performance a lot which got fixed in 0.94.9+
+check out following issue for more detail:
+
+https://issues.apache.org/jira/browse/HBASE-8639
+
+2. Deploy phoenix jar to HBASE cluster.
+
+Copy lib/phoenix-*-client.jar to everyHBaseNode:path_to_hbase/lib/
+
+3. Tweak some settings accroding to your cluster env.
+
+In bin/config.sh fill in all settings with correct values.
+
+In bin dir, run ./applyconfig.sh to generate some scripts and apply changes
+according to the values you have been set into config.sh
+
+4. Run benchmark
+
+preparing database : run loaddata.sh, it will create the table then load the data.
+query : doquery.sh
+
+5. Clean up table.
+
+At present, Phoenix do not support drop table thoughly from hbase.
+you will need to clean up table on hbase cluster firstly by hand by
+
+disable and drop nodetable, linktable, counttable
+
+then run cleanup.sh to drop table metadata from phoenix system table.
+
+
+====== Tuning ======
+
+Regarding HBASE, by default, we are using config/hbase-site.xml come with this
+prebuilt package. take it as an example for futher tunning or merge it with your
+HBase Cluster's existing one.
+
+You can look into README.md and PhoenixStoreReadme.md in the source
+tree to understand and tune various other parameters.
+

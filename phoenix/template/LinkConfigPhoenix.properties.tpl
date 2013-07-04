@@ -1,4 +1,4 @@
-# Sample Phoenix LinkBench configuration file for MapReduce.
+# Sample Phoenix LinkBench configuration file.
 #
 # This file contains settings for the data store, as well as controlling
 # benchmark output and behavior.  The workload is defined in a separate
@@ -14,7 +14,7 @@
 # Path for workload properties file.  Properties in this file will override
 # those in workload properties file.
 # Can be absolute path, or relative path from LinkBench home directory
-workload_file = config/FBWorkload.properties
+workload_file = config/PhoenixWorkload.properties
 
 #################################
 #                               #
@@ -27,10 +27,10 @@ linkstore = com.facebook.LinkBench.LinkStorePhoenix
 nodestore = com.facebook.LinkBench.LinkStorePhoenix
 
 # Phoenix connection information
-host = ZKaddress
+host = ZKADDRESS_PLACEHOLDER
 user = user
 password = password
-port = 2181
+port = ZKPORT_PLACEHOLDER
 dbid = notused
 
 # database table names
@@ -75,13 +75,7 @@ maxsamples = 10000
 #                             #
 ###############################
 
-# config to enable the load phase for MR job.
-loaddata = true
-
-# number of threads to run for loading node during load phase
-node_loaders = 5
-
-# number of threads to run for loading link during load phase
+# number of threads to run during load phase
 loaders = 10
 
 # whether to generate graph nodes during load process
@@ -99,14 +93,11 @@ loader_chunk_size = 1000
 #                                #
 ##################################
 
-# config to enable the request phase for MR job.
-dorequest = false
-
 # number of threads to run during request phase
 requesters = 100
 
 # read + write requests per thread
-requests = 50000
+requests = 10000
 
 # request rate per thread.  <= 0 means unthrottled requests, > 0 limits
 #  the average request rate to that number of requests per second per thread,
