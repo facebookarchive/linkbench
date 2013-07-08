@@ -37,6 +37,9 @@ cp -a ${LINKBENCHDIR}/target/FacebookLinkBench.jar ${LIBDIR}/
 cp -a ${LINKBENCHDIR}/phoenix/* ${DESTDIR}
 
 cp -a ${PHOENIXDIR}/bin/* ${BINDIR}/
+rm -f ${BINDIR}/hbase-site.xml
+ln -s "../config/hbase-site.xml" ${BINDIR}/hbase-site.xml
+
 cp -a ${PHOENIXDIR}/target/*-client.jar ${LIBDIR}/
 
 echo "Packaging files into ${DESTPACKAGE}.tar.bz2 ..."

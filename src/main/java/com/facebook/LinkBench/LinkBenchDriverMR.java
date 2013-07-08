@@ -239,6 +239,12 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     
     Configuration conf = getConf();
     ConfigUtil.setConfigFileNamesToConf(conf, configFileNames);
+    
+    // disable task timeout, since we do need to run a very long time
+    conf.setLong("mapred.task.timeout", 0);
+
+    // Do not run additional map tasks upon slow .
+    conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
 
     Job job = new Job(conf);
     

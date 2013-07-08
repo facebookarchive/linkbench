@@ -26,24 +26,39 @@ according to the values you have been set into config.sh
 
 4. Run benchmark
 
-preparing database : run loaddata.sh, it will create the table then load the data.
-query : doquery.sh
+preparing database : run inittable.sh, it will create the table needed.
+Load data : run loaddata.sh, it will load the data into the table.
+query : run doquery.sh, it will run queries base on the settings in config/LinkConfigPhoenix.properties
 
 5. Clean up table.
 
-At present, Phoenix do not support drop table thoughly from hbase.
-you will need to clean up table on hbase cluster firstly by hand by
+At present, Phoenix only drop metadata of the table while do not drop low level hbase table.
+you will need to clean up table on hbase cluster manually before hand to clean up data throughly.
 
-disable and drop nodetable, linktable, counttable
+on your hbase cluster, run hbase-bin-dir/hbase shell
 
-then run cleanup.sh to drop table metadata from phoenix system table.
+disalbe 'NODETABLE'
+drop 'NODETABLE'
+disalbe 'LINKTABLE'
+drop 'LINKTABLE'
+disalbe 'COUNTTABLE'
+drop 'COUNTTABLE'
+
+then run removetable.sh in linkbench dir to drop table metadata from phoenix system table.
 
 
-====== Tuning ======
+
+============ Tuning ===============
 
 Regarding HBASE, by default, we are using config/hbase-site.xml come with this
 prebuilt package. take it as an example for futher tunning or merge it with your
 HBase Cluster's existing one.
+
+Loading of data could be run with MapReduce mode. In this case, you need to have a runable
+Hadoop/MapReduce cluster ( not necessary the same with the HBase Cluster). Then in config/
+fill in right value for core-site.xml and mapred-site.xml or link to your cluster config files.
+
+Then use mr_load.sh instead of loaddata.sh to load data with MapReduce.
 
 You can look into README.md and PhoenixStoreReadme.md in the source
 tree to understand and tune various other parameters.
