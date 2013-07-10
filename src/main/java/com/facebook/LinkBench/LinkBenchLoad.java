@@ -146,7 +146,7 @@ public class LinkBenchLoad implements Runnable {
     double medianLinkDataSize = ConfigUtil.getDouble(props,
                                               Config.LINK_DATASIZE);
     linkDataSize = new LogNormalDistribution();
-    linkDataSize.init(0, LinkStore.MAX_LINK_DATA, medianLinkDataSize,
+    linkDataSize.init(1, LinkStore.MAX_LINK_DATA, medianLinkDataSize,
                                          Config.LINK_DATASIZE_SIGMA);
 
     try {
@@ -381,7 +381,7 @@ public class LinkBenchLoad implements Runnable {
     link.link_type = LinkStore.DEFAULT_LINK_TYPE;
     link.visibility = LinkStore.VISIBILITY_DEFAULT;
     link.version = 0;
-    link.data = new byte[0];
+    link.data = new byte[1];
     link.time = System.currentTimeMillis();
     return link;
   }
@@ -583,6 +583,12 @@ public class LinkBenchLoad implements Runnable {
       long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
       long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
       long nids = maxid1 - startid1;
+      
+      if (ConfigUtil.isMapReduceMode(props)) {
+        int nlinkloaders = ConfigUtil.getInt(props, Config.NUM_LOADERS);
+        nids = nids / nlinkloaders;
+      }
+
       long progressReportInterval = ConfigUtil.getLong(props,
                            Config.LOAD_PROG_INTERVAL, 50000L);
       return new LoadProgress(progressLogger, nids, progressReportInterval);

@@ -81,7 +81,7 @@ CLASSPATH=${CLASSPATH}:lib/FacebookLinkBench.jar;
 unset IFS
 
 # figure out which class to run
-CLASS='com.facebook.LinkBench.LinkBenchDriver'
+CLASS='com.facebook.LinkBench.LinkBenchDriverMR'
 
 # run it
 exec "$JAVA" $JAVA_HEAP_MAX $OPTS $JMX_OPTS -classpath "$CLASSPATH" $CLASS \

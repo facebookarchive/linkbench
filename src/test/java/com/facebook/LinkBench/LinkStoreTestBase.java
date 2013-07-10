@@ -342,7 +342,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     DummyLinkStore store = getStoreHandle(true);
     long id1 = 99999999999L;
     Link a = new Link(id1, LinkStore.DEFAULT_LINK_TYPE, 42,
-                      LinkStore.VISIBILITY_DEFAULT, new byte[0], 1,
+                      LinkStore.VISIBILITY_DEFAULT, new byte[1], 1,
                       System.currentTimeMillis());
     Link b = a.clone();
     b.id2 = 43;

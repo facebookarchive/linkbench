@@ -1,0 +1,65 @@
+This is a README for prebuilt package. 
+
+If you are working with the source code tree, use PhoenixStoreReadme.md in the source tree
+
+====== HOWTO run ======
+
+1. You need to have a ready HBase Cluster to test upon
+
+Should be 0.94.5+, better to have hbase version 0.94.7
+
+There is a bug that impact the performance a lot which got fixed in 0.94.9+
+check out following issue for more detail:
+
+https://issues.apache.org/jira/browse/HBASE-8639
+
+2. Deploy phoenix jar to HBASE cluster.
+
+Copy lib/phoenix-*-client.jar to everyHBaseNode:path_to_hbase/lib/
+
+3. Tweak some settings accroding to your cluster env.
+
+In bin/config.sh fill in all settings with correct values.
+
+In bin dir, run ./applyconfig.sh to generate some scripts and apply changes
+according to the values you have been set into config.sh
+
+4. Run benchmark
+
+preparing database : run inittable.sh, it will create the table needed.
+Load data : run loaddata.sh, it will load the data into the table.
+query : run doquery.sh, it will run queries base on the settings in config/LinkConfigPhoenix.properties
+
+5. Clean up table.
+
+At present, Phoenix only drop metadata of the table while do not drop low level hbase table.
+you will need to clean up table on hbase cluster manually before hand to clean up data throughly.
+
+on your hbase cluster, run hbase-bin-dir/hbase shell
+
+disalbe 'NODETABLE'
+drop 'NODETABLE'
+disalbe 'LINKTABLE'
+drop 'LINKTABLE'
+disalbe 'COUNTTABLE'
+drop 'COUNTTABLE'
+
+then run removetable.sh in linkbench dir to drop table metadata from phoenix system table.
+
+
+
+============ Tuning ===============
+
+Regarding HBASE, by default, we are using config/hbase-site.xml come with this
+prebuilt package. take it as an example for futher tunning or merge it with your
+HBase Cluster's existing one.
+
+Loading of data could be run with MapReduce mode. In this case, you need to have a runable
+Hadoop/MapReduce cluster ( not necessary the same with the HBase Cluster). Then in config/
+fill in right value for core-site.xml and mapred-site.xml or link to your cluster config files.
+
+Then use mr_load.sh instead of loaddata.sh to load data with MapReduce.
+
+You can look into README.md and PhoenixStoreReadme.md in the source
+tree to understand and tune various other parameters.
+

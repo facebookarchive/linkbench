@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+
+<!-- Example to reduce major compaction during huge put -->
+<!--
+  <property>
+    <name>hbase.hstore.compactionThreshold</name>
+    <value>40</value>
+  </property>
+
+  <property>
+    <name>hbase.hstore.compaction.max</name>
+    <value>120</value>
+  </property>
+
+  <property>
+    <name>hbase.hstore.blockingStoreFiles</name>
+    <value>100</value>
+  </property>
+
+  <property>
+    <name>hbase.hregion.memstore.flush.size</name>
+    <value>268435456</value>
+  </property>
+-->
+
+<!-- Example for phoenix -->
+
+  <property>
+    <name>phoenix.query.timeoutMs</name>
+    <value>1200000</value>
+  </property>
+
+  <property>
+    <name>phoenix.query.threadPoolSize</name>
+    <value>240</value>
+  </property>
+
+  <property>
+    <name>phoenix.query.targetConcurrency</name>
+    <value>16</value>
+  </property>
+
+  <property>
+    <name>phoenix.query.maxConcurrency</name>
+    <value>24</value>
+  </property>
+
+  <property>
+    <name>phoenix.query.queueSize</name>
+    <value>2000</value>
+  </property>
+
+  <property>
+    <name>phoenix.query.maxIntraRegionParallelization</name>
+    <value>1</value>
+  </property>
+
+  <property>
+    <name>phoenix.query.spoolThresholdBytes</name>
+    <value>2048000</value>
+  </property>
+
+
+<!-- End For phoenix  -->
+
+<!-- Example for HBASE -->
+
+  <property>
+    <name>hbase.client.scanner.caching</name>
+    <value>1000</value>
+  </property>
+
+  <property>
+    <name>hbase.rpc.timeout</name>
+    <value>600000</value>
+  </property>
+
+<!-- End for HBASE -->
+
+</configuration>

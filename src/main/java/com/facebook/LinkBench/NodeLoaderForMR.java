@@ -33,11 +33,11 @@ import com.facebook.LinkBench.util.ClassLoadUtil;
 /**
  * Load class for generating node data
  *
- * This is separate from link loading because we can't have multiple parallel
- * loaders loading nodes, as the order of IDs being assigned would be messed up
- * @author tarmstrong
+ * This differs with NodeLoader that it is allowed to run parallel in MR tasks.
+ * We do this by load a range of the nodes, However we don't check the
+ * return value of the node ID since it won't be continuous.
  */
-public class NodeLoader implements Runnable {
+public class NodeLoaderForMR implements Runnable {
   private static final long REPORT_INTERVAL = 25000;
   private final Properties props;
   private final Logger logger;
@@ -56,6 +56,8 @@ public class NodeLoader implements Runnable {
 
   private long startTime_ms;
 
+  private long startID;
+  private long endID;
   private long nodesLoaded = 0;
   private long totalNodes = 0;
 
@@ -70,9 +72,10 @@ public class NodeLoader implements Runnable {
   private final long displayFreq_ms;
 
 
-  public NodeLoader(Properties props, Logger logger,
+  public NodeLoaderForMR(Properties props, Logger logger,
       NodeStore nodeStore, Random rng,
-      LatencyStats latencyStats, PrintStream csvStreamOut, int loaderId) {
+      LatencyStats latencyStats, PrintStream csvStreamOut, int loaderId,
+      long startID, long endID) {
     super();
     this.props = props;
     this.logger = logger;
@@ -80,6 +83,8 @@ public class NodeLoader implements Runnable {
     this.rng = rng;
     this.latencyStats = latencyStats;
     this.loaderId = loaderId;
+    this.startID = startID;
+    this.endID = endID;
 
     double medianDataLength = ConfigUtil.getDouble(props, Config.NODE_DATASIZE);
     nodeDataLength = new LogNormalDistribution();
@@ -119,7 +124,9 @@ public class NodeLoader implements Runnable {
 
     try {
       // Set up ids to start at desired range
-      nodeStore.resetNodeStore(dbid, ConfigUtil.getLong(props, Config.MIN_ID));
+      // In our case, the node table should don't get truncate
+      // just reset the nodeID locally for this loader.
+      nodeStore.resetNodeStore(dbid, startID);
     } catch (Exception e) {
       logger.error("Error while resetting IDs, cannot proceed with " +
           "node loading", e);
@@ -129,13 +136,11 @@ public class NodeLoader implements Runnable {
     int bulkLoadBatchSize = nodeStore.bulkLoadBatchSize();
     ArrayList<Node> nodeLoadBuffer = new ArrayList<Node>(bulkLoadBatchSize);
 
-    long maxId = ConfigUtil.getLong(props, Config.MAX_ID);
-    long startId = ConfigUtil.getLong(props, Config.MIN_ID);
-    totalNodes = maxId - startId;
-    nextReport = startId + REPORT_INTERVAL;
+    totalNodes = endID - startID;
+    nextReport = startID + REPORT_INTERVAL;
     startTime_ms = System.currentTimeMillis();
     lastDisplayTime_ms = startTime_ms;
-    for (long id = startId; id < maxId; id++) {
+    for (long id = startID; id < endID; id++) {
       genNode(rng, id, nodeLoadBuffer, bulkLoadBatchSize);
 
       long now = System.currentTimeMillis();
@@ -146,7 +151,7 @@ public class NodeLoader implements Runnable {
     // Load any remaining data
     loadNodes(nodeLoadBuffer);
 
-    logger.info("Loading of nodes [" + startId + "," + maxId + ") done");
+    logger.info("Loading of nodes [" + startID + "," + endID + ") done");
     displayAndResetStats();
     nodeStore.close();
   }
@@ -178,21 +183,11 @@ public class NodeLoader implements Runnable {
   }
 
   private void loadNodes(ArrayList<Node> nodeLoadBuffer) {
-    long actualIds[] = null;
     long timestart = System.nanoTime();
     try {
-      actualIds = nodeStore.bulkAddNodes(dbid, nodeLoadBuffer);
+      nodeStore.bulkAddNodes(dbid, nodeLoadBuffer);
       long timetaken = (System.nanoTime() - timestart);
       nodesLoaded += nodeLoadBuffer.size();
-
-      // Check that expected ids were allocated
-      assert(actualIds.length == nodeLoadBuffer.size());
-      for (int i = 0; i < actualIds.length; i++) {
-        if (nodeLoadBuffer.get(i).id != actualIds[i]) {
-          logger.warn("Expected ID of node: " + nodeLoadBuffer.get(i).id +
-                      " != " + actualIds[i] + " the actual ID");
-        }
-      }
 
       nodeLoadBuffer.clear();
 

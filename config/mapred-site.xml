@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+
+<property>
+<name>mapred.job.tracker</name>
+<value>127.0.0.1:8021</value>
+</property>
+
+</configuration>
+

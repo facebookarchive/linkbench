@@ -15,44 +15,40 @@
  */
 package com.facebook.LinkBench;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
-import org.apache.hadoop.mapred.FileInputFormat;
-import org.apache.hadoop.mapred.FileOutputFormat;
-import org.apache.hadoop.mapred.InputFormat;
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.JobClient;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.MapReduceBase;
-import org.apache.hadoop.mapred.Mapper;
-import org.apache.hadoop.mapred.OutputCollector;
-import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hadoop.mapred.Reducer;
-import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.mapred.SequenceFileInputFormat;
-import org.apache.hadoop.mapred.SequenceFileOutputFormat;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.LinkBenchLoad.LoadChunk;
 import com.facebook.LinkBench.LinkBenchLoad.LoadProgress;
 import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
 import com.facebook.LinkBench.stats.LatencyStats;
+import com.facebook.LinkBench.util.ClassLoadUtil;
+
 
 /**
  * LinkBenchDriverMR class.
@@ -66,34 +62,53 @@ import com.facebook.LinkBench.stats.LatencyStats;
 public class LinkBenchDriverMR extends Configured implements Tool {
   public static final int LOAD = 1;
   public static final int REQUEST = 2;
+  public static final int NODEMAPPER = 0;
+  public static final int LINKMAPPER = 1;
+  public static final int REQUESTMAPPER = 0;
+
   private static Path TMP_DIR = new Path("TMP_Link_Bench");
   private static boolean REPORT_PROGRESS = false;
-  private static boolean USE_INPUT_FILES = false; //use generate input by default
 
   private static final Logger logger =
               Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
-  static enum Counters { LINK_LOADED, REQUEST_DONE }
+  static enum Counters { NODE_LOADED, LINK_LOADED, REQUEST_DONE }
 
-  private static Properties props;
-  private static String store;
-
+  private Properties props;
+  private String[] configFileNames = new String[3];
   private static final Class<?>[] EMPTY_ARRAY = new Class[]{};
 
+  private static void enqueueLoadWork(BlockingQueue<LoadChunk> chunk_q,
+      long startid1, long maxid1, int chunkSize, Random rng) {
+    // Enqueue work chunks.  Do it in reverse order as a heuristic to improve
+    // load balancing, since queue is FIFO and later chunks tend to be larger
+
+    long chunk_num = 0;
+    ArrayList<LoadChunk> stack = new ArrayList<LoadChunk>();
+    for (long id1 = startid1; id1 < maxid1; id1 += chunkSize) {
+      stack.add(new LoadChunk(chunk_num, id1,
+                    Math.min(id1 + chunkSize, maxid1), rng));
+      chunk_num++;
+    }
+
+    for (int i = stack.size() - 1; i >= 0; i--) {
+      chunk_q.add(stack.get(i));
+    }
+
+    chunk_q.add(LoadChunk.SHUTDOWN);
+  }
+  
   /**
    * generate an instance of LinkStore
    * @param currentphase LOAD or REQUEST
    * @param mapperid id of the mapper 0, 1, ...
    */
-  private static LinkStore initStore(Phase currentphase, int mapperid)
+  private static LinkStore initStore(String linkStoreClassName, Phase currentphase, int mapperid)
     throws IOException {
 
     LinkStore newstore = null;
 
-    if (store == null) {
-      store = ConfigUtil.getPropertyRequired(props, Config.LINKSTORE_CLASS);
-      logger.info("Using store class: " + store);
-    }
+    logger.info("Using store class: " + linkStoreClassName);
 
     // The property "store" defines the class name that will be used to
     // store data in a database. The folowing class names are pre-packaged
@@ -105,115 +120,84 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     //
     Class<?> clazz = null;
     try {
-      clazz = getClassByName(store);
+      clazz = getClassByName(linkStoreClassName);
     } catch (java.lang.ClassNotFoundException nfe) {
-      throw new IOException("Cound not find class for " + store);
+      throw new IOException("Cound not find class for " + linkStoreClassName);
     }
     newstore = (LinkStore)newInstance(clazz);
     if (clazz == null) {
-      throw new IOException("Unknown data store " + store);
+      throw new IOException("Unknown data store " + linkStoreClassName);
     }
 
     return newstore;
   }
 
   /**
-   * InputSplit for generated inputs
+   * @param linkStore a LinkStore instance to be reused if it turns out
+   * that linkStore and nodeStore classes are same
+   * @return
+   * @throws Exception
+   * @throws IOException
    */
-  private class LinkBenchInputSplit implements InputSplit {
-    private int id;  // id of mapper
-    private int num; // total number of mappers
-
-    LinkBenchInputSplit() {}
-    public LinkBenchInputSplit(int i, int n) {
-      this.id = i;
-      this.num = n;
-    }
-    public int getID() {return this.id;}
-    public int getNum() {return this.num;}
-    public long getLength() {return 1;}
-
-    public String[] getLocations() throws IOException {
-      return new String[]{};
+  private static NodeStore createNodeStore(String nodeStoreClassName, LinkStore linkStore) throws
+      IOException {
+    if (nodeStoreClassName == null) {
+      logger.debug("No NodeStore implementation provided");
+    } else {
+      logger.debug("Using NodeStore implementation: " + nodeStoreClassName);
     }
 
-    public void readFields(DataInput in) throws IOException {
-        this.id = in.readInt();
-        this.num = in.readInt();
-    }
-
-    public void write(DataOutput out) throws IOException {
-        out.writeInt(this.id);
-        out.writeInt(this.num);
-    }
-
-  }
-
-  /**
-   * RecordReader for generated inputs
-   */
-  private class LinkBenchRecordReader
-    implements RecordReader<IntWritable, IntWritable> {
-    private int id;
-    private int num;
-    private boolean done;
-
-    public LinkBenchRecordReader(LinkBenchInputSplit split) {
-      this.id = split.getID();
-      this.num = split.getNum();
-      this.done = false;
-    }
-
-    public IntWritable createKey() {return new IntWritable();}
-    public IntWritable createValue() {return new IntWritable();}
-    public void close() throws IOException { }
-
-    // one loader per split
-    public float getProgress() { return 0.5f;}
-    // one loader per split
-    public long getPos() {return 1;}
-
-    public boolean next(IntWritable key, IntWritable value)
-      throws IOException {
-      if (this.done) {
-        return false;
-      } else {
-        key.set(this.id);
-        value.set(this.num);
-        this.done = true;
+    if (linkStore != null && linkStore.getClass().getName().equals(
+                                                nodeStoreClassName)) {
+      // Same class, reuse object
+      if (!NodeStore.class.isAssignableFrom(linkStore.getClass())) {
+        throw new IOException("Specified NodeStore class " + nodeStoreClassName
+                          + " is not a subclass of NodeStore");
       }
-      return true;
-    }
-  }
-
-  /**
-   * InputFormat for generated inputs
-   */
-  private class LinkBenchInputFormat
-    implements InputFormat<IntWritable, IntWritable> {
-
-    public InputSplit[] getSplits(JobConf conf, int numsplits) {
-      InputSplit[] splits = new InputSplit[numsplits];
-      for (int i = 0; i < numsplits; ++i) {
-        splits[i] = (InputSplit) new LinkBenchInputSplit(i, numsplits);
+      return (NodeStore)linkStore;
+    } else {
+      NodeStore nodeStore;
+      try {
+        nodeStore = ClassLoadUtil.newInstance(nodeStoreClassName,
+                                                            NodeStore.class);
+        return nodeStore;
+      } catch (java.lang.ClassNotFoundException nfe) {
+        throw new IOException("Cound not find class for " + nodeStoreClassName);
       }
-      return splits;
     }
-
-    public RecordReader<IntWritable, IntWritable> getRecordReader(
-      InputSplit split, JobConf conf, Reporter reporter) {
-      return (RecordReader)(new LinkBenchRecordReader((LinkBenchInputSplit)split));
-    }
-
-    public void validateInput(JobConf conf) {}  // no need to validate
   }
-
+  
   /**
+   * generate an instance of NodeStore
+   * @return
+   * @throws Exception
+   */
+  private static NodeStore createNodeStore(String nodeStoreClassName) throws IOException {
+    if (nodeStoreClassName == null) {
+      logger.debug("No NodeStore implementation provided");
+    } else {
+      logger.debug("Using NodeStore implementation: " + nodeStoreClassName);
+    }
+
+    NodeStore nodeStore;
+    try {
+      nodeStore = ClassLoadUtil.newInstance(nodeStoreClassName,
+                                                          NodeStore.class);
+      return nodeStore;
+    } catch (java.lang.ClassNotFoundException nfe) {
+      throw new IOException("Cound not find class for " + nodeStoreClassName);
+    }
+  
+  }
+  
+   /**
    * create JobConf for map reduce job
    * @param currentphase LOAD or REQUEST
    * @param nmappers number of mappers (loader or requester)
+   * @param nnodemappers number of mappers for node ( only work for loader )
    */
-  private JobConf createJobConf(int currentphase, int nmappers) {
+/*
+  private JobConf createJobConf(int currentphase, int nmappers, int nnodemappers) {
     final JobConf jobconf = new JobConf(getConf(), getClass());
     jobconf.setJobName("LinkBench MapReduce Driver");
 
@@ -230,7 +214,7 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     } else { //REQUEST
       jobconf.setMapperClass(RequestMapper.class);
     }
-    jobconf.setNumMapTasks(nmappers);
+    jobconf.setNumMapTasks(nmappers + nnodemappers);
     jobconf.setReducerClass(LoadRequestReducer.class);
     jobconf.setNumReduceTasks(1);
 
@@ -240,21 +224,78 @@ public class LinkBenchDriverMR extends Configured implements Tool {
 
     return jobconf;
   }
+*/
 
+  /**
+  * Prepare map reduce job
+  * @param currentphase LOAD or REQUEST
+  * @param nmappers number of mappers (loader or requester)
+  * @param nnodemappers number of mappers for node ( only work for loader )
+  * @throws IOException 
+  */
+  
+  private Job prepareJob(int currentphase, int nmappers, int nnodemappers)
+      throws IOException {
+    
+    Configuration conf = getConf();
+    ConfigUtil.setConfigFileNamesToConf(conf, configFileNames);
+    
+    // disable task timeout, since we do need to run a very long time
+    conf.setLong("mapred.task.timeout", 0);
+
+    // Do not run additional map tasks upon slow .
+    conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
+
+    Job job = new Job(conf);
+    
+    job.setJarByClass(LinkBenchDriverMR.class);
+    job.setJobName("LinkBench MapReduce Driver");
+
+    job.setInputFormatClass(SequenceFileInputFormat.class);
+
+    job.setOutputKeyClass(IntWritable.class);
+    job.setOutputValueClass(LongWritable.class);
+    job.setOutputFormatClass(SequenceFileOutputFormat.class);
+    
+    if(currentphase == LOAD) {
+      job.setMapperClass(LoadMapper.class);
+    } else { //REQUEST
+      job.setMapperClass(RequestMapper.class);
+    }
+    
+    job.setReducerClass(LoadRequestReducer.class);
+    job.setNumReduceTasks(1);
+
+    TableMapReduceUtil.addDependencyJars(job);
+    // Add a Class from the hbase.jar so it gets registered too.
+    TableMapReduceUtil.addDependencyJars(job.getConfiguration(),
+        org.apache.hadoop.hbase.util.Bytes.class);
+
+//    TableMapReduceUtil.initCredentials(job);
+
+
+    // turn off speculative execution, because DFS doesn't handle
+    // multiple writers to the same file.
+    job.setSpeculativeExecution(false);
+
+    return job;
+  }
+  
   /**
    * setup input files for map reduce job
    * @param jobconf configuration of the map reduce job
    * @param nmappers number of mappers (loader or requester)
+   * @param nnodemappers number of mappers for node ( only work for loader )
    */
-  private static FileSystem setupInputFiles(JobConf jobconf, int nmappers)
+  private FileSystem setupInputFiles(Job job, int currentphase, int nmappers, int nnodemappers)
     throws IOException, InterruptedException {
     //setup input/output directories
     final Path indir = new Path(TMP_DIR, "in");
     final Path outdir = new Path(TMP_DIR, "out");
-    FileInputFormat.setInputPaths(jobconf, indir);
-    FileOutputFormat.setOutputPath(jobconf, outdir);
+    FileInputFormat.setInputPaths(job, indir);
+    FileOutputFormat.setOutputPath(job, outdir);
 
-    final FileSystem fs = FileSystem.get(jobconf);
+    final FileSystem fs = FileSystem.get(getConf());
     if (fs.exists(TMP_DIR)) {
       throw new IOException("Tmp directory " + fs.makeQualified(TMP_DIR)
           + " already exists.  Please remove it first.");
@@ -264,42 +305,71 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     }
 
     //generate an input file for each map task
-    if (USE_INPUT_FILES) {
-      for(int i=0; i < nmappers; ++i) {
-        final Path file = new Path(indir, "part"+i);
-        final IntWritable mapperid = new IntWritable(i);
-        final IntWritable nummappers = new IntWritable(nmappers);
-        final SequenceFile.Writer writer = SequenceFile.createWriter(
-          fs, jobconf, file,
-          IntWritable.class, IntWritable.class, CompressionType.NONE);
+
+    // For Link
+    for (int i = 0; i < nmappers; ++i) {
+      final Path file = new Path(indir, "part" + i);
+      final IntWritable mapperid = new IntWritable(i);
+      final IntWritable nummappers = new IntWritable(nmappers);
+      final SequenceFile.Writer writer = SequenceFile.createWriter(fs, getConf(),
+          file, IntWritable.class, IntWritable.class, CompressionType.NONE);
+      try {
+        writer.append(mapperid, nummappers);
+      } finally {
+        writer.close();
+      }
+      logger.info("Wrote input for Map #" + i);
+    }
+
+    if (currentphase == LOAD) {
+      // Use negative ID for node to distinguish from link. dirty but quick ;)
+      // start from -1 to -nnodemappers
+      for (int i = 0; i < nnodemappers; ++i) {
+
+        // need to add the offest with nmappers
+        final Path file = new Path(indir, "part" + (i + nmappers));
+
+        final IntWritable mapperid = new IntWritable(-1 - i);
+        final IntWritable nummappers = new IntWritable(nnodemappers);
+        final SequenceFile.Writer writer = SequenceFile.createWriter(fs,
+            getConf(), file, IntWritable.class, IntWritable.class,
+            CompressionType.NONE);
         try {
           writer.append(mapperid, nummappers);
         } finally {
           writer.close();
         }
-        logger.info("Wrote input for Map #"+i);
+        logger.info("Wrote input for Node Map #" + i);
       }
     }
+
     return fs;
   }
 
   /**
    * read output from the map reduce job
    * @param fs the DFS FileSystem
-   * @param jobconf configuration of the map reduce job
+   * @param the map reduce job
    */
-  public static long readOutput(FileSystem fs, JobConf jobconf)
+  public long[] readOutput(int currentphase, FileSystem fs, Job job)
     throws IOException, InterruptedException {
     //read outputs
     final Path outdir = new Path(TMP_DIR, "out");
     Path infile = new Path(outdir, "reduce-out");
-    IntWritable nworkers = new IntWritable();
+    IntWritable type = new IntWritable();
     LongWritable result = new LongWritable();
-    long output = 0;
-    SequenceFile.Reader reader = new SequenceFile.Reader(fs, infile, jobconf);
+    long output[] = new long[2];
+    SequenceFile.Reader reader = new SequenceFile.Reader(fs, infile, getConf());
     try {
-      reader.next(nworkers, result);
-      output = result.get();
+      if (currentphase == LOAD) {
+        reader.next(type, result);
+        output[NODEMAPPER] = result.get();
+        reader.next(type, result);
+        output[LINKMAPPER] = result.get();
+      } else if (currentphase == REQUEST) {
+        reader.next(type, result);
+        output[REQUESTMAPPER] = result.get();
+      }
     } finally {
       reader.close();
     }
@@ -311,16 +381,32 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    * Load data to the store
    * Output the number of loaded links
    */
-  public static class LoadMapper extends MapReduceBase
-    implements Mapper<IntWritable, IntWritable, IntWritable, LongWritable> {
+  public static class LoadMapper extends 
+    Mapper<IntWritable, IntWritable, IntWritable, LongWritable> {
+    private Configuration conf;
+    private Properties props;
 
+    @Override
+    protected void setup(Context context) throws IOException,
+        InterruptedException {
+      conf = context.getConfiguration();
+      props = ConfigUtil.loadPropertiesMR(conf);
+      //ConfigUtil.setupLogging(props, null);
+    }
+
+    @Override
     public void map(IntWritable loaderid,
                     IntWritable nloaders,
-                    OutputCollector<IntWritable, LongWritable> output,
-                    Reporter reporter) throws IOException {
-      ConfigUtil.setupLogging(props, null);
-      LinkStore store = initStore(Phase.LOAD, loaderid.get());
-      LatencyStats latencyStats = new LatencyStats(nloaders.get());
+                    Context context)
+           throws IOException, InterruptedException{
+     
+      int id = loaderid.get();
+      int numMapper = nloaders.get();
+
+      boolean mapperForNode = id < 0 ? true : false;
+      if (mapperForNode) {
+        id = (-1 - id); // Map from -1 ~ -n back to ( 0 ~ n-1);
+      }
 
       long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
       long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
@@ -328,25 +414,60 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       LoadProgress prog_tracker = LoadProgress.create(
             Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER), props);
 
-      LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats,
-                               null,
-                               loaderid.get(), maxid1 == startid1 + 1,
-                               nloaders.get(), prog_tracker, new Random());
+      // FIXME : need to detect the case that mapperStep < 1 here
+      // or do not allow this to happen when create the job.
+      long mapperStep = (maxid1 - startid1) / numMapper;
+      long mapperStartId = startid1 + (id * mapperStep);
+      long mapperEndId = mapperStartId + mapperStep;
+      
+      // The last mapper should cover the range up to maxid1;
+      if (id == numMapper -1) {
+        mapperEndId = maxid1;
+      }
 
-      LinkedList<LinkBenchLoad> tasks = new LinkedList<LinkBenchLoad>();
-      tasks.add(loader);
-      long linksloaded = 0;
-      try {
-        LinkBenchDriver.concurrentExec(tasks);
-        linksloaded = loader.getLinksLoaded();
-      } catch (java.lang.Throwable t) {
-        throw new IOException(t);
+      logger.info("Map Task " + id + ", ID range : [" + mapperStartId + ", " + mapperEndId + ")");
+      //Fixme : in MR mode, latencyStats array approaching not working right, need a fix.
+      LatencyStats latencyStats = new LatencyStats(numMapper);
+
+      if (mapperForNode) {
+        String nodeStoreClassName = props.getProperty(Config.NODESTORE_CLASS);
+        // for Node
+        NodeStore nodeStore = createNodeStore(nodeStoreClassName);
+        Random rng = new Random();
+        NodeLoaderForMR loader = new NodeLoaderForMR(props, logger, nodeStore, rng,
+            latencyStats, null, id, mapperStartId, mapperEndId);
+        loader.run();
+        long nodesloaded = loader.getNodesLoaded();
+        context.write(new IntWritable(NODEMAPPER), new LongWritable(nodesloaded));
+        if (REPORT_PROGRESS) {
+          context.getCounter(Counters.NODE_LOADED).increment(nodesloaded);
+        }
+
+      } else {
+        // for Link
+        LinkStore store = initStore(
+            ConfigUtil.getPropertyRequired(props, Config.LINKSTORE_CLASS),
+            Phase.LOAD, id);
+
+        int chunkSize = ConfigUtil.getInt(props, Config.LOADER_CHUNK_SIZE, 2048);
+        BlockingQueue<LoadChunk> chunk_q = new LinkedBlockingQueue<LoadChunk>();
+        enqueueLoadWork(chunk_q, mapperStartId, mapperEndId, chunkSize, new Random());
+     
+        LinkBenchLoad loader = new LinkBenchLoad(store, props, latencyStats,
+                                 null,
+                                 id, false,
+                                 chunk_q, prog_tracker);
+        prog_tracker.startTimer();
+        loader.run();
+        long linksloaded = loader.getLinksLoaded();
+
+        context.write(new IntWritable(LINKMAPPER), new LongWritable(linksloaded));
+        if (REPORT_PROGRESS) {
+          context.getCounter(Counters.LINK_LOADED).increment(linksloaded);
+        }
       }
-      output.collect(new IntWritable(nloaders.get()),
-                     new LongWritable(linksloaded));
-      if (REPORT_PROGRESS) {
-        reporter.incrCounter(Counters.LINK_LOADED, linksloaded);
-      }
+
+      context.progress();
     }
   }
 
@@ -355,46 +476,48 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    * Send requests
    * Output the number of finished requests
    */
-  public static class RequestMapper extends MapReduceBase
-    implements Mapper<IntWritable, IntWritable, IntWritable, LongWritable> {
+  public static class RequestMapper
+    extends Mapper<IntWritable, IntWritable, IntWritable, LongWritable> {
 
+    private Configuration conf;
+    private Properties props;
+
+    @Override
+    protected void setup(Context context) throws IOException,
+        InterruptedException {
+      conf = context.getConfiguration();
+      props = ConfigUtil.loadPropertiesMR(conf);
+    }
+
+    @Override
     public void map(IntWritable requesterid,
                     IntWritable nrequesters,
-                    OutputCollector<IntWritable, LongWritable> output,
-                    Reporter reporter) throws IOException {
-      ConfigUtil.setupLogging(props, null);
-      LinkStore store = initStore(Phase.REQUEST, requesterid.get());
+                    Context context)
+           throws IOException, InterruptedException{
+      //ConfigUtil.setupLogging(props, null);
+      
+      LinkStore linkstore = initStore(
+          ConfigUtil.getPropertyRequired(props, Config.LINKSTORE_CLASS),
+          Phase.REQUEST, requesterid.get());
+
+      String nodeStoreClassName = props.getProperty(Config.NODESTORE_CLASS);
+      NodeStore nodestore = createNodeStore(nodeStoreClassName, linkstore);
       LatencyStats latencyStats = new LatencyStats(nrequesters.get());
       RequestProgress progress =
                               LinkBenchRequest.createProgress(logger, props);
       progress.startTimer();
       // TODO: Don't support NodeStore yet
       final LinkBenchRequest requester =
-        new LinkBenchRequest(store, null, props, latencyStats, null, progress,
+        new LinkBenchRequest(linkstore, nodestore, props, latencyStats, null, progress,
                 new Random(), requesterid.get(), nrequesters.get());
 
+      requester.run();
+      long requestdone = requester.getRequestsDone();
 
-      // Wrap in runnable to handle error
-      Thread t = new Thread(new Runnable() {
-        public void run() {
-          try {
-            requester.run();
-          } catch (Throwable t) {
-            logger.error("Uncaught error in requester:", t);
-          }
-        }
-      });
-      t.start();
-      long requestdone = 0;
-      try {
-        t.join();
-        requestdone = requester.getRequestsDone();
-      } catch (InterruptedException e) {
-      }
-      output.collect(new IntWritable(nrequesters.get()),
+      context.write(new IntWritable(REQUESTMAPPER),
                      new LongWritable(requestdone));
       if (REPORT_PROGRESS) {
-        reporter.incrCounter(Counters.REQUEST_DONE, requestdone);
+        context.getCounter(Counters.REQUEST_DONE).increment(requestdone);
       }
     }
   }
@@ -403,112 +526,127 @@ public class LinkBenchDriverMR extends Configured implements Tool {
    * Reducer for both LOAD and REQUEST
    * Get the sum of "loaded links" or "finished requests"
    */
-  public static class LoadRequestReducer extends MapReduceBase
-    implements Reducer<IntWritable, LongWritable, IntWritable, LongWritable> {
-    private long sum = 0;
-    private int nummappers = 0;
-    private JobConf conf;
+  public static class LoadRequestReducer
+    extends Reducer<IntWritable, LongWritable, IntWritable, LongWritable> {
+    private long sum[] = new long[3];
 
-    /** Store job configuration. */
     @Override
-    public void configure(JobConf job) {
-      conf = job;
+    protected void setup(Context context) throws IOException,
+        InterruptedException {
+      sum[NODEMAPPER] = 0;
+      sum[LINKMAPPER] = 0;
     }
 
-    public void reduce(IntWritable nmappers,
-                       Iterator<LongWritable> values,
-                       OutputCollector<IntWritable, LongWritable> output,
-                       Reporter reporter) throws IOException {
+    // FIXME : need to differentiate node and link
+    @Override
+    public void reduce(IntWritable mapper_type,
+                       Iterable<LongWritable> values,
+                       Context context)
+           throws IOException, InterruptedException {
 
-      nummappers = nmappers.get();
-      while(values.hasNext()) {
-        sum += values.next().get();
+      int type = mapper_type.get();
+      for(LongWritable value : values) {
+        sum[type] += value.get();
       }
-      output.collect(new IntWritable(nmappers.get()),
-                     new LongWritable(sum));
+      context.write(mapper_type, new LongWritable(sum[type]));
     }
 
     /**
      * Reduce task done, write output to a file.
      */
     @Override
-    public void close() throws IOException {
+    protected void cleanup(Context context) throws IOException {
       //write output to a file
       Path outDir = new Path(TMP_DIR, "out");
       Path outFile = new Path(outDir, "reduce-out");
-      FileSystem fileSys = FileSystem.get(conf);
-      SequenceFile.Writer writer = SequenceFile.createWriter(fileSys, conf,
+      FileSystem fileSys = FileSystem.get(context.getConfiguration());
+      SequenceFile.Writer writer = SequenceFile.createWriter(fileSys, context.getConfiguration(),
           outFile, IntWritable.class, LongWritable.class,
           CompressionType.NONE);
-      writer.append(new IntWritable(nummappers), new LongWritable(sum));
+      writer.append(new IntWritable(NODEMAPPER), new LongWritable(sum[NODEMAPPER]));
+      writer.append(new IntWritable(LINKMAPPER), new LongWritable(sum[LINKMAPPER]));
       writer.close();
     }
   }
 
   /**
    * main route of the LOAD phase
+   * @throws ClassNotFoundException 
    */
-  private void load() throws IOException, InterruptedException {
-    boolean loaddata = (!props.containsKey(Config.LOAD_DATA)) ||
+  private void load() throws IOException, InterruptedException, ClassNotFoundException {
+    boolean loaddata = (props.containsKey(Config.LOAD_DATA)) &&
                         ConfigUtil.getBool(props, Config.LOAD_DATA);
     if (!loaddata) {
       logger.info("Skipping load data per the config");
       return;
     }
 
-    int nloaders = ConfigUtil.getInt(props, Config.NUM_LOADERS);
-    final JobConf jobconf = createJobConf(LOAD, nloaders);
-    FileSystem fs = setupInputFiles(jobconf, nloaders);
+    int nlinkloaders = ConfigUtil.getInt(props, Config.NUM_LOADERS);
+    int nnodeloaders = ConfigUtil.getInt(props, Config.NUM_NODE_LOADERS);
+    Job loadjob = prepareJob(LOAD, nlinkloaders, nnodeloaders);
+    FileSystem fs = setupInputFiles(loadjob, LOAD, nlinkloaders, nnodeloaders);
 
     try {
-      logger.info("Starting loaders " + nloaders);
+      logger.info("Starting loaders " + nlinkloaders);
       final long starttime = System.currentTimeMillis();
-      JobClient.runJob(jobconf);
+      loadjob.waitForCompletion(true);
+
       long loadtime = (System.currentTimeMillis() - starttime);
 
       // compute total #links loaded
       long maxid1 = ConfigUtil.getLong(props, Config.MAX_ID);
       long startid1 = ConfigUtil.getLong(props, Config.MIN_ID);
-      int nlinks_default = ConfigUtil.getInt(props, Config.NLINKS_DEFAULT);
-      long expectedlinks = (1 + nlinks_default) * (maxid1 - startid1);
-      long actuallinks = readOutput(fs, jobconf);
+      long counts[] = readOutput(LOAD, fs, loadjob);
 
-      logger.info("LOAD PHASE COMPLETED. Expected to load " +
-                         expectedlinks + " links. " +
-                         actuallinks + " loaded in " + (loadtime/1000) + " seconds." +
-                         "Links/second = " + ((1000*actuallinks)/loadtime));
+      logger.info("LOAD PHASE COMPLETED. "
+          + "ID ranage : " + startid1 + " - " + maxid1 + ".");
+
+      logger.info("Actually " + counts[NODEMAPPER] + " nodes loaded, "
+          + counts[LINKMAPPER] + " links loaded in " + (loadtime / 1000) + " seconds, "
+          + "Links/second = " + ((1000 * counts[LINKMAPPER]) / loadtime));
     } finally {
+      logger.info("Deleting " + TMP_DIR);
       fs.delete(TMP_DIR, true);
     }
   }
 
   /**
    * main route of the REQUEST phase
+   * @throws ClassNotFoundException 
    */
-  private void sendrequests() throws IOException, InterruptedException {
+  private void sendrequests() throws IOException, InterruptedException, ClassNotFoundException {
     // config info for requests
+    
+    boolean dorequest = (props.containsKey(Config.DO_REQUEST))
+        && ConfigUtil.getBool(props, Config.DO_REQUEST);
+    if (!dorequest) {
+      logger.info("Skipping request data per the config");
+      return;
+    }
+    
     int nrequesters = ConfigUtil.getInt(props, Config.NUM_REQUESTERS);
-    final JobConf jobconf = createJobConf(REQUEST, nrequesters);
-    FileSystem fs = setupInputFiles(jobconf, nrequesters);
+    Job requestJob = prepareJob(REQUEST, nrequesters, 0);
+    FileSystem fs = setupInputFiles(requestJob, REQUEST, nrequesters, 0);
 
     try {
       logger.info("Starting requesters " + nrequesters);
       final long starttime = System.currentTimeMillis();
-      JobClient.runJob(jobconf);
+      requestJob.waitForCompletion(true);
       long endtime = System.currentTimeMillis();
 
       // request time in millis
       long requesttime = (endtime - starttime);
-      long requestsdone = readOutput(fs, jobconf);
+      long counts[] = readOutput(REQUEST, fs, requestJob);
 
-      logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
+      logger.info("REQUEST PHASE COMPLETED. " + counts[REQUESTMAPPER] +
                          " requests done in " + (requesttime/1000) + " seconds." +
-                         "Requests/second = " + (1000*requestsdone)/requesttime);
+                         "Requests/second = " + (1000*counts[REQUESTMAPPER])/requesttime);
     } finally {
       fs.delete(TMP_DIR, true);
     }
   }
 
+  
   /**
    * read in configuration and invoke LOAD and REQUEST
    */
@@ -519,8 +657,11 @@ public class LinkBenchDriverMR extends Configured implements Tool {
       ToolRunner.printGenericCommandUsage(System.err);
       return -1;
     }
-    props = new Properties();
-    props.load(new FileInputStream(args[0]));
+
+    props = ConfigUtil.parseConfigFile(args[0], configFileNames);
+    logger.info("configFile name = " + configFileNames[ConfigUtil.CONFIGFILEPOS]);
+    logger.info("workloadConfigFile name = " + configFileNames[ConfigUtil.WORKLOADFILEPOS]);
+    logger.info("distributionDataFile name = " + configFileNames[ConfigUtil.DISTFILEPOS]);
 
     // get name or temporary directory
     String tempdirname = props.getProperty(Config.TEMPDIR);
@@ -531,9 +672,8 @@ public class LinkBenchDriverMR extends Configured implements Tool {
     REPORT_PROGRESS = (!props.containsKey(Config.MAPRED_REPORT_PROGRESS)) ||
         ConfigUtil.getBool(props, Config.MAPRED_REPORT_PROGRESS);
 
-    // whether store mapper input in files
-    USE_INPUT_FILES = (!props.containsKey(Config.MAPRED_USE_INPUT_FILES)) ||
-                    ConfigUtil.getBool(props, Config.MAPRED_USE_INPUT_FILES);
+    String files = getConf().get("tmpfiles");
+    logger.info("tmpfiles = " + files);
 
     load();
     sendrequests();

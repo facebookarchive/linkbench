@@ -1,0 +1,6 @@
+== Scripts usage ==
+
+generateSQL.sh :
+
+Tools help to generate SQL file for creating phoenix table used by linkbench.
+You might want to Modify maxid and presplit number to adjust table size.
