@@ -19,30 +19,25 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 
-import com.facebook.LinkBench.Link;
-import com.facebook.LinkBench.LinkCount;
-import com.facebook.LinkBench.LinkStore;
-import com.facebook.LinkBench.Phase;
-
 /**
  * Can either be used as a wrapper around an existing LinkStore instance that
  * logs operations, or as a dummy linkstore instance that does nothing
  *
  */
-public class DummyLinkStore extends GraphStore {
+public class StatsDummyLinkStore extends GraphStore {
 
   public LinkStore wrappedStore;
   public GraphStore wrappedGraphStore;
 
-  public DummyLinkStore() {
+  public StatsDummyLinkStore() {
     this(null);
   }
 
-  public DummyLinkStore(LinkStore wrappedStore) {
+  public StatsDummyLinkStore(LinkStore wrappedStore) {
     this(wrappedStore, false);
   }
 
-  public DummyLinkStore(LinkStore wrappedStore, boolean alreadyInitialized) {
+  public StatsDummyLinkStore(LinkStore wrappedStore, boolean alreadyInitialized) {
     this.wrappedStore = wrappedStore;
     if (wrappedStore instanceof GraphStore) {
       wrappedGraphStore = (GraphStore) wrappedStore;

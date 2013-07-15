@@ -18,7 +18,7 @@ package com.facebook.LinkBench;
 import java.io.IOException;
 import java.util.Properties;
 
-public class DummyLinkStoreTest extends LinkStoreTestBase {
+public class StatsDummyLinkStoreTest extends LinkStoreTestBase {
 
   private Properties props;
 
@@ -29,9 +29,9 @@ public class DummyLinkStoreTest extends LinkStoreTestBase {
   }
 
   @Override
-  protected DummyLinkStore getStoreHandle(boolean initialized)
+  protected StatsDummyLinkStore getStoreHandle(boolean initialized)
                                   throws IOException, Exception {
-    DummyLinkStore store = new DummyLinkStore();
+    StatsDummyLinkStore store = new StatsDummyLinkStore();
     if (initialized) {
       store.initialize(props, Phase.REQUEST, 0);
     }

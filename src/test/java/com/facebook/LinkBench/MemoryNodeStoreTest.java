@@ -28,7 +28,7 @@ public class MemoryNodeStoreTest extends NodeStoreTestBase {
 
   @Override
   protected NodeStore getNodeStoreHandle(boolean initialized) throws Exception, IOException {
-    return new DummyLinkStore(store.newHandle(), initialized);
+    return new StatsDummyLinkStore(store.newHandle(), initialized);
   }
 
 }

@@ -27,8 +27,8 @@ public class MemoryGraphStoreTest extends GraphStoreTestBase {
   }
 
   @Override
-  protected DummyLinkStore getStoreHandle(boolean initialized) throws IOException, Exception {
-    return new DummyLinkStore(store.newHandle(), initialized);
+  protected StatsDummyLinkStore getStoreHandle(boolean initialized) throws IOException, Exception {
+    return new StatsDummyLinkStore(store.newHandle(), initialized);
   }
 
 }

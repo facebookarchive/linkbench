@@ -67,10 +67,10 @@ public abstract class GraphStoreTestBase extends TestCase {
   }
 
   /** Get a new handle to the initialized store, wrapped in
-   * DummyLinkStore
+   * StatsDummyLinkStore
    * @return new handle to linkstore
    */
-  protected abstract DummyLinkStore getStoreHandle(boolean initialized)
+  protected abstract StatsDummyLinkStore getStoreHandle(boolean initialized)
                                     throws IOException, Exception;
 
   @Override
@@ -177,7 +177,7 @@ public abstract class GraphStoreTestBase extends TestCase {
       LinkStoreTestBase.serialLoad(rng, logger, props, getStoreHandle(false));
       serialLoadNodes(rng, logger, props, getStoreHandle(false));
 
-      DummyLinkStore reqStore = getStoreHandle(false);
+      StatsDummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 1, 10000);
 
@@ -237,7 +237,7 @@ public abstract class GraphStoreTestBase extends TestCase {
    * Delete all nodes in ID range specified
    */
   static void deleteNodeIDRange(String testDB, int type,
-      DummyLinkStore storeHandle,
+      StatsDummyLinkStore storeHandle,
       long startId, long idCount) throws Exception {
     for (long i = startId; i < startId + idCount; i++) {
       storeHandle.deleteNode(testDB, type, i);
@@ -245,7 +245,7 @@ public abstract class GraphStoreTestBase extends TestCase {
   }
 
   private void serialLoadNodes(Random rng, Logger logger, Properties props,
-      DummyLinkStore storeHandle) throws Exception {
+      StatsDummyLinkStore storeHandle) throws Exception {
     storeHandle.initialize(props, Phase.LOAD, 0);
     storeHandle.resetNodeStore(testDB, ConfigUtil.getLong(props,
                                                   Config.MIN_ID));
