@@ -58,8 +58,10 @@ public class LinkStoreMysql extends GraphStore {
   String defaultDB;
 
   Level debuglevel;
-  Connection conn;
-  Statement stmt;
+  // Use read-only and read-write connections and statements to avoid toggling
+  // auto-commit.
+  Connection conn_ro, conn_rw;
+  Statement stmt_ro, stmt_rw;
 
   private Phase phase;
 
@@ -128,8 +130,10 @@ public class LinkStoreMysql extends GraphStore {
 
   // connects to test database
   private void openConnection() throws Exception {
-    conn = null;
-    stmt = null;
+    conn_ro = null;
+    conn_rw = null;
+    stmt_ro = null;
+    stmt_rw = null;
 
     String jdbcUrl = "jdbc:mysql://"+ host + ":" + port + "/";
     if (defaultDB != null) {
@@ -137,32 +141,41 @@ public class LinkStoreMysql extends GraphStore {
     }
 
     Class.forName("com.mysql.jdbc.Driver").newInstance();
-    conn = DriverManager.getConnection(
-                        jdbcUrl +
-                        "?elideSetAutoCommits=true" +
-                        "&useLocalTransactionState=true" +
-                        "&allowMultiQueries=true" +
-                        "&useLocalSessionState=true" +
+
+    jdbcUrl += "?elideSetAutoCommits=true" +
+               "&useLocalTransactionState=true" +
+               "&allowMultiQueries=true" +
+               "&useLocalSessionState=true" +
    /* Need affected row count from queries to distinguish updates/inserts
     * consistently across different MySql versions (see MySql bug 46675) */
-                        "&useAffectedRows=true",
-                        user, pwd);
+               "&useAffectedRows=true";
+
+    conn_rw = DriverManager.getConnection(jdbcUrl, user, pwd);
+    conn_rw.setAutoCommit(false);
+
+    conn_ro = DriverManager.getConnection(jdbcUrl, user, pwd);
+    conn_ro.setAutoCommit(true);
+
     //System.err.println("connected");
-    conn.setAutoCommit(false);
-    stmt = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
-                                ResultSet.CONCUR_READ_ONLY);
+    stmt_rw = conn_rw.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
+                                      ResultSet.CONCUR_READ_ONLY);
+    stmt_ro = conn_ro.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
+                                      ResultSet.CONCUR_READ_ONLY);
 
     if (phase == Phase.LOAD && disableBinLogForLoad) {
       // Turn binary logging off for duration of connection
-      stmt.executeUpdate("SET SESSION sql_log_bin=0");
+      stmt_rw.executeUpdate("SET SESSION sql_log_bin=0");
+      stmt_ro.executeUpdate("SET SESSION sql_log_bin=0");
     }
   }
 
   @Override
   public void close() {
     try {
-      if (stmt != null) stmt.close();
-      if (conn != null) conn.close();
+      if (stmt_rw != null) stmt_rw.close();
+      if (stmt_ro != null) stmt_ro.close();
+      if (conn_rw != null) conn_rw.close();
+      if (conn_ro != null) conn_ro.close();
     } catch (SQLException e) {
       logger.error("Error while closing MySQL connection: ", e);
     }
@@ -172,8 +185,11 @@ public class LinkStoreMysql extends GraphStore {
     logger.info("Reopening MySQL connection in threadID " + threadID);
 
     try {
-      if (conn != null) {
-        conn.close();
+      if (conn_rw != null) {
+        conn_rw.close();
+      }
+      if (conn_ro != null) {
+        conn_ro.close();
       }
 
       openConnection();
@@ -279,9 +295,6 @@ public class LinkStoreMysql extends GraphStore {
                          "." + l.link_type);
     }
 
-    // conn.setAutoCommit(false);
-
-
     // if the link is already there then update its visibility
     // only update visibility; skip updating time, version, etc.
 
@@ -363,7 +376,7 @@ public class LinkStoreMysql extends GraphStore {
       if (!update_data) {
         updatecount += " commit;";
       }
-      stmt.executeUpdate(updatecount);
+      stmt_rw.executeUpdate(updatecount);
     }
 
     if (update_data) {
@@ -380,11 +393,11 @@ public class LinkStoreMysql extends GraphStore {
         logger.trace(updatedata);
       }
 
-      stmt.executeUpdate(updatedata);
+      stmt_rw.executeUpdate(updatedata);
     }
 
     if (INTERNAL_TESTING) {
-      testCount(stmt, dbid, linktable, counttable, l.id1, l.link_type);
+      testCount(stmt_ro, dbid, linktable, counttable, l.id1, l.link_type);
     }
     return row_found;
   }
@@ -427,7 +440,7 @@ public class LinkStoreMysql extends GraphStore {
       logger.trace(insert);
     }
 
-    int nrows = stmt.executeUpdate(insert);
+    int nrows = stmt_rw.executeUpdate(insert);
     return nrows;
 }
 
@@ -454,8 +467,6 @@ public class LinkStoreMysql extends GraphStore {
                          "." + link_type);
     }
 
-    // conn.setAutoCommit(false);
-
     // First do a select to check if the link is not there, is there and
     // hidden, or is there and visible;
     // Result could be either NULL, VISIBILITY_HIDDEN or VISIBILITY_DEFAULT.
@@ -476,7 +487,7 @@ public class LinkStoreMysql extends GraphStore {
       logger.trace(select);
     }
 
-    ResultSet result = stmt.executeQuery(select);
+    ResultSet result = stmt_rw.executeQuery(select);
 
     int visibility = -1;
     boolean found = false;
@@ -520,7 +531,7 @@ public class LinkStoreMysql extends GraphStore {
         logger.trace(delete);
       }
 
-      stmt.executeUpdate(delete);
+      stmt_rw.executeUpdate(delete);
 
       // update count table
       // * if found (id1, link_type) in count table, set
@@ -545,15 +556,15 @@ public class LinkStoreMysql extends GraphStore {
         logger.trace(update);
       }
 
-      stmt.executeUpdate(update);
+      stmt_rw.executeUpdate(update);
     }
+
+    conn_rw.commit();
 
     if (INTERNAL_TESTING) {
-      testCount(stmt, dbid, linktable, counttable, id1, link_type);
+      testCount(stmt_ro, dbid, linktable, counttable, id1, link_type);
     }
 
-    conn.commit();
-    // conn.setAutoCommit(true);
     return found;
   }
 
@@ -622,14 +633,14 @@ public class LinkStoreMysql extends GraphStore {
       querySB.append(id2);
     }
 
-    querySB.append("); commit;");
+    querySB.append(");");
     String query = querySB.toString();
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Query is " + query);
     }
 
-    ResultSet rs = stmt.executeQuery(query);
+    ResultSet rs = stmt_ro.executeQuery(query);
 
     // Get the row count to allocate result array
     assert(rs.getType() != ResultSet.TYPE_FORWARD_ONLY);
@@ -682,18 +693,19 @@ public class LinkStoreMysql extends GraphStore {
     String query = " select id1, id2, link_type," +
                    " visibility, data, time," +
                    " version from " + dbid + "." + linktable +
+                   " FORCE INDEX(`id1_type`) " +
                    " where id1 = " + id1 + " and link_type = " + link_type +
                    " and time >= " + minTimestamp +
                    " and time <= " + maxTimestamp +
                    " and visibility = " + LinkStore.VISIBILITY_DEFAULT +
                    " order by time desc " +
-                   " limit " + offset + "," + limit + "; commit;";
+                   " limit " + offset + "," + limit + ";";
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Query is " + query);
     }
 
-    ResultSet rs = stmt.executeQuery(query);
+    ResultSet rs = stmt_ro.executeQuery(query);
 
     // Find result set size
     // be sure we fast forward to find result set size
@@ -753,9 +765,9 @@ public class LinkStoreMysql extends GraphStore {
         throws Exception {
     long count = 0;
     String query = " select count from " + dbid + "." + counttable +
-                   " where id = " + id1 + " and link_type = " + link_type + "; commit;";
+                   " where id = " + id1 + " and link_type = " + link_type + ";";
 
-    ResultSet rs = stmt.executeQuery(query);
+    ResultSet rs = stmt_ro.executeQuery(query);
     boolean found = false;
 
     while (rs.next()) {
@@ -803,7 +815,7 @@ public class LinkStoreMysql extends GraphStore {
     }
 
     addLinksNoCount(dbid, links);
-    conn.commit();
+    conn_rw.commit();
   }
 
   @Override
@@ -851,8 +863,8 @@ public class LinkStoreMysql extends GraphStore {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(sql);
     }
-    stmt.executeUpdate(sql);
-    conn.commit();
+    stmt_rw.executeUpdate(sql);
+    conn_rw.commit();
   }
 
   private void checkNodeTableConfigured() throws Exception {
@@ -866,9 +878,9 @@ public class LinkStoreMysql extends GraphStore {
   public void resetNodeStore(String dbid, long startID) throws Exception {
     checkNodeTableConfigured();
     // Truncate table deletes all data and allows us to reset autoincrement
-    stmt.execute(String.format("TRUNCATE TABLE `%s`.`%s`;",
+    stmt_rw.execute(String.format("TRUNCATE TABLE `%s`.`%s`;",
                  dbid, nodetable));
-    stmt.execute(String.format("ALTER TABLE `%s`.`%s` " +
+    stmt_rw.execute(String.format("ALTER TABLE `%s`.`%s` " +
         "AUTO_INCREMENT = %d;", dbid, nodetable, startID));
   }
 
@@ -924,8 +936,8 @@ public class LinkStoreMysql extends GraphStore {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(sql);
     }
-    stmt.executeUpdate(sql.toString(), Statement.RETURN_GENERATED_KEYS);
-    ResultSet rs = stmt.getGeneratedKeys();
+    stmt_rw.executeUpdate(sql.toString(), Statement.RETURN_GENERATED_KEYS);
+    ResultSet rs = stmt_rw.getGeneratedKeys();
 
     long newIds[] = new long[nodes.size()];
     // Find the generated id
@@ -960,10 +972,10 @@ public class LinkStoreMysql extends GraphStore {
 
   private Node getNodeImpl(String dbid, int type, long id) throws Exception {
     checkNodeTableConfigured();
-    ResultSet rs = stmt.executeQuery(
+    ResultSet rs = stmt_ro.executeQuery(
       "SELECT id, type, version, time, data " +
       "FROM `" + dbid + "`.`" + nodetable + "` " +
-      "WHERE id=" + id + "; commit;");
+      "WHERE id=" + id + ";");
     if (rs.next()) {
       Node res = new Node(rs.getLong(1), rs.getInt(2),
            rs.getLong(3), rs.getInt(4), rs.getBytes(5));
@@ -1004,7 +1016,7 @@ public class LinkStoreMysql extends GraphStore {
       logger.trace(sql);
     }
 
-    int rows = stmt.executeUpdate(sql);
+    int rows = stmt_rw.executeUpdate(sql);
 
     if (rows == 1) return true;
     else if (rows == 0) return false;
@@ -1027,7 +1039,7 @@ public class LinkStoreMysql extends GraphStore {
 
   private boolean deleteNodeImpl(String dbid, int type, long id) throws Exception {
     checkNodeTableConfigured();
-    int rows = stmt.executeUpdate(
+    int rows = stmt_rw.executeUpdate(
         "DELETE FROM `" + dbid + "`.`" + nodetable + "` " +
         "WHERE id=" + id + " and type =" + type + "; commit;");
 
