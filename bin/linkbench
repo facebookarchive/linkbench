@@ -67,7 +67,7 @@ CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
 IFS=
 
 # add latest jar to CLASSPATH
-CLASSPATH=${CLASSPATH}:target/FacebookLinkBench.jar;
+CLASSPATH=${CLASSPATH}:target/FacebookLinkBench.jar:
 
 # restore ordinary behaviour
 unset IFS

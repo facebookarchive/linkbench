@@ -1,39 +1,24 @@
 // Copyright 2012 Facebook
-//The thirft file that was used to auto-generate the code for RocksDb
+
+include "rocks_common.thrift"
 
 namespace cpp facebook.rocks
 namespace java facebook.rocks
+namespace java.swift com.facebook.rocks.swift
 namespace php rocks
 namespace py rocks
 
-// Types
 typedef binary Text
 typedef binary Bytes
 
 typedef binary Slice
 
-enum Code {
-  kOk = 0,
-  kEnd = 1,
-  kNotFound = 2,
-  kCorruption = 3,
-  kNotSupported = 4,
-  kInvalidArgument = 5,
-  kIOError = 6,
-  kSnapshotNotExists = 7,
-  kWrongShard = 8,
-  kUnknownError = 9,
-  kClientError = 10,
-}
-
-struct RetCode {
-  1: Code state,
-  2: Slice msg,
-}
+const string kVersionHeader = "version";
+const string kShardKeyRange = "keyrange";
 
 exception RocksException {
   1:Text msg,
-  2:Code errorCode
+  2:i32 errorCode
 }
 
 //
@@ -49,6 +34,11 @@ enum CompressionType {
   kSnappyCompression = 0x1,
   kZlib = 0x2,
   kBZip2 = 0x3
+}
+
+enum OpType {
+  kPut    = 0x0,
+  kDelete = 0x1
 }
 
 /**
@@ -68,20 +58,14 @@ struct TaoAssocGetResult {
   6:Text data,
 }
 
-
-struct RocksGetResponse {
-  1: RetCode retCode,
-  2: Slice value
+struct RocksMultiGetResponse {
+  1: rocks_common.RetCode retCode,
+  2: list<rocks_common.RocksGetResponse> gets
 }
 
-struct kv {
-  1:Slice key,
-  2:Slice value
-}
-
-struct RocksIterateResponse {
-  1: RetCode status,
-  2: list<kv> data,
+struct MultiWriteOperation {
+  1: OpType opType,
+  2: rocks_common.kv data
 }
 
 // Options for writing
@@ -96,7 +80,7 @@ struct Snapshot {
 
 // Snapshot result
 struct ResultSnapshot {
-  1:RetCode status,
+  1:rocks_common.RetCode status,
   2:Snapshot snapshot
 }
 
@@ -123,58 +107,78 @@ enum AssocVisibility
                   // as soon as possible
 }
 
-service RocksService { 
+service RocksService {
   // puts a key in the database
-  RetCode Put(1:Text dbname,
+  rocks_common.RetCode Put(1:Text dbname,
               2:Slice key,
               3:Slice value,
               4:WriteOptions options),
 
   // deletes a key from the database
-  RetCode Delete(1:Text dbname,
+  rocks_common.RetCode Delete(1:Text dbname,
                  2:Slice key,
                  3:WriteOptions options),
 
-  // writes batch of keys into the database
-  RetCode Write(1:Text dbname,
-                2:list<kv> batch,
-                3:WriteOptions options),
+  // Processes the specified batch of puts & deletes.
+  rocks_common.RetCode MultiWrite(1:Text dbname,
+                     2:list<MultiWriteOperation> batch,
+                     3:WriteOptions options),
 
   // fetch a key from the DB.
   // RocksResponse.status == kNotFound means key does non exist
   // RocksResponse.status == kOk means key is found
-  RocksGetResponse Get(1:Text dbname,
+  rocks_common.RocksGetResponse Get(1:Text dbname,
                        2:Slice inputkey,
                        3:ReadOptions options),
 
-  // fetch a range of KVs.
+  // Batched get of the specified keys.
+  // RocksMultiGetResponse.retCode.status is set to kOk if no error was
+  // encountered while processing the batch else it is set to the error that was
+  // encountered and no values are returned.  In the event in which everything
+  // was successful, the responses are returned as a collection of
+  // RocksGetResponse (one per requested key).  RocksGetResponse.retCode.status
+  // is set to kOk if the key was found else it is set to kNotFound.
+  RocksMultiGetResponse MultiGet(1:Text dbname,
+                                 2:list<Slice> inputkeys,
+                                 3:ReadOptions options),
+
+  // fetch a range of KVs in the range specified by startKey and endKey.
+  // startKey is always included while endKey is included only if includeEndKey
+  // is set.
   // startKey gives the start key.
   // endKey gives the end key.
   // RocksIterateResponse.status == kOK means more data.
   // RocksIterateResponse.status == kEnd means no data.
   // All other return status means errors.
-  RocksIterateResponse Iterate(1:Text dbname,
+  rocks_common.RocksIterateResponse Iterate(1:Text dbname,
                                2:Slice startKey,
                                3:Slice endKey,
                                4:ReadOptions options,
-                               5:i32 max),
+                               5:i32 max,
+                               6:bool includeEndKey),
 
   // Create snapshot.
   ResultSnapshot CreateSnapshot(1:Text dbname,
                                 2:Slice startKey),
 
   // Release snapshots
-  RetCode ReleaseSnapshot(1:Text dbname,
+  rocks_common.RetCode ReleaseSnapshot(1:Text dbname,
                           2:Snapshot snapshot),
 
   // compact a range of keys
   // begin.size == 0 to start at a range earlier than the first existing key
   // end.size == 0 to end at a range later than the last existing key
-  RetCode CompactRange(1:Text dbname,
+  rocks_common.RetCode CompactRange(1:Text dbname,
                        2:Slice start,
                        3:Slice endhere),
 
-  bool Empty(),
+  i64 GetApproximateSize(
+    1: Text dbname,
+    2: Slice start,
+    3: Slice endhere
+  ),
+
+  bool isEmpty(),
 
   void Noop(),
 
@@ -215,7 +219,9 @@ service RocksService {
     9:Text data,
 
     /** wormhole comment */
-    10:Text wormhole_comment
+    10:Text wormhole_comment,
+
+    11:WriteOptions options,
   ) throws (1:IOError io),
 
  /**
@@ -243,7 +249,9 @@ service RocksService {
     6:bool update_count,
 
     /** wormhole comment */
-    7:Text wormhole_comment
+    7:Text wormhole_comment,
+
+    8:WriteOptions options,
   ) throws (1:IOError io),
 
   /**
