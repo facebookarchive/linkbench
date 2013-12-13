@@ -8,19 +8,22 @@ public class RocksException extends Exception
 {
     private static final long serialVersionUID = 1L;
 
-private byte[] msg;
+    @ThriftConstructor
+    public RocksException(
+        @ThriftField(value=1, name="msg") final byte [] msg,
+        @ThriftField(value=2, name="errorCode") final int errorCode
+    ) {
+        this.msg = msg;
+        this.errorCode = errorCode;
+    }
 
-@ThriftField(value=1, name="msg")
-public byte[] getMsg() { return msg; }
+    private final byte [] msg;
 
-@ThriftField(value=1, name="msg")
-public void setMsg(final byte[] msg) { this.msg = msg; }
+    @ThriftField(value=1, name="msg")
+    public byte [] getMsg() { return msg; }
 
-private Code errorCode;
+    private final int errorCode;
 
-@ThriftField(value=2, name="errorCode")
-public Code getErrorCode() { return errorCode; }
-
-@ThriftField(value=2, name="errorCode")
-public void setErrorCode(final Code errorCode) { this.errorCode = errorCode; }
+    @ThriftField(value=2, name="errorCode")
+    public int getErrorCode() { return errorCode; }
 }

@@ -5,16 +5,16 @@ import java.util.*;
 
 import static com.google.common.base.Objects.toStringHelper;
 
-@ThriftStruct("RocksGetResponse")
-public class RocksGetResponse
+@ThriftStruct("RocksMultiGetResponse")
+public class RocksMultiGetResponse
 {
     @ThriftConstructor
-    public RocksGetResponse(
+    public RocksMultiGetResponse(
         @ThriftField(value=1, name="retCode") final RetCode retCode,
-        @ThriftField(value=2, name="value") final byte [] value
+        @ThriftField(value=2, name="gets") final List<RocksGetResponse> gets
     ) {
         this.retCode = retCode;
-        this.value = value;
+        this.gets = gets;
     }
 
     private final RetCode retCode;
@@ -22,17 +22,17 @@ public class RocksGetResponse
     @ThriftField(value=1, name="retCode")
     public RetCode getRetCode() { return retCode; }
 
-    private final byte [] value;
+    private final List<RocksGetResponse> gets;
 
-    @ThriftField(value=2, name="value")
-    public byte [] getValue() { return value; }
+    @ThriftField(value=2, name="gets")
+    public List<RocksGetResponse> getGets() { return gets; }
 
     @Override
     public String toString()
     {
         return toStringHelper(this)
             .add("retCode", retCode)
-            .add("value", value)
+            .add("gets", gets)
             .toString();
     }
 }

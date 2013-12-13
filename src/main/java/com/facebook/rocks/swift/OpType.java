@@ -2,13 +2,13 @@ package com.facebook.rocks.swift;
 
 import com.facebook.swift.codec.*;
 
-public enum CompressionType
+public enum OpType
 {
-    K_NO_COMPRESSION(0), K_SNAPPY_COMPRESSION(1), K_ZLIB(2), K_BZIP2(3);
+    K_PUT(0), K_DELETE(1);
 
     private final int value;
 
-    CompressionType(int value)
+    OpType(int value)
     {
         this.value = value;
     }

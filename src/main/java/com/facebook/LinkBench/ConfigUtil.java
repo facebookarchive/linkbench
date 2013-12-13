@@ -210,6 +210,15 @@ public class ConfigUtil {
    */
   public static boolean getBool(Properties props, String key)
       throws LinkBenchConfigError {
+    return getBool(props, key, null);
+  }
+
+  public static boolean getBool(Properties props, String key,
+      Boolean defaultVal) throws LinkBenchConfigError {
+    if (defaultVal != null && !props.containsKey(key)) {
+      return defaultVal;
+    }
+
     String v = getPropertyRequired(props, key).trim().toLowerCase();
     // Parse manually since parseBoolean accepts many things as "false"
     if (v.equals("true")) {
