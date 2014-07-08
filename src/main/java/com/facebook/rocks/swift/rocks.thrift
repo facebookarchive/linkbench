@@ -41,23 +41,6 @@ enum OpType {
   kDelete = 0x1
 }
 
-/**
- * Holds the assoc get result of a id2
- */
-struct TaoAssocGetResult {
-  /** id2 of assoc */
-  1:i64 id2,
-
-  /** time stamp of the assoc */
-  4:i64 time,
-
-  /** version of the data blob */
-  5:i64 dataVersion,
-
-  /** serialized data of the asoc */
-  6:Text data,
-}
-
 struct RocksMultiGetResponse {
   1: rocks_common.RetCode retCode,
   2: list<rocks_common.RocksGetResponse> gets
@@ -182,6 +165,109 @@ service RocksService {
 
   void Noop(),
 
+  // fbtype related
+  rocks_common.TaoFBTypeGetResult TaoFBTypeGet(
+    // fbid info to get
+    1:i64 fbid,
+  ) throws (1:IOError io);
+
+  rocks_common.TaoFBTypeCreateResult TaoFBTypeCreate(
+    // dbid
+    1:i32 dbid,
+
+    // Creation time
+    2:i64 ctime,
+
+    // Type of fbid to create
+    3:i32 fbtype,
+
+    /** wormhole comment */
+    4:Text wormhole_comment,
+
+    5:WriteOptions woptions,
+  ) throws (1:IOError io);
+
+  rocks_common.RetCode TaoFBTypeResurrect(
+    // FBID to resurrect
+    1:i64 fbid,
+
+    // FbType
+    2:i32 fbtype,
+
+    // Deletion flags
+    3:i32 deletion_flags,
+
+    /** wormhole comment */
+    4:Text wormhole_comment,
+
+    5:WriteOptions woptions,
+  ) throws (1:IOError io);
+
+  rocks_common.RetCode TaoFBTypeDel(
+    // fbid to delete
+    1:i64 fbid,
+
+    // FbType
+    2:i32 fbtype,
+
+    // Type of delete to perform
+    3:i32 flags,
+
+    /** wormhole comment */
+    4:Text wormhole_comment,
+
+    5:WriteOptions woptions,
+  ) throws (1:IOError io);
+
+  rocks_common.RetCode TaoFBObjectPut(
+    // fbid to delete
+    1:i64 fbid,
+
+    // FbType of the fbid
+    2:i32 fbtype,
+
+    // version
+    3:i32 version,
+
+    // new version
+    4:i32 new_version,
+
+    // time
+    5:i64 time,
+
+    // data
+    6:Text data,
+
+    // is create
+    7:bool is_create,
+
+    /** wormhole comment */
+    8:Text wormhole_comment,
+
+    9:WriteOptions woptions,
+  ) throws (1:IOError io);
+
+  rocks_common.TaoFBObjectGetResult TaoFBObjectGet(
+    // fbid to delete
+    1:i64 fbid,
+
+    // FbType of the fbid
+    2:i32 fbtype,
+  ) throws (1:IOError io);
+
+  rocks_common.RetCode TaoFBObjectDel(
+    // fbid to delete
+    1:i64 fbid,
+
+    // FbType of the fbid
+    2:i32 fbtype,
+
+    /** wormhole comment */
+    3:Text wormhole_comment,
+
+    4:WriteOptions woptions,
+  ) throws (1:IOError io);
+
   /**
    * TAO Assoc Put operation.
    * Note that currently the argument visibility has no effect.
@@ -190,7 +276,7 @@ service RocksService {
    * @if update_count is false, then return 0
    * @return negative number if failure
    */
-  i64 TaoAssocPut(
+  rocks_common.TaoAssocCountResult TaoAssocPut(
     /** name of table */
     1:Text tableName,
 
@@ -213,7 +299,7 @@ service RocksService {
     7:bool update_count,
 
     /** version of the data blob */
-    8:i64 dataVersion,
+    8:i64 version,
 
     /** serialized data of assoc */
     9:Text data,
@@ -221,7 +307,7 @@ service RocksService {
     /** wormhole comment */
     10:Text wormhole_comment,
 
-    11:WriteOptions options,
+    11:WriteOptions woptions,
   ) throws (1:IOError io),
 
  /**
@@ -229,7 +315,7 @@ service RocksService {
   *
   * @return the updated count for this assoc
   */
-  i64 TaoAssocDelete(
+  rocks_common.TaoAssocCountResult TaoAssocDelete(
     /** name of table */
     1:Text tableName,
 
@@ -242,27 +328,26 @@ service RocksService {
     /** id2 of assoc */
     4:i64 id2,
 
+    5:i64 version,
+
     /** visibility flag for this delete */
-    5:AssocVisibility visibility,
+    6:AssocVisibility visibility,
 
     /** whether to keep the count or not */
-    6:bool update_count,
+    7:bool update_count,
 
     /** wormhole comment */
-    7:Text wormhole_comment,
+    8:Text wormhole_comment,
 
-    8:WriteOptions options,
+    9:WriteOptions woptions,
   ) throws (1:IOError io),
 
   /**
-   * TAO Assoc RangeGet operation.
-   * Obtain assocs in bewteen start_time and end_time in reverse time order.
-   * The range check is inclusive: start_time >= time && time >= end_time.
-   * And yes, start_time >= end_time because this range scan is a backward
-   * scan in time, starting with most recent time and scanning backwards
-   * for the most recent n assocs.
+   * TAO Assoc Get TimeRange operation.
+   * Obtain assocs in bewteen starTime and endTime in the given order.
+   * The range check is inclusive: startTime <= time && time <= endTime.
    */
-  list<TaoAssocGetResult> TaoAssocRangeGet(
+  rocks_common.TaoAssocGetResult TaoAssocGetTimeRange(
     /** name of table */
     1:Text tableName,
 
@@ -273,10 +358,37 @@ service RocksService {
     3:i64 id1,
 
     /** maximum timestamp of assocs to retrieve */
-    4:i64 start_time,
+    4:i64 startTime,
 
     /** minimum timestamp of assocs to retrieve */
-    5:i64 end_time,
+    5:i64 endTime,
+
+    /** number of assocs to skip from start */
+    6:i64 offset,
+
+    /** max number of assocs (columns) returned */
+    7:i64 limit
+  ) throws (1:IOError io),
+
+  /**
+   * TAO Assoc Get CursorRange operation.
+   * Obtain assocs after <time, id2> in the given order.
+   */
+  rocks_common.TaoAssocGetResult TaoAssocGetCursorRange(
+    /** name of table */
+    1:Text tableName,
+
+    /** type of assoc */
+    2:i64 assocType,
+
+    /** id1 of assoc */
+    3:i64 id1,
+
+    /** cursor: id2 **/
+    4:i64 id2,
+
+    /** cursor: time */
+    5:i64 time,
 
     /** number of assocs to skip from start */
     6:i64 offset,
@@ -287,8 +399,9 @@ service RocksService {
 
   /**
    * TAO Assoc Get operation.
+   * Obtain assocs with the given id2s
    */
-  list<TaoAssocGetResult> TaoAssocGet(
+  rocks_common.TaoAssocGetResult TaoAssocGetID2s(
     /** name of table */
     1:Text tableName,
 
@@ -306,7 +419,7 @@ service RocksService {
    * TAO Assoc Count Get operation.
    * Returns the number of assocs for given id1 and assoc type
    */
-  i64 TaoAssocCount(
+  rocks_common.TaoAssocCountResult TaoAssocCount(
     /** name of table */
     1:Text tableName,
 
@@ -315,5 +428,30 @@ service RocksService {
 
     /** id1 of assoc */
     3:i64 id1,
+  ) throws (1:IOError io),
+
+  rocks_common.TaoAssocCountResult TaoAssocCountPut(
+    /** name of table */
+    1:Text tableName,
+
+    /** type of assoc */
+    2:i64 assocType,
+
+    /** id1 of assoc */
+    3:i64 id1,
+
+    4:i64 count,
+
+    /** wormhole comment */
+    5:Text wormhole_comment,
+
+    6:WriteOptions woptions,
+  ) throws (1:IOError io),
+
+  rocks_common.RetCode InvalidateKeys(
+    /** keys to invalidate */
+    1:Text keys,
+
+    2:WriteOptions woptions,
   ) throws (1:IOError io),
 }

@@ -5,16 +5,16 @@ import java.util.*;
 
 import static com.google.common.base.Objects.toStringHelper;
 
-@ThriftStruct("TaoAssocGetResult")
-public class TaoAssocGetResult
+@ThriftStruct("TaoFBTypeCreateResult")
+public class TaoFBTypeCreateResult
 {
     @ThriftConstructor
-    public TaoAssocGetResult(
+    public TaoFBTypeCreateResult(
         @ThriftField(value=1, name="retCode") final RetCode retCode,
-        @ThriftField(value=2, name="entries") final List<TaoAssocGetEntry> entries
+        @ThriftField(value=2, name="fbid") final long fbid
     ) {
         this.retCode = retCode;
-        this.entries = entries;
+        this.fbid = fbid;
     }
 
     private final RetCode retCode;
@@ -22,17 +22,17 @@ public class TaoAssocGetResult
     @ThriftField(value=1, name="retCode")
     public RetCode getRetCode() { return retCode; }
 
-    private final List<TaoAssocGetEntry> entries;
+    private final long fbid;
 
-    @ThriftField(value=2, name="entries")
-    public List<TaoAssocGetEntry> getEntries() { return entries; }
+    @ThriftField(value=2, name="fbid")
+    public long getFbid() { return fbid; }
 
     @Override
     public String toString()
     {
         return toStringHelper(this)
             .add("retCode", retCode)
-            .add("entries", entries)
+            .add("fbid", fbid)
             .toString();
     }
 }

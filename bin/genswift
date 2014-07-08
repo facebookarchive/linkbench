@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# The command script
+#
+# Environment Variables
+#
+#   JAVA_HOME        The java implementation to use.  Overrides JAVA_HOME.
+#
+
+BIN=$(dirname $(readlink -f "$0"))
+HOME=`dirname $BIN`
+echo "HOME is at $HOME"
+
+if [ "$JAVA_HOME" = "" ]; then
+  JAVA=`which java`
+  if [ ! -x $JAVA ]; then
+    echo "Error: java not found, set JAVA_HOME or add java to PATH."
+    exit 1
+  fi
+else
+  JAVA=$JAVA_HOME/bin/java
+fi
+
+echo "Using java at: $JAVA"
+
+SWIFT="$BIN/swift-generator-cli-0.11.0-standalone.jar"
+
+# run it
+pushd "$HOME/src/main/java/com/facebook/rocks/swift"
+rm *.java
+rm -rf gen-swift
+"$JAVA" -jar "$SWIFT" -tweak ADD_CLOSEABLE_INTERFACE rocks_common.thrift
+"$JAVA" -jar "$SWIFT" -tweak ADD_CLOSEABLE_INTERFACE rocks.thrift
+mv gen-swift/com/facebook/rocks/swift/* .
+rm -rf gen-swift
+popd

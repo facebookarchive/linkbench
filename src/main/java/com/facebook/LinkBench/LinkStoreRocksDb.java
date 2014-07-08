@@ -47,26 +47,19 @@ import static com.google.common.net.HostAndPort.fromParts;
 
 /*
  * This file implements Linkbench methods for loading/requesting data to rocksDb
- * database server by calling thrift apis after creating 2 java thrift clients
- * through swift : assocClient for the link operations and nodeClient for the
- * node operations. assocClient interacts on port 'port' on the database =
- * dbid + "assocs" AND nodeClient interacts on port 'port'+1 on the database=
- * dbid + "nodes"
+ * database server by calling thrift apis after creating a java thrift client
+ * through swift : rocksClient for the link and the node operations.
  */
 
 public class LinkStoreRocksDb extends GraphStore {
   private static final ThriftClientManager clientManager =
     new ThriftClientManager();
-  private ThreadLocal<RocksService> assocClient =
-      new ThreadLocal<RocksService>();
-  private ThreadLocal<RocksService> nodeClient =
+  private ThreadLocal<RocksService> rocksClient =
       new ThreadLocal<RocksService>();
 
   /* RocksDb database server configuration keys */
-  public static final String CONFIG_HOST_NODES = "host_nodes";
-  public static final String CONFIG_PORT_NODES = "port_nodes";
-  public static final String CONFIG_HOST_ASSOCS = "host_assocs";
-  public static final String CONFIG_PORT_ASSOCS = "port_assocs";
+  public static final String CONFIG_HOST = "host";
+  public static final String CONFIG_PORT = "port";
   public static final String CONFIG_WRITE_SYNC = "write_options_sync";
   public static final String CONFIG_WRITE_DISABLE_WAL =
     "write_options_disableWAL";
@@ -79,10 +72,8 @@ public class LinkStoreRocksDb extends GraphStore {
 
   private static int totalThreads = 0;
 
-  String hostNodes;
-  int portNodes;
-  String hostAssocs;
-  int portAssocs;
+  String host;
+  int port;
   WriteOptions writeOptions;
   String user;
   String pwd;
@@ -93,38 +84,21 @@ public class LinkStoreRocksDb extends GraphStore {
 
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
-  private RocksService getAssocClient() throws Exception {
-    if (assocClient.get() == null) {
+  private RocksService getRocksClient() throws Exception {
+    if (rocksClient.get() == null) {
       try {
-        assocClient.set(clientManager.createClient(
-          new FramedClientConnector(fromParts(hostAssocs, portAssocs)),
+        rocksClient.set(clientManager.createClient(
+          new FramedClientConnector(fromParts(host, port)),
           RocksService.class).get());
-        logger.info("Opened assoc Rocksdb connection to " + hostAssocs
-                    + ":" + portAssocs);
+        logger.info("Opened Rocksdb connection to " + host
+                    + ":" + port);
       } catch (Exception e) {
-        logger.error("Error in open assoc! Host " + hostAssocs + " port "
-                     + portAssocs + " " + e);
+        logger.error("Error in open rocksdb to " + host
+                     + ":" + port + " " + e);
         throw e;
       }
     }
-    return assocClient.get();
-  }
-
-  private RocksService getNodeClient() throws Exception {
-    if (nodeClient.get() == null) {
-      try {
-        nodeClient.set(clientManager.createClient(
-          new FramedClientConnector(fromParts(hostNodes, portNodes)),
-            RocksService.class).get());
-        logger.info("Opened node Rocksdb connection to " + hostNodes
-                    + ":" + portNodes);
-      } catch (Exception e) {
-        logger.error("Error in open node! Host " + hostNodes + " port ++"
-                     + portNodes + " " + e);
-        throw e;
-      }
-    }
-    return nodeClient.get();
+    return rocksClient.get();
   }
 
   static synchronized void incrThreads() {
@@ -157,10 +131,8 @@ public class LinkStoreRocksDb extends GraphStore {
   public void initialize(Properties p, Phase currentPhase, int threadId)
       throws IOException, Exception {
     incrThreads();
-    hostNodes = ConfigUtil.getPropertyRequired(p, CONFIG_HOST_NODES);
-    portNodes = ConfigUtil.getInt(p, CONFIG_PORT_NODES);
-    hostAssocs = ConfigUtil.getPropertyRequired(p, CONFIG_HOST_ASSOCS);
-    portAssocs = ConfigUtil.getInt(p, CONFIG_PORT_ASSOCS);
+    host = ConfigUtil.getPropertyRequired(p, CONFIG_HOST);
+    port = ConfigUtil.getInt(p, CONFIG_PORT);
     writeOptions = new WriteOptions(
       ConfigUtil.getBool(p, CONFIG_WRITE_SYNC, false),
       ConfigUtil.getBool(p, CONFIG_WRITE_DISABLE_WAL, false)
@@ -180,13 +152,9 @@ public class LinkStoreRocksDb extends GraphStore {
   public void clearErrors(int threadID) {
     logger.warn("Closing Rocksdb connection in threadID " + threadID);
     try {
-      if (assocClient.get() != null) {
-        assocClient.get().close();
-        assocClient.remove();
-      }
-      if (nodeClient.get() != null) {
-        nodeClient.get().close();
-        nodeClient.remove();
+      if (rocksClient.get() != null) {
+        rocksClient.get().close();
+        rocksClient.remove();
       }
     } catch (Throwable e) {
       logger.error("Error in Reopen!" + e);
@@ -216,10 +184,15 @@ public class LinkStoreRocksDb extends GraphStore {
     AssocVisibility av = AssocVisibility.values()[l.visibility];
     String s = "wormhole...";
     dbid += "assocs";
-    return getAssocClient().TaoAssocPut(
+    TaoAssocCountResult result = getRocksClient().TaoAssocPut(
         dbid.getBytes(), l.link_type, l.id1, l.id2, l.time,
         av, true, Long.valueOf(l.version), l.data, s.getBytes(),
-        writeOptions) == 1;
+        writeOptions);
+    if (result.getRetCode().getState() != Code.K_OK) {
+        throw new Exception();
+    }
+
+    return result.getCount()  == 1;
   }
 
   /**
@@ -234,9 +207,11 @@ public class LinkStoreRocksDb extends GraphStore {
     for (Link l:links) {
       AssocVisibility av = AssocVisibility.values()[l.visibility];
       String s = "wormhole...";
-      if (getAssocClient().TaoAssocPut(dbid.getBytes(), l.link_type, l.id1,
+      TaoAssocCountResult result =
+      getRocksClient().TaoAssocPut(dbid.getBytes(), l.link_type, l.id1,
          l.id2, l.time, av, false, Long.valueOf(l.version), l.data,
-         s.getBytes(), writeOptions) == 1) {
+         s.getBytes(), writeOptions);
+      if (result.getRetCode().getState() != Code.K_OK) {
         logger.error("addLinksNoCount failed!");
         throw new RuntimeException("addLinksNoCount failed!");
       }
@@ -265,8 +240,12 @@ public class LinkStoreRocksDb extends GraphStore {
     }
     String s = "wormhole...";
     dbid += "assocs";
-    return getAssocClient().TaoAssocDelete(dbid.getBytes() , link_type, id1,
-      id2, AssocVisibility.HARD__DELETE, true, s.getBytes(), writeOptions) == 1;
+    TaoAssocCountResult result = getRocksClient().TaoAssocDelete(
+      dbid.getBytes() , link_type, id1, id2,
+      -1 /*version ignored*/, AssocVisibility.HARD__DELETE, true,
+      s.getBytes(), writeOptions);
+    return (result.getRetCode().getState() == Code.K_OK &&
+            result.getCount() == 1);
   }
 
   @Override
@@ -318,14 +297,14 @@ public class LinkStoreRocksDb extends GraphStore {
       l.add(new Long(id2s[i]));
     }
     dbid += "assocs";
-    List<TaoAssocGetResult> tr = getAssocClient().TaoAssocGet(dbid.getBytes(),
+    TaoAssocGetResult tr = getRocksClient().TaoAssocGetID2s(dbid.getBytes(),
       link_type, id1, l);
-    Link results[] = new Link[tr.size()];
+    Link results[] = new Link[tr.getEntries().size()];
     int i = 0;
-    for (TaoAssocGetResult tar : tr) {
+    for (TaoAssocGetEntry tar : tr.getEntries()) {
       results[i] = new Link(id1, link_type, tar.getId2(),
           LinkStore.VISIBILITY_DEFAULT, tar.getData(),
-          (int)(tar.getDataVersion()), tar.getTime());
+          (int)(tar.getVersion()), tar.getTime());
     }
     return results;
   }
@@ -355,15 +334,15 @@ public class LinkStoreRocksDb extends GraphStore {
     long minTimestamp, long maxTimestamp, int offset, int limit)
     throws Exception {
     dbid += "assocs";
-    List<TaoAssocGetResult> tr = getAssocClient().TaoAssocRangeGet(
-        dbid.getBytes(), link_type, id1, maxTimestamp, minTimestamp,
+    TaoAssocGetResult tr = getRocksClient().TaoAssocGetTimeRange(
+        dbid.getBytes(), link_type, id1, minTimestamp, maxTimestamp,
         Long.valueOf(offset), Long.valueOf(limit));
-    Link results[] = new Link[tr.size()];
+    Link results[] = new Link[tr.getEntries().size()];
     int i = 0;
-    for (TaoAssocGetResult tar : tr) {
+    for (TaoAssocGetEntry tar : tr.getEntries()) {
       results[i] = new Link(id1, link_type, tar.getId2(),
           LinkStore.VISIBILITY_DEFAULT, tar.getData(),
-          (int)(tar.getDataVersion()), tar.getTime());
+          (int)(tar.getVersion()), tar.getTime());
       i++;
     }
     return results;
@@ -385,10 +364,13 @@ public class LinkStoreRocksDb extends GraphStore {
     throws Exception {
     long count = 0;
     dbid += "assocs";
-    count = getAssocClient().TaoAssocCount(dbid.getBytes(), link_type, id1);
+    TaoAssocCountResult result = getRocksClient().TaoAssocCount(
+      dbid.getBytes(), link_type, id1);
     boolean found = false;
-    if (count > 0) {
+    if (result.getRetCode().getState() == Code.K_OK &&
+        result.getCount() > 0) {
       found = true;
+      count = result.getCount();
     }
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Count result: " + id1 + "," + link_type +
@@ -440,26 +422,11 @@ public class LinkStoreRocksDb extends GraphStore {
     if (counts.size() == 0)
       return;
 
-    List<MultiWriteOperation> batchCounts = new ArrayList<MultiWriteOperation>();
-    for (LinkCount count: counts) {
-      byte[] id1 = ByteBuffer.allocate(8).putLong(
-        count.id1).array();
-      byte[] linkType = ByteBuffer.allocate(8).putLong(
-        count.link_type).array();
-      byte[] ckey = new byte[id1.length + linkType.length + 1];
-      System.arraycopy(id1, 0, ckey, 0, id1.length);
-      System.arraycopy(linkType, 0, ckey, id1.length, linkType.length);
-      char c = 'c';
-      ckey[ckey.length - 1] = (byte)c;
-
-      byte[] countValue = ByteBuffer.allocate(8).putLong(
-        count.count).array();
-
-      Kv keyvalue = new Kv(ckey, countValue);
-      batchCounts.add(new MultiWriteOperation(OpType.K_PUT, keyvalue));
-    }
     dbid += "assocs";
-    getAssocClient().MultiWrite(dbid.getBytes(), batchCounts, writeOptions);
+    for (LinkCount count: counts) {
+      getRocksClient().TaoAssocCountPut(
+        dbid.getBytes(), count.link_type, count.id1, count.count, null, writeOptions);
+    }
   }
 
   @Override
@@ -495,18 +462,12 @@ public class LinkStoreRocksDb extends GraphStore {
 
   private long[] bulkAddNodesImpl(String dbid, List<Node> nodes)
     throws Exception {
-    dbid += "nodes";
     long newIds[] = new long[nodes.size()];
     int i = 0;
     for (Node n : nodes) {
-      ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
-      outputStream.write(ByteBuffer.allocate(8).putInt(n.type).array());
-      outputStream.write(ByteBuffer.allocate(8).putLong(n.version).array());
-      outputStream.write(ByteBuffer.allocate(8).putInt(n.time).array());
-      outputStream.write(n.data);
-      byte[] idAsByte = ByteBuffer.allocate(8).putLong(n.id).array();
-      RetCode code = getNodeClient().Put(
-        dbid.getBytes(), idAsByte, outputStream.toByteArray(), writeOptions);
+      RetCode code = getRocksClient().TaoFBObjectPut(
+        n.id, n.type, (int) n.version, (int) n.version,
+        (long) n.time, n.data, true, null, writeOptions);
       if (code.getState() != Code.K_OK) {
         throw new Exception();
       }
@@ -527,24 +488,12 @@ public class LinkStoreRocksDb extends GraphStore {
 
   private Node getNodeImpl(String dbid, int type, long id) throws Exception {
     ReadOptions ropts = new ReadOptions(false, false, null);
-    dbid += "nodes";
-    RocksGetResponse rgr =
-      getNodeClient().Get(
-        dbid.getBytes(), ByteBuffer.allocate(8).putLong(id).array(), ropts);
+    TaoFBObjectGetResult rgr = getRocksClient().TaoFBObjectGet(id, type);
     if (rgr.getRetCode().getState() == (Code.K_NOT_FOUND)) {
       return null; //Node was not found
     } else if (rgr.getRetCode().getState() == (Code.K_OK)) {
-      byte[] rgrValue = rgr.getValue();
-      if (rgrValue.length < 24) {
-        logger.error("Fetched node does not have proper value");
-        return null;
-      }
-      int ntype = ByteBuffer.wrap(rgrValue, 0, 8).getInt();
-      long nversion = ByteBuffer.wrap(rgrValue, 8, 8).getInt();
-      int ntime = ByteBuffer.wrap(rgrValue, 16, 8).getInt();
-      byte[] ndata =
-        ByteBuffer.wrap(rgrValue, 24, rgrValue.length - 24).array();
-      return new Node(id, ntype, nversion, ntime, ndata);
+      return new Node(
+        id, type, rgr.getVersion(), (int) rgr.getUpdateTime(), rgr.getData());
     } else {
       logger.error("IO Error");
       return null;
@@ -577,9 +526,8 @@ public class LinkStoreRocksDb extends GraphStore {
 
   private boolean deleteNodeImpl(String dbid, int type, long id)
     throws Exception {
-    dbid += "nodes";
-    return getNodeClient().Delete(
-      dbid.getBytes(), ByteBuffer.allocate(8).putLong(id).array(),
-      writeOptions).getState() == (Code.K_OK);
+    RetCode retCode = getRocksClient().
+      TaoFBObjectDel(id, type, null, writeOptions);
+    return (retCode.getState() == Code.K_OK);
   }
 }
