@@ -1,8 +1,10 @@
 // Copyright 2012 Facebook
 
 include "rocks_common.thrift"
+//include "common/fb303/if/fb303.thrift"
 
 namespace cpp facebook.rocks
+namespace cpp2 facebook.rocks
 namespace java facebook.rocks
 namespace java.swift com.facebook.rocks.swift
 namespace php rocks
@@ -17,38 +19,7 @@ const string kVersionHeader = "version";
 const string kShardKeyRange = "keyrange";
 
 exception RocksException {
-  1:Text msg,
-  2:i32 errorCode
-}
-
-//
-// An IOError exception from an assoc operation
-//
-exception IOError {
-  1:string message
-}
-
-// Different compression types supported
-enum CompressionType {
-  kNoCompression     = 0x0,
-  kSnappyCompression = 0x1,
-  kZlib = 0x2,
-  kBZip2 = 0x3
-}
-
-enum OpType {
-  kPut    = 0x0,
-  kDelete = 0x1
-}
-
-struct RocksMultiGetResponse {
-  1: rocks_common.RetCode retCode,
-  2: list<rocks_common.RocksGetResponse> gets
-}
-
-struct MultiWriteOperation {
-  1: OpType opType,
-  2: rocks_common.kv data
+  1:string msg,
 }
 
 // Options for writing
@@ -59,12 +30,6 @@ struct WriteOptions {
 
 struct Snapshot {
   1:i64 snapshotid     // server generated
-}
-
-// Snapshot result
-struct ResultSnapshot {
-  1:rocks_common.RetCode status,
-  2:Snapshot snapshot
 }
 
 // Options for reading. If you do not have a
@@ -90,86 +55,12 @@ enum AssocVisibility
                   // as soon as possible
 }
 
-service RocksService {
-  // puts a key in the database
-  rocks_common.RetCode Put(1:Text dbname,
-              2:Slice key,
-              3:Slice value,
-              4:WriteOptions options),
-
-  // deletes a key from the database
-  rocks_common.RetCode Delete(1:Text dbname,
-                 2:Slice key,
-                 3:WriteOptions options),
-
-  // Processes the specified batch of puts & deletes.
-  rocks_common.RetCode MultiWrite(1:Text dbname,
-                     2:list<MultiWriteOperation> batch,
-                     3:WriteOptions options),
-
-  // fetch a key from the DB.
-  // RocksResponse.status == kNotFound means key does non exist
-  // RocksResponse.status == kOk means key is found
-  rocks_common.RocksGetResponse Get(1:Text dbname,
-                       2:Slice inputkey,
-                       3:ReadOptions options),
-
-  // Batched get of the specified keys.
-  // RocksMultiGetResponse.retCode.status is set to kOk if no error was
-  // encountered while processing the batch else it is set to the error that was
-  // encountered and no values are returned.  In the event in which everything
-  // was successful, the responses are returned as a collection of
-  // RocksGetResponse (one per requested key).  RocksGetResponse.retCode.status
-  // is set to kOk if the key was found else it is set to kNotFound.
-  RocksMultiGetResponse MultiGet(1:Text dbname,
-                                 2:list<Slice> inputkeys,
-                                 3:ReadOptions options),
-
-  // fetch a range of KVs in the range specified by startKey and endKey.
-  // startKey is always included while endKey is included only if includeEndKey
-  // is set.
-  // startKey gives the start key.
-  // endKey gives the end key.
-  // RocksIterateResponse.status == kOK means more data.
-  // RocksIterateResponse.status == kEnd means no data.
-  // All other return status means errors.
-  rocks_common.RocksIterateResponse Iterate(1:Text dbname,
-                               2:Slice startKey,
-                               3:Slice endKey,
-                               4:ReadOptions options,
-                               5:i32 max,
-                               6:bool includeEndKey),
-
-  // Create snapshot.
-  ResultSnapshot CreateSnapshot(1:Text dbname,
-                                2:Slice startKey),
-
-  // Release snapshots
-  rocks_common.RetCode ReleaseSnapshot(1:Text dbname,
-                          2:Snapshot snapshot),
-
-  // compact a range of keys
-  // begin.size == 0 to start at a range earlier than the first existing key
-  // end.size == 0 to end at a range later than the last existing key
-  rocks_common.RetCode CompactRange(1:Text dbname,
-                       2:Slice start,
-                       3:Slice endhere),
-
-  i64 GetApproximateSize(
-    1: Text dbname,
-    2: Slice start,
-    3: Slice endhere
-  ),
-
-  bool isEmpty(),
-
-  void Noop(),
-
+service RocksService {//extends fb303.FacebookService {
   // fbtype related
   rocks_common.TaoFBTypeGetResult TaoFBTypeGet(
     // fbid info to get
     1:i64 fbid,
-  ) throws (1:IOError io);
+  ) throws (1:RocksException io);
 
   rocks_common.TaoFBTypeCreateResult TaoFBTypeCreate(
     // dbid
@@ -185,7 +76,7 @@ service RocksService {
     4:Text wormhole_comment,
 
     5:WriteOptions woptions,
-  ) throws (1:IOError io);
+  ) throws (1:RocksException io);
 
   rocks_common.RetCode TaoFBTypeResurrect(
     // FBID to resurrect
@@ -201,7 +92,7 @@ service RocksService {
     4:Text wormhole_comment,
 
     5:WriteOptions woptions,
-  ) throws (1:IOError io);
+  ) throws (1:RocksException io);
 
   rocks_common.RetCode TaoFBTypeDel(
     // fbid to delete
@@ -217,9 +108,9 @@ service RocksService {
     4:Text wormhole_comment,
 
     5:WriteOptions woptions,
-  ) throws (1:IOError io);
+  ) throws (1:RocksException io);
 
-  rocks_common.RetCode TaoFBObjectPut(
+  void TaoFBObjectPut(
     // fbid to delete
     1:i64 fbid,
 
@@ -245,7 +136,7 @@ service RocksService {
     8:Text wormhole_comment,
 
     9:WriteOptions woptions,
-  ) throws (1:IOError io);
+  ) throws (1:RocksException io);
 
   rocks_common.TaoFBObjectGetResult TaoFBObjectGet(
     // fbid to delete
@@ -253,9 +144,9 @@ service RocksService {
 
     // FbType of the fbid
     2:i32 fbtype,
-  ) throws (1:IOError io);
+  ) throws (1:RocksException io);
 
-  rocks_common.RetCode TaoFBObjectDel(
+  void TaoFBObjectDel(
     // fbid to delete
     1:i64 fbid,
 
@@ -266,7 +157,7 @@ service RocksService {
     3:Text wormhole_comment,
 
     4:WriteOptions woptions,
-  ) throws (1:IOError io);
+  ) throws (1:RocksException io);
 
   /**
    * TAO Assoc Put operation.
@@ -276,7 +167,7 @@ service RocksService {
    * @if update_count is false, then return 0
    * @return negative number if failure
    */
-  rocks_common.TaoAssocCountResult TaoAssocPut(
+  i64 TaoAssocPut(
     /** name of table */
     1:Text tableName,
 
@@ -308,14 +199,14 @@ service RocksService {
     10:Text wormhole_comment,
 
     11:WriteOptions woptions,
-  ) throws (1:IOError io),
+  ) throws (1:RocksException io),
 
  /**
   * TAO Assoc Delete operation.
   *
   * @return the updated count for this assoc
   */
-  rocks_common.TaoAssocCountResult TaoAssocDelete(
+  i64 TaoAssocDelete(
     /** name of table */
     1:Text tableName,
 
@@ -340,14 +231,14 @@ service RocksService {
     8:Text wormhole_comment,
 
     9:WriteOptions woptions,
-  ) throws (1:IOError io),
+  ) throws (1:RocksException io),
 
   /**
    * TAO Assoc Get TimeRange operation.
    * Obtain assocs in bewteen starTime and endTime in the given order.
    * The range check is inclusive: startTime <= time && time <= endTime.
    */
-  rocks_common.TaoAssocGetResult TaoAssocGetTimeRange(
+  list<rocks_common.TaoAssocGetEntry> TaoAssocGetTimeRange(
     /** name of table */
     1:Text tableName,
 
@@ -368,13 +259,13 @@ service RocksService {
 
     /** max number of assocs (columns) returned */
     7:i64 limit
-  ) throws (1:IOError io),
+  ) throws (1:RocksException io),
 
   /**
    * TAO Assoc Get CursorRange operation.
    * Obtain assocs after <time, id2> in the given order.
    */
-  rocks_common.TaoAssocGetResult TaoAssocGetCursorRange(
+  list<rocks_common.TaoAssocGetEntry> TaoAssocGetCursorRange(
     /** name of table */
     1:Text tableName,
 
@@ -395,13 +286,13 @@ service RocksService {
 
     /** max number of assocs (columns) returned */
     7:i64 limit
-  ) throws (1:IOError io),
+  ) throws (1:RocksException io),
 
   /**
    * TAO Assoc Get operation.
    * Obtain assocs with the given id2s
    */
-  rocks_common.TaoAssocGetResult TaoAssocGetID2s(
+  list<rocks_common.TaoAssocGetEntry> TaoAssocGetID2s(
     /** name of table */
     1:Text tableName,
 
@@ -413,13 +304,13 @@ service RocksService {
 
     /** list of id2 need to be fetch */
     4:list<i64> id2s
-  ) throws (1:IOError io),
+  ) throws (1:RocksException ex),
 
   /**
    * TAO Assoc Count Get operation.
    * Returns the number of assocs for given id1 and assoc type
    */
-  rocks_common.TaoAssocCountResult TaoAssocCount(
+  i64 TaoAssocCount(
     /** name of table */
     1:Text tableName,
 
@@ -428,9 +319,9 @@ service RocksService {
 
     /** id1 of assoc */
     3:i64 id1,
-  ) throws (1:IOError io),
+  ) throws (1:RocksException ex),
 
-  rocks_common.TaoAssocCountResult TaoAssocCountPut(
+  i64 TaoAssocCountPut(
     /** name of table */
     1:Text tableName,
 
@@ -446,12 +337,5 @@ service RocksService {
     5:Text wormhole_comment,
 
     6:WriteOptions woptions,
-  ) throws (1:IOError io),
-
-  rocks_common.RetCode InvalidateKeys(
-    /** keys to invalidate */
-    1:Text keys,
-
-    2:WriteOptions woptions,
-  ) throws (1:IOError io),
+  ) throws (1:RocksException io),
 }

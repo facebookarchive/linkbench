@@ -1,6 +1,7 @@
 // Copyright 2012 Facebook
 
 namespace cpp facebook.rocks
+namespace cpp2 facebook.rocks
 namespace java facebook.rocks
 namespace java.swift com.facebook.rocks.swift
 namespace php rocks
@@ -38,21 +39,6 @@ struct RetCode {
   2: Slice msg,
 }
 
-struct RocksGetResponse {
-  1: RetCode retCode,
-  2: Slice value
-}
-
-struct kv {
-  1:Slice key,
-  2:Slice value
-}
-
-struct RocksIterateResponse {
-  1: RetCode status,
-  2: list<kv> data,
-}
-
 /**
  * Response from fbtype_get
  */
@@ -79,7 +65,7 @@ struct TaoFBTypeCreateResult {
 }
 
 struct TaoFBObjectGetResult {
-  1: RetCode retCode,
+  1: bool found,
 
   2:i32 version,
 

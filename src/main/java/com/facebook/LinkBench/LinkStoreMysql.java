@@ -29,6 +29,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -134,6 +135,7 @@ public class LinkStoreMysql extends GraphStore {
     conn_rw = null;
     stmt_ro = null;
     stmt_rw = null;
+    Random rng = new Random();
 
     String jdbcUrl = "jdbc:mysql://"+ host + ":" + port + "/";
     if (defaultDB != null) {
@@ -150,8 +152,24 @@ public class LinkStoreMysql extends GraphStore {
     * consistently across different MySql versions (see MySql bug 46675) */
                "&useAffectedRows=true";
 
+    /* Fix for failing connections at high concurrency, short random delay for
+     * each */
+    try {
+      int t = rng.nextInt(1000) + 100;
+      //System.err.println("Sleeping " + t + " msecs");
+      Thread.sleep(t);
+    } catch (InterruptedException ie) {
+    }
+
     conn_rw = DriverManager.getConnection(jdbcUrl, user, pwd);
     conn_rw.setAutoCommit(false);
+
+    try {
+      int t = rng.nextInt(1000) + 100;
+      //System.err.println("Sleeping " + t + " msecs");
+      Thread.sleep(t);
+    } catch (InterruptedException ie) {
+    }
 
     conn_ro = DriverManager.getConnection(jdbcUrl, user, pwd);
     conn_ro.setAutoCommit(true);

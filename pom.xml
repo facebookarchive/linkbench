@@ -81,12 +81,12 @@
         <dependency>
             <groupId>com.facebook.swift</groupId>
             <artifactId>swift-codec</artifactId>
-            <version>0.10.0</version>
+            <version>0.14.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.facebook.swift</groupId>
             <artifactId>swift-service</artifactId>
-            <version>0.10.0</version>
+            <version>0.14.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -250,6 +250,29 @@
                   <!-- Configure basic set of tests that don't have special
                        provider dependencies and aren't long-running -->
                   <excludedGroups>com.facebook.LinkBench.testtypes.ProviderTest</excludedGroups>
+              </configuration>
+            </plugin>
+            <plugin>
+              <groupId>com.facebook.mojo</groupId>
+              <artifactId>swift-maven-plugin</artifactId>
+              <version>0.14.0-SNAPSHOT</version>
+              <executions>
+                <execution>
+                  <goals>
+                    <goal>generate</goal>
+                  </goals>
+                </execution>
+              </executions>
+              <configuration>
+                <idlFiles>
+                  <directory>
+                    ${basedir}/src/main/java/com/facebook/rocks/swift/
+                  </directory>
+                  <includes>
+                    <include>*</include>
+                  </includes>
+                </idlFiles>
+                <addCloseableInterface>true</addCloseableInterface>
               </configuration>
             </plugin>
         </plugins>

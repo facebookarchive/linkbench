@@ -102,7 +102,7 @@ public class LinkStoreRocksDb extends GraphStore {
   }
 
   static synchronized void incrThreads() {
-     totalThreads++; 
+     totalThreads++;
   }
 
   static synchronized boolean isLastThread() {
@@ -133,10 +133,10 @@ public class LinkStoreRocksDb extends GraphStore {
     incrThreads();
     host = ConfigUtil.getPropertyRequired(p, CONFIG_HOST);
     port = ConfigUtil.getInt(p, CONFIG_PORT);
-    writeOptions = new WriteOptions(
-      ConfigUtil.getBool(p, CONFIG_WRITE_SYNC, false),
-      ConfigUtil.getBool(p, CONFIG_WRITE_DISABLE_WAL, false)
-    );
+    writeOptions = new WriteOptions();
+    writeOptions.setSync(ConfigUtil.getBool(p, CONFIG_WRITE_SYNC, false));
+    writeOptions.setDisableWAL(
+      ConfigUtil.getBool(p, CONFIG_WRITE_DISABLE_WAL, false));
     debuglevel = ConfigUtil.getDebugLevel(p);
   }
 
@@ -184,15 +184,12 @@ public class LinkStoreRocksDb extends GraphStore {
     AssocVisibility av = AssocVisibility.values()[l.visibility];
     String s = "wormhole...";
     dbid += "assocs";
-    TaoAssocCountResult result = getRocksClient().TaoAssocPut(
+    long result = getRocksClient().TaoAssocPut(
         dbid.getBytes(), l.link_type, l.id1, l.id2, l.time,
         av, true, Long.valueOf(l.version), l.data, s.getBytes(),
         writeOptions);
-    if (result.getRetCode().getState() != Code.K_OK) {
-        throw new Exception();
-    }
 
-    return result.getCount()  == 1;
+    return result == 1;
   }
 
   /**
@@ -207,14 +204,10 @@ public class LinkStoreRocksDb extends GraphStore {
     for (Link l:links) {
       AssocVisibility av = AssocVisibility.values()[l.visibility];
       String s = "wormhole...";
-      TaoAssocCountResult result =
+      long result =
       getRocksClient().TaoAssocPut(dbid.getBytes(), l.link_type, l.id1,
          l.id2, l.time, av, false, Long.valueOf(l.version), l.data,
          s.getBytes(), writeOptions);
-      if (result.getRetCode().getState() != Code.K_OK) {
-        logger.error("addLinksNoCount failed!");
-        throw new RuntimeException("addLinksNoCount failed!");
-      }
     }
     return true;
 }
@@ -240,12 +233,11 @@ public class LinkStoreRocksDb extends GraphStore {
     }
     String s = "wormhole...";
     dbid += "assocs";
-    TaoAssocCountResult result = getRocksClient().TaoAssocDelete(
+    long result = getRocksClient().TaoAssocDelete(
       dbid.getBytes() , link_type, id1, id2,
-      -1 /*version ignored*/, AssocVisibility.HARD__DELETE, true,
+      -1 /*version ignored*/, AssocVisibility.HARD_DELETE, true,
       s.getBytes(), writeOptions);
-    return (result.getRetCode().getState() == Code.K_OK &&
-            result.getCount() == 1);
+    return result == 1;
   }
 
   @Override
@@ -297,11 +289,12 @@ public class LinkStoreRocksDb extends GraphStore {
       l.add(new Long(id2s[i]));
     }
     dbid += "assocs";
-    TaoAssocGetResult tr = getRocksClient().TaoAssocGetID2s(dbid.getBytes(),
+    List<TaoAssocGetEntry> tr = getRocksClient().TaoAssocGetID2s(
+        dbid.getBytes(),
       link_type, id1, l);
-    Link results[] = new Link[tr.getEntries().size()];
+    Link results[] = new Link[tr.size()];
     int i = 0;
-    for (TaoAssocGetEntry tar : tr.getEntries()) {
+    for (TaoAssocGetEntry tar : tr) {
       results[i] = new Link(id1, link_type, tar.getId2(),
           LinkStore.VISIBILITY_DEFAULT, tar.getData(),
           (int)(tar.getVersion()), tar.getTime());
@@ -334,12 +327,12 @@ public class LinkStoreRocksDb extends GraphStore {
     long minTimestamp, long maxTimestamp, int offset, int limit)
     throws Exception {
     dbid += "assocs";
-    TaoAssocGetResult tr = getRocksClient().TaoAssocGetTimeRange(
+    List<TaoAssocGetEntry> tr = getRocksClient().TaoAssocGetTimeRange(
         dbid.getBytes(), link_type, id1, minTimestamp, maxTimestamp,
         Long.valueOf(offset), Long.valueOf(limit));
-    Link results[] = new Link[tr.getEntries().size()];
+    Link results[] = new Link[tr.size()];
     int i = 0;
-    for (TaoAssocGetEntry tar : tr.getEntries()) {
+    for (TaoAssocGetEntry tar : tr) {
       results[i] = new Link(id1, link_type, tar.getId2(),
           LinkStore.VISIBILITY_DEFAULT, tar.getData(),
           (int)(tar.getVersion()), tar.getTime());
@@ -362,19 +355,12 @@ public class LinkStoreRocksDb extends GraphStore {
 
   private long countLinksImpl(String dbid, long id1, long link_type)
     throws Exception {
-    long count = 0;
     dbid += "assocs";
-    TaoAssocCountResult result = getRocksClient().TaoAssocCount(
+    long count = getRocksClient().TaoAssocCount(
       dbid.getBytes(), link_type, id1);
-    boolean found = false;
-    if (result.getRetCode().getState() == Code.K_OK &&
-        result.getCount() > 0) {
-      found = true;
-      count = result.getCount();
-    }
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("Count result: " + id1 + "," + link_type +
-                         " is " + found + " and " + count);
+                         " is " + count);
     }
     return count;
   }
@@ -465,12 +451,9 @@ public class LinkStoreRocksDb extends GraphStore {
     long newIds[] = new long[nodes.size()];
     int i = 0;
     for (Node n : nodes) {
-      RetCode code = getRocksClient().TaoFBObjectPut(
+      getRocksClient().TaoFBObjectPut(
         n.id, n.type, (int) n.version, (int) n.version,
         (long) n.time, n.data, true, null, writeOptions);
-      if (code.getState() != Code.K_OK) {
-        throw new Exception();
-      }
       newIds[i++] = n.id;
     }
     return newIds;
@@ -487,16 +470,16 @@ public class LinkStoreRocksDb extends GraphStore {
   }
 
   private Node getNodeImpl(String dbid, int type, long id) throws Exception {
-    ReadOptions ropts = new ReadOptions(false, false, null);
+    ReadOptions ropts = new ReadOptions();
+    ropts.setVerifyChecksums(true);
+    ropts.setFillCache(true);
+
     TaoFBObjectGetResult rgr = getRocksClient().TaoFBObjectGet(id, type);
-    if (rgr.getRetCode().getState() == (Code.K_NOT_FOUND)) {
+    if (!rgr.isFound()) {
       return null; //Node was not found
-    } else if (rgr.getRetCode().getState() == (Code.K_OK)) {
+    } else {
       return new Node(
         id, type, rgr.getVersion(), (int) rgr.getUpdateTime(), rgr.getData());
-    } else {
-      logger.error("IO Error");
-      return null;
     }
   }
 
@@ -526,8 +509,8 @@ public class LinkStoreRocksDb extends GraphStore {
 
   private boolean deleteNodeImpl(String dbid, int type, long id)
     throws Exception {
-    RetCode retCode = getRocksClient().
+    getRocksClient().
       TaoFBObjectDel(id, type, null, writeOptions);
-    return (retCode.getState() == Code.K_OK);
+    return true;
   }
 }
