@@ -199,7 +199,7 @@ public class NodeLoader implements Runnable {
       // convert to microseconds
       stats.addStats(LinkBenchOp.LOAD_NODE_BULK, timetaken/1000, false);
       latencyStats.recordLatency(loaderId,
-                    LinkBenchOp.LOAD_NODE_BULK, timetaken);
+                    LinkBenchOp.LOAD_NODE_BULK, timetaken/1000);
 
       if (nodesLoaded >= nextReport) {
         double totalTimeTaken = (System.currentTimeMillis() - startTime_ms) / 1000.0;
