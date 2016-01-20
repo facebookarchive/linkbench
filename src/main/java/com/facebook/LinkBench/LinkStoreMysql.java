@@ -145,6 +145,7 @@ public class LinkStoreMysql extends GraphStore {
     Class.forName("com.mysql.jdbc.Driver").newInstance();
 
     jdbcUrl += "?elideSetAutoCommits=true" +
+               "&useSSL=false" +
                "&useLocalTransactionState=true" +
                "&allowMultiQueries=true" +
                "&useLocalSessionState=true" +
