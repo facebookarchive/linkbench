@@ -71,8 +71,8 @@ public class MySqlLinkStoreTest extends LinkStoreTestBase {
 
 
   @Override
-  public DummyLinkStore getStoreHandle(boolean initialize) throws IOException, Exception {
-    DummyLinkStore result = new DummyLinkStore(new LinkStoreMysql());
+  public StatsDummyLinkStore getStoreHandle(boolean initialize) throws IOException, Exception {
+    StatsDummyLinkStore result = new StatsDummyLinkStore(new LinkStoreMysql());
     if (initialize) {
       result.initialize(currProps, Phase.REQUEST, 0);
     }

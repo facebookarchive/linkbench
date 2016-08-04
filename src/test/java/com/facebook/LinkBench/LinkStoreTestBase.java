@@ -87,10 +87,10 @@ public abstract class LinkStoreTestBase extends TestCase {
   }
 
   /** Get a new handle to the initialized store, wrapped in
-   * DummyLinkStore
+   * StatsDummyLinkStore
    * @return new handle to linkstore
    */
-  protected abstract DummyLinkStore getStoreHandle(boolean initialized)
+  protected abstract StatsDummyLinkStore getStoreHandle(boolean initialized)
                                     throws IOException, Exception;
 
   @Override
@@ -201,7 +201,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   /** Simple test with multiple operations on single link */
   @Test
   public void testOneLink() throws IOException, Exception {
-    DummyLinkStore store = getStoreHandle(true);
+    StatsDummyLinkStore store = getStoreHandle(true);
 
     long id1 = 1123, id2 = 1124, ltype = 321;
     Link writtenLink = new Link(id1, ltype, id2,
@@ -267,7 +267,7 @@ public abstract class LinkStoreTestBase extends TestCase {
 
   @Test
   public void testMultipleLinks() throws Exception, IOException {
-    DummyLinkStore store = getStoreHandle(true);
+    StatsDummyLinkStore store = getStoreHandle(true);
     long ida = 5434, idb = 5435, idc = 9999, idd = 9998;
     long ltypea = 1, ltypeb = 2;
 
@@ -339,7 +339,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    */
   @Test
   public void testMultiget() throws IOException, Exception {
-    DummyLinkStore store = getStoreHandle(true);
+    StatsDummyLinkStore store = getStoreHandle(true);
     long id1 = 99999999999L;
     Link a = new Link(id1, LinkStore.DEFAULT_LINK_TYPE, 42,
                       LinkStore.VISIBILITY_DEFAULT, new byte[0], 1,
@@ -369,7 +369,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    */
   @Test
   public void testHiding() throws Exception {
-    DummyLinkStore store = getStoreHandle(true);
+    StatsDummyLinkStore store = getStoreHandle(true);
     Link l = new Link(1, 1, 1,
           LinkStore.VISIBILITY_HIDDEN, new byte[] {0x1}, 1,
           System.currentTimeMillis());
@@ -404,7 +404,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     changed.data = new byte[] {'2', '2', '2'};
     changed.version = 1;
     changed.time = 2;
-    DummyLinkStore store = getStoreHandle(true);
+    StatsDummyLinkStore store = getStoreHandle(true);
 
     store.addLink(testDB, orig, true);
 
@@ -448,7 +448,7 @@ public abstract class LinkStoreTestBase extends TestCase {
 
   private void testAddThenUpdate(Link l, byte[] updateData) throws IOException,
       Exception {
-    DummyLinkStore ls = getStoreHandle(true);
+    StatsDummyLinkStore ls = getStoreHandle(true);
     ls.addLink(testDB, l, true);
 
     Link l2 = ls.getLink(testDB, 1, 1, 1);
@@ -527,7 +527,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     fillLoadProps(props, startId, idCount, linksPerId);
 
     initStore(props);
-    DummyLinkStore store = getStoreHandle(false);
+    StatsDummyLinkStore store = getStoreHandle(false);
 
     try {
       Random rng = createRNG();
@@ -591,7 +591,7 @@ public abstract class LinkStoreTestBase extends TestCase {
 
       serialLoad(rng, logger, props, getStoreHandle(false));
 
-      DummyLinkStore reqStore = getStoreHandle(false);
+      StatsDummyLinkStore reqStore = getStoreHandle(false);
       LatencyStats latencyStats = new LatencyStats(1);
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 0, 1000);
 
@@ -654,7 +654,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       serialLoad(rng, logger, props, getStoreHandle(false));
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 2, 1000);
 
-      DummyLinkStore reqStore = getStoreHandle(false);
+      StatsDummyLinkStore reqStore = getStoreHandle(false);
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
                       props, new LatencyStats(1), System.out, tracker,
                       rng, 0, 1);
@@ -713,7 +713,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       serialLoad(rng, logger, props, getStoreHandle(false));
       RequestProgress tracker = new RequestProgress(logger, requests, timeLimit, 0, 1000);
 
-      DummyLinkStore reqStore = getStoreHandle(false);
+      StatsDummyLinkStore reqStore = getStoreHandle(false);
       reqStore.setRangeLimit(rangeLimit); // Small limit for testing
       LatencyStats latencyStats = new LatencyStats(1);
       LinkBenchRequest requester = new LinkBenchRequest(reqStore, null,
@@ -741,7 +741,7 @@ public abstract class LinkStoreTestBase extends TestCase {
     }
   }
 
-  private void checkExpectedList(DummyLinkStore store,
+  private void checkExpectedList(StatsDummyLinkStore store,
             long id1, long ltype, Link... expected) throws Exception {
     if (!store.isRealLinkStore()) return;
     assertEquals(expected.length, store.countLinks(testDB, id1, ltype));
@@ -769,7 +769,7 @@ public abstract class LinkStoreTestBase extends TestCase {
    * @throws Exception
    */
   static void serialLoad(Random rng, Logger logger, Properties props,
-      DummyLinkStore store) throws IOException, Exception {
+      StatsDummyLinkStore store) throws IOException, Exception {
     LatencyStats latencyStats = new LatencyStats(1);
 
     /* Load up queue with work */
@@ -800,7 +800,7 @@ public abstract class LinkStoreTestBase extends TestCase {
         + " in rows");
   }
 
-  private void validateLoadedData(Logger logger, DummyLinkStore wrappedStore,
+  private void validateLoadedData(Logger logger, StatsDummyLinkStore wrappedStore,
       long startId, long idCount, int linksPerId, long maxTimestamp)
                                                           throws Exception {
     for (long i = startId; i < startId + idCount; i++) {
@@ -832,7 +832,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   }
 
   static void deleteIDRange(String testDB,
-        DummyLinkStore store, long startId, long idCount)
+        StatsDummyLinkStore store, long startId, long idCount)
       throws Exception {
     // attempt to delete data
     for (long i = startId; i < startId + idCount; i++) {

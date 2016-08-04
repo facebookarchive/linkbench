@@ -65,8 +65,8 @@ public class MySqlGraphStoreTest extends GraphStoreTestBase {
 
 
   @Override
-  protected DummyLinkStore getStoreHandle(boolean initialize) throws IOException, Exception {
-    DummyLinkStore result = new DummyLinkStore(new LinkStoreMysql());
+  protected StatsDummyLinkStore getStoreHandle(boolean initialize) throws IOException, Exception {
+    StatsDummyLinkStore result = new StatsDummyLinkStore(new LinkStoreMysql());
     if (initialize) {
       result.initialize(props, Phase.REQUEST, 0);
     }
