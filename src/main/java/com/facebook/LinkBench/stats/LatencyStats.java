@@ -173,7 +173,8 @@ public class LatencyStats {
                      " p95 = " + percentileString(type, 95)  + "ms " +
                      " p99 = " + percentileString(type, 99)  + "ms " +
                      " max = " + df.format(getMax(type)) + "ms " +
-                     " mean = " + df.format(getMean(type))+ "ms");
+                     " mean = " + df.format(getMean(type))+ "ms" +
+                     " threads = " + maxThreads);
     }
   }
 
@@ -190,7 +191,7 @@ public class LatencyStats {
       for (int percentile: percentiles) {
         out.print(String.format(",p%d_low,p%d_high", percentile, percentile));
       }
-      out.print(",max,mean");
+      out.print(",max,mean,threads");
       out.println();
     }
 
@@ -218,6 +219,8 @@ public class LatencyStats {
       out.print(df.format(getMax(op)));
       out.print(",");
       out.print(df.format(getMean(op)));
+      out.print(",");
+      out.print("maxThreads");
       out.println();
     }
   }
